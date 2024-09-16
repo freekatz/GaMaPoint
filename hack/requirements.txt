@@ -1,0 +1,36 @@
+# causal-conv1d==1.4.0   # https://github.com/Dao-AILab/causal-conv1d/releases/tag/v1.4.0
+# mamba-ssm==2.2.2  # https://github.com/state-spaces/mamba/releases/tag/v2.2.2
+Cython
+cumm-cu118
+spconv-cu118
+easydict
+einops
+h5py
+gdown
+jupyter
+kiui
+matplotlib
+multimethod
+ninja
+numpy
+opencv-python
+packaging
+pandas
+pickleshare
+pillow
+protobuf
+pyvista
+pyyaml
+scipy
+scikit_image
+scikit-learn
+shortuuid
+termcolor
+tensorboard
+tensorboardX
+thop
+transforms3d
+timm
+tqdm
+vtk
+wandb
