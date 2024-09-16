@@ -207,11 +207,12 @@ def main(cfg):
     best_epoch = 0
     best_miou = 0
     if cfg.mode == 'pretrain':
-        logging.info(f"Loading model from {cfg.ckpt}")
         model_dict = load_state(cfg.ckpt, model=model, optimizer=optimizer, scaler=scaler)
         start_epoch = model_dict['last_epoch']
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
+        logging.info(f"Loading model from {cfg.ckpt}, best miou: {best_miou}, best epoch: {best_epoch}, start epoch: {start_epoch}")
+    cfg.epochs = cfg.epochs + start_epoch
     scheduler_steps = steps_per_epoch * start_epoch
 
     warmup(model, warmup_loader)
@@ -222,7 +223,7 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
     time_cost = 0.
-    for epoch in range(start_epoch, cfg.epochs + start_epoch):
+    for epoch in range(start_epoch, cfg.epochs):
         timer.record(f'epoch_{epoch}_start')
         if epoch > 0:
             time_cost = timer.record(f'epoch_{epoch - 1}_end')
