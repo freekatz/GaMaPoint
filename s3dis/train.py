@@ -211,7 +211,7 @@ def main(cfg):
         start_epoch = model_dict['last_epoch']
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        logging.info(f"Loading model from {cfg.ckpt}, best miou: {best_miou}, best epoch: {best_epoch}, start epoch: {start_epoch}")
+        logging.info(f"Loading model from {cfg.ckpt}, best miou={best_miou}, best epoch={best_epoch}, start epoch={start_epoch}")
     cfg.epochs = cfg.epochs + start_epoch
     scheduler_steps = steps_per_epoch * start_epoch
 
@@ -225,7 +225,7 @@ def main(cfg):
     time_cost = 0.
     for epoch in range(start_epoch, cfg.epochs):
         timer.record(f'epoch_{epoch}_start')
-        if epoch > 0:
+        if epoch > start_epoch:
             time_cost = timer.record(f'epoch_{epoch - 1}_end')
             timer_meter.update(time_cost)
         train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
@@ -244,11 +244,11 @@ def main(cfg):
                 best_miou = val_miou
                 macc_when_best = val_macc
             with np.printoptions(precision=8, suppress=True):
-                logging.info(f'Current ckpt val info: epoch={epoch}: '
+                logging.info(f'Current ckpt val info: epoch={epoch}'
                              + f'\n\tval_miou={val_miou:.8f} val_macc={val_macc:.8f} val_accs={val_accs.detach().cpu().numpy()}'
                              + f'\n\tval_ious={val_ious.detach().cpu().numpy()}')
         logging.info(f'Current ckpt train info: epoch={epoch} lr={lr:.8f}'
-                     + f'\n\ttrain_miou={train_miou:.8f} avg_time_cost: {timer_meter.avg:.8f}'
+                     + f'\n\ttrain_miou={train_miou:.8f} avg_time_cost={timer_meter.avg:.8f}'
                      + f'\n\tval_miou={val_miou:.8f} best_val_miou={best_miou:.8f}')
 
         if is_best:
