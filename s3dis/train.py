@@ -93,8 +93,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
 
         m.update(pred, target)
         loss_meter.update(loss.item())
-        pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
-                             f"Loss {loss_meter.val:.4f}")
+        pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] Loss {loss_meter.avg:.4f}")
     acc, macc, miou, iou = m.calc()
     return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
 
@@ -211,7 +210,7 @@ def main(cfg):
         start_epoch = model_dict['last_epoch']
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        logging.info(f"Loading model from {cfg.ckpt}, best miou={best_miou}, best epoch={best_epoch}, start epoch={start_epoch}")
+        logging.info(f"Loading model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     cfg.epochs = cfg.epochs + start_epoch
     scheduler_steps = steps_per_epoch * start_epoch
 
@@ -252,7 +251,7 @@ def main(cfg):
                      + f'\n\tval_miou={val_miou:.8f} best_val_miou={best_miou:.8f}')
 
         if is_best:
-            logging.info(f'Find a better ckpt @E{epoch}, best_val_miou={best_miou:.8f}')
+            logging.info(f'Find a better ckpt: epoch={epoch}, best_val_miou={best_miou:.8f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
