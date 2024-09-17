@@ -224,9 +224,6 @@ def main(cfg):
     time_cost = 0.
     for epoch in range(start_epoch, cfg.epochs):
         timer.record(f'epoch_{epoch}_start')
-        if epoch > start_epoch:
-            time_cost = timer.record(f'epoch_{epoch - 1}_end')
-            timer_meter.update(time_cost)
         train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
@@ -246,6 +243,9 @@ def main(cfg):
                 logging.info(f'Current ckpt val info: epoch={epoch}'
                              + f'\n\tval_miou={val_miou:.8f} val_macc={val_macc:.8f} val_accs={val_accs.detach().cpu().numpy()}'
                              + f'\n\tval_ious={val_ious.detach().cpu().numpy()}')
+
+        time_cost = timer.record(f'epoch_{epoch - 1}_end')
+        timer_meter.update(time_cost)
         logging.info(f'Current ckpt train info: epoch={epoch} lr={lr:.8f}'
                      + f'\n\ttrain_miou={train_miou:.8f} avg_time_cost={timer_meter.avg:.8f}'
                      + f'\n\tval_miou={val_miou:.8f} best_val_miou={best_miou:.8f}')

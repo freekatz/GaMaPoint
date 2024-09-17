@@ -6,7 +6,7 @@ from backbone.ops.gs_3d import GaussianOptions
 
 
 class S3disConfig(SimpleNamespace):
-    k = [24, 32, 32, 32]
+    k = [24, 24, 24, 24]
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
