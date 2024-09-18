@@ -117,5 +117,6 @@ class EasyConfig(dict):
             self.__setattr__(arg_key, arg_value)
 
     def save(self, path):
+        # todo skip objects and opt output
         with open(path, 'w') as f:
             yaml.dump(self.dict(), f, sort_keys=True)

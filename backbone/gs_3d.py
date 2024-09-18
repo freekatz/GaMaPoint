@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 
 import torch
+from fsspec.registry import default
+
 # from pytorch3d.ops import sample_farthest_points
 
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
@@ -228,11 +230,13 @@ class NaiveGaussian3D:
     def __init__(self,
                  opt: GaussianOptions = None,
                  batch_size: int = 8,
+                 device: str = 'cuda',
                  **kwargs):
         if opt is None:
             opt = GaussianOptions.default()
         self.opt = opt
         self.batch_size = batch_size
+        self.device = device
 
         self.gs_points = GaussianPoints(batch_size)
 
@@ -277,6 +281,7 @@ class NaiveGaussian3D:
                 campos=(x, y, z),
                 target=(cx, cy, cz),
                 fovy=cam_fovy,
+                device=self.device,
             ))
             inside_cameras.append(OrbitCamera(
                 camid=2 * j + 1,
@@ -285,6 +290,7 @@ class NaiveGaussian3D:
                 campos=(cx, cy, cz),
                 target=(x, y, z),
                 fovy=cam_fovy,
+                device=self.device,
             ))
         cameras_all = outside_cameras + inside_cameras
         self.gs_points.__update_attr__('cameras', cameras_all)
@@ -315,6 +321,7 @@ class NaiveGaussian3D:
                 campos=(x, y, z),
                 target=(cx, cy, cz),
                 fovy=cam_fovy,
+                device=self.device,
             ))
         self.gs_points.__update_attr__('cameras', cameras_all)
         return cameras_all
@@ -350,7 +357,7 @@ class NaiveGaussian3D:
             depths = depths.squeeze(0)
 
             visible = depths != 0
-            camid = torch.zeros_like(depths)
+            camid = torch.zeros_like(depths, device=self.device)
             camid[...] = cameras[j].camid + cam_seed * n_cameras * 2
 
             uv_all.append(uv)

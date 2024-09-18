@@ -1,5 +1,3 @@
-import sys
-
 import __init__
 
 import argparse
@@ -31,8 +29,11 @@ from utils.timer import Timer
 
 
 def fix_batch(cfg, gs_list, warmup=False) -> NaiveGaussian3D:
-    assert len(gs_list) == cfg.batch_size
-    assert gs_list[0].gs_points.p.device == 'cuda'
+    if not warmup:
+        assert len(gs_list) == cfg.batch_size
+    else:
+        assert len(gs_list) == 1
+    assert gs_list[0].gs_points.p.is_cuda
 
     for idx in range(len(gs_list)):
         gs = gs_list[idx]
@@ -43,7 +44,13 @@ def fix_batch(cfg, gs_list, warmup=False) -> NaiveGaussian3D:
 
 
 def make_gs_points(cfg, gs_points, warmup=False) -> GaussianPoints:
-    n_layers = len(cfg.grid_size)
+    if warmup:
+        grid_size = cfg.s3dis_warmup_cfg.grid_size
+        ks = cfg.s3dis_warmup_cfg.k
+    else:
+        grid_size = cfg.s3dis_cfg.grid_size
+        ks = cfg.s3dis_cfg.k
+    n_layers = len(grid_size)
     p = gs_points.p
     p_gs = gs_points.p_gs
 
@@ -54,17 +61,17 @@ def make_gs_points(cfg, gs_points, warmup=False) -> GaussianPoints:
     for i in range(n_layers):
         # down sample
         if i > 0:
-            grid_size = cfg.grid_size[i]
+            gsize = grid_size[i]
             if warmup:
-                ds_idx = torch.randperm(p.shape[0])[:int(p.shape[0] / grid_size)].contiguous()
+                ds_idx = torch.randperm(p.shape[0])[:int(p.shape[0] / gsize)].contiguous()
             else:
-                ds_idx = grid_subsampling(p, grid_size)
+                ds_idx = grid_subsampling(p, gsize)
             p = p[ds_idx]
             p_gs = p_gs[ds_idx]
             idx_ds.append(ds_idx)
 
         # group
-        k = cfg.k[i]
+        k = ks[i]
         kdt = KDTree(p)
         idx_group.append(kdt.knn(p, k, False)[0].long())
         kdt_gs = KDTree(p_gs)
@@ -165,7 +172,7 @@ def warmup(model: nn.Module, warmup_loader):
     for idx, gs_list in pbar:
         for gs in gs_list:
             gs.gs_points.to_cuda(non_blocking=True)
-        gs = fix_batch(cfg, gs_list, warmup=False)
+        gs = fix_batch(cfg, gs_list, warmup=True)
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():

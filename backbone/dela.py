@@ -6,7 +6,7 @@ from torch.nn.init import trunc_normal_
 import sys
 from pathlib import Path
 
-from backbone.ops.gs_3d import NaiveGaussian3D
+from backbone.gs_3d import NaiveGaussian3D
 
 sys.path.append(str(Path(__file__).absolute().parent.parent))
 from timm.layers import DropPath
