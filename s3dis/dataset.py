@@ -7,7 +7,6 @@ from torch.utils.data import Dataset
 from pathlib import Path
 
 from backbone.ops.gs_3d import NaiveGaussian3D, GaussianOptions
-from s3dis.configs.s3dis_s import S3disConfig
 from utils.cutils import grid_subsampling, KDTree, grid_subsampling_test
 
 

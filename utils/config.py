@@ -115,3 +115,7 @@ class EasyConfig(dict):
     def load_args(self, args):
         for arg_key, arg_value in args.__dict__.items():
             self.__setattr__(arg_key, arg_value)
+
+    def save(self, path):
+        with open(path, 'w') as f:
+            yaml.dump(self.dict(), f, sort_keys=True)

@@ -94,6 +94,18 @@ class GaussianPoints(object):
     def keys(self):
         return self.__dict__.keys()
 
+    def to_cuda(self, non_blocking=True):
+        keys = self.keys()
+        for key in keys:
+            item = self.__get_attr__(key)
+            if isinstance(self.__get_attr__(key), torch.Tensor):
+                item = item.cuda(non_blocking=non_blocking)
+            if isinstance(item, list):
+                for i in range(len(item)):
+                    if isinstance(item[i], torch.Tensor):
+                        item[i] = item[i].cuda(non_blocking=non_blocking)
+            self.__update_attr__(key, item)
+
     def down_sampling(self, key, layer_idx, need_idx=False):
         item = self.__get_attr__(key)
         ds_idx = self.idx_ds[layer_idx]

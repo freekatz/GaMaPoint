@@ -29,30 +29,24 @@ from utils.timer import Timer
 
 
 def prepare_exp(cfg):
-    cfg.exp_id = len(glob(f'{cfg.exp}/*'))
-    cfg.exp_dir = f'{cfg.exp}/{cfg.exp_id:03d}'
+    exp_root = 'exp'
+    exp_id = len(glob(f'{exp_root}/{cfg.exp}-*'))
+    cfg.exp_name = f'{cfg.exp}-{exp_id:03d}'
+    cfg.exp_dir = f'{exp_root}/{cfg.exp_name}'
     cfg.log_path = f'{cfg.exp_dir}/train.log'
     cfg.best_small_ckpt_path = f'{cfg.exp_dir}/best_small.ckpt'
     cfg.best_ckpt_path = f'{cfg.exp_dir}/best.ckpt'
     cfg.last_ckpt_path = f'{cfg.exp_dir}/last.ckpt'
 
     os.makedirs(cfg.exp_dir, exist_ok=True)
-    setup_logger_dist(cfg.log_path, 0, name=cfg.exp)
+    cfg.save(f'{cfg.exp_dir}/config.yaml')
+    setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
-def warmup(model: nn.Module, warmup_loader: DataLoader):
+def warmup(model: nn.Module, warmup_loader):
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
     for idx, gs in pbar:
-        keys = gs.gs_points.keys() if callable(gs.gs_points.keys) else gs.gs_points.keys
-        for key in keys:
-            item = gs.gs_points.__get_attr__(key)
-            if isinstance(gs.gs_points.__get_attr__(key), torch.Tensor):
-                item = item.cuda(non_blocking=True)
-            if isinstance(item, list):
-                for i in range(len(item)):
-                    if isinstance(item[i], torch.Tensor):
-                        item[i] = item[i].cuda(non_blocking=True)
-            gs.gs_points.__update_attr__(key, item)
+        gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
@@ -66,16 +60,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
     for idx, gs in pbar:
-        keys = gs.gs_points.keys() if callable(gs.gs_points.keys) else gs.gs_points.keys
-        for key in keys:
-            item = gs.gs_points.__get_attr__(key)
-            if isinstance(gs.gs_points.__get_attr__(key), torch.Tensor):
-                item = item.cuda(non_blocking=True)
-            if isinstance(item, list):
-                for i in range(len(item)):
-                    if isinstance(item[i], torch.Tensor):
-                        item[i] = item[i].cuda(non_blocking=True)
-            gs.gs_points.__update_attr__(key, item)
+        gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
@@ -103,22 +88,17 @@ def validate(cfg, model, val_loader):
     m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
     for idx, gs in pbar:
-        keys = gs.gs_points.keys() if callable(gs.gs_points.keys) else gs.gs_points.keys
-        for key in keys:
-            item = gs.gs_points.__get_attr__(key)
-            if isinstance(gs.gs_points.__get_attr__(key), torch.Tensor):
-                item = item.cuda(non_blocking=True)
-            if isinstance(item, list):
-                for i in range(len(item)):
-                    if isinstance(item[i], torch.Tensor):
-                        item[i] = item[i].cuda(non_blocking=True)
-            gs.gs_points.__update_attr__(key, item)
+        gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
         m.update(pred, target)
     acc, macc, miou, iou = m.calc()
     return miou, macc, iou, acc
+
+
+def fix_batch(cfg, batch):
+    pass
 
 
 def main(cfg):
@@ -274,7 +254,7 @@ def main(cfg):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('s3dis training')
     # for prepare
-    parser.add_argument('--exp', type=str, required=False, default='exp_s3dis')
+    parser.add_argument('--exp', type=str, required=False, default='')
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
     parser.add_argument('--model_size', type=str, required=False, default='s',
