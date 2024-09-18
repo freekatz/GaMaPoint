@@ -2,7 +2,7 @@ import __init__
 
 from types import SimpleNamespace
 
-from backbone.ops.gs_3d import GaussianOptions
+from backbone.gs_3d import GaussianOptions
 
 
 class S3disConfig(SimpleNamespace):
