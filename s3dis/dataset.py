@@ -6,7 +6,7 @@ import math
 from torch.utils.data import Dataset
 from pathlib import Path
 
-from backbone.gs_3d import GaussianOptions, NaiveGaussian3D
+from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list
 from utils.cutils import grid_subsampling, grid_subsampling_test
 
 
@@ -47,6 +47,8 @@ class S3DIS(Dataset):
                  train=True,
                  warmup=False,
                  voxel_max=24000,
+                 grid_size=[0.04, 0.08, 0.16, 0.32],
+                 k=[24, 24, 24, 24],
                  batch_size=8,
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
@@ -56,6 +58,8 @@ class S3DIS(Dataset):
         self.train = train
         self.warmup = warmup
         self.voxel_max = voxel_max
+        self.grid_size = grid_size
+        self.k = k
         self.batch_size = batch_size
         self.gs_opts = gs_opts
 
@@ -89,7 +93,6 @@ class S3DIS(Dataset):
             xyz = self.xyz_transform(xyz)
 
         # pre sample xyz
-        # here grid size is assumed 0.04, so estimated downsampling ratio is ~14
         if self.train:
             ds_idx = grid_subsampling(xyz, 0.04, 2.5 / 14)
         else:
@@ -112,10 +115,12 @@ class S3DIS(Dataset):
         height = xyz[:, 2:]
         feature = torch.cat([colors, height], dim=1)
 
-        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size)
+        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
+        gs.projects(xyz, cam_seed=idx)
+        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k, warmup=self.warmup)
         return gs
 
     def __getitem_test__(self, idx):
@@ -133,10 +138,12 @@ class S3DIS(Dataset):
         colors.mul_(1 / 250.)
         feature = torch.cat([colors, xyz[:, 2:]], dim=1)
 
-        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size)
+        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
+        gs.projects(xyz, cam_seed=idx)
+        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k, warmup=self.warmup)
         return gs
 
     def xyz_transform(self, xyz):
@@ -167,5 +174,5 @@ class S3DIS(Dataset):
 
 def s3dis_collate_fn(batch):
     gs_list = list(batch)
-    return gs_list
-
+    new_gs = merge_gs_list(gs_list)
+    return new_gs

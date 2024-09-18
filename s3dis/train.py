@@ -16,7 +16,6 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from backbone import DelaSemSeg
-from backbone.gs_3d import NaiveGaussian3D, merge_gs_list, make_gs_points
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params
@@ -25,28 +24,6 @@ from utils.logger import setup_logger_dist
 from utils.metrics import Metric, AverageMeter
 from utils.random import set_random_seed
 from utils.timer import Timer
-
-
-def fix_batch(cfg, gs_list, train=True, warmup=False) -> NaiveGaussian3D:
-    if train:
-        assert len(gs_list) == cfg.batch_size
-    else:
-        assert len(gs_list) == 1
-    assert gs_list[0].gs_points.p.is_cuda
-
-    if warmup:
-        grid_size = cfg.s3dis_warmup_cfg.grid_size
-        ks = cfg.s3dis_warmup_cfg.k
-    else:
-        grid_size = cfg.s3dis_cfg.grid_size
-        ks = cfg.s3dis_cfg.k
-
-    for idx in range(len(gs_list)):
-        gs = gs_list[idx]
-        gs.projects(gs.gs_points.p, cam_seed=idx)
-        gs_list[idx].gs_points = make_gs_points(gs.gs_points, grid_size, ks, warmup=warmup)
-    gs = merge_gs_list(gs_list)
-    return gs
 
 
 def prepare_exp(cfg):
@@ -67,10 +44,7 @@ def prepare_exp(cfg):
 def warmup(model: nn.Module, warmup_loader):
     model.train()
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
-    for idx, gs_list in pbar:
-        for gs in gs_list:
-            gs.gs_points.to_cuda(non_blocking=True)
-        gs = fix_batch(cfg, gs_list, train=False, warmup=True)
+    for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
@@ -84,10 +58,8 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
-    for idx, gs_list in pbar:
-        for gs in gs_list:
-            gs.gs_points.to_cuda(non_blocking=True)
-        gs = fix_batch(cfg, gs_list, train=True, warmup=False)
+    for idx, gs in pbar:
+        gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
@@ -114,10 +86,7 @@ def validate(cfg, model, val_loader):
     model.eval()
     m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
-    for idx, gs_list in pbar:
-        for gs in gs_list:
-            gs.gs_points.to_cuda(non_blocking=True)
-        gs = fix_batch(cfg, gs_list, train=False, warmup=False)
+    for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
@@ -211,7 +180,7 @@ def main(cfg):
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
         logging.info(f"Loading model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
-    cfg.epochs = cfg.epochs + start_epoch
+    cfg.epochs = cfg.epochs + start_epoch - 1
     scheduler_steps = steps_per_epoch * start_epoch
 
     warmup(model, warmup_loader)
@@ -221,7 +190,7 @@ def main(cfg):
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
-    for epoch in range(start_epoch, cfg.epochs):
+    for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'epoch_{epoch}_start')
         train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,

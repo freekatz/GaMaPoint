@@ -7,7 +7,7 @@ from torch_kdtree import build_kd_tree
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
-from utils.cutils import grid_subsampling
+from utils.cutils import grid_subsampling, KDTree
 
 
 def create_sampler(sampler='random', **kwargs):
@@ -455,8 +455,10 @@ def make_gs_points(gs_points, grid_size, ks, warmup=False) -> GaussianPoints:
             if warmup:
                 ds_idx = torch.randperm(p.shape[0])[:int(p.shape[0] / gsize)].contiguous()
             else:
-                ds_idx = grid_subsampling(p.detach().cpu(), gsize)
-            ds_idx = ds_idx.cuda()
+                if p.is_cuda:
+                    ds_idx = grid_subsampling(p.detach().cpu(), gsize)
+                else:
+                    ds_idx = grid_subsampling(p, gsize)
             p = p[ds_idx]
             p_gs = p_gs[ds_idx]
             idx_ds.append(ds_idx)
