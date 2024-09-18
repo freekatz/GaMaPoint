@@ -280,7 +280,7 @@ if __name__ == '__main__':
                         choices=['s', 'b', 'l', 'xl'])
 
     # for dataset
-    parser.add_argument('--dataset', type=str, required=False, default='dataset')
+    parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
     parser.add_argument('--train_loop', type=int, required=False, default=30)
     parser.add_argument('--val_loop', type=int, required=False, default=1)
     parser.add_argument('--val_area', type=str, required=False, default='5')
