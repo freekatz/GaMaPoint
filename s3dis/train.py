@@ -176,7 +176,7 @@ def main(cfg):
     best_miou = 0
     if cfg.mode == 'pretrain':
         model_dict = load_state(cfg.ckpt, model=model, optimizer=optimizer, scaler=scaler)
-        start_epoch = model_dict['last_epoch']
+        start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
         logging.info(f"Loading model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
@@ -223,9 +223,9 @@ def main(cfg):
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                       best_epoch=best_epoch, last_epoch=epoch + 1, best_miou=best_miou)
+                       best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
         save_state(cfg.last_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                   best_epoch=best_epoch, last_epoch=epoch + 1, best_miou=best_miou)
+                   best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
         if writer is not None:
             writer.add_scalar('best_miou', best_miou, epoch)
             writer.add_scalar('val_miou', val_miou, epoch)
