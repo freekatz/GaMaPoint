@@ -16,140 +16,37 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from backbone import DelaSemSeg
-from backbone.gs_3d import NaiveGaussian3D, GaussianPoints
+from backbone.gs_3d import NaiveGaussian3D, merge_gs_list, make_gs_points
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params
 from utils.config import EasyConfig
-from utils.cutils import grid_subsampling, KDTree
 from utils.logger import setup_logger_dist
 from utils.metrics import Metric, AverageMeter
 from utils.random import set_random_seed
 from utils.timer import Timer
 
 
-def fix_batch(cfg, gs_list, warmup=False) -> NaiveGaussian3D:
-    if not warmup:
+def fix_batch(cfg, gs_list, train=True, warmup=False) -> NaiveGaussian3D:
+    if train:
         assert len(gs_list) == cfg.batch_size
     else:
         assert len(gs_list) == 1
     assert gs_list[0].gs_points.p.is_cuda
 
-    for idx in range(len(gs_list)):
-        gs = gs_list[idx]
-        gs.projects(gs.gs_points.p, cam_seed=idx)
-        gs_list[idx].gs_points = make_gs_points(cfg, gs.gs_points, warmup=warmup)
-    gs = merge_gs_list(gs_list)
-    return gs
-
-
-def make_gs_points(cfg, gs_points, warmup=False) -> GaussianPoints:
     if warmup:
         grid_size = cfg.s3dis_warmup_cfg.grid_size
         ks = cfg.s3dis_warmup_cfg.k
     else:
         grid_size = cfg.s3dis_cfg.grid_size
         ks = cfg.s3dis_cfg.k
-    n_layers = len(grid_size)
-    p = gs_points.p
-    p_gs = gs_points.p_gs
 
-    idx_ds = []
-    idx_us = []
-    idx_group = []
-    idx_gs_group = []
-    for i in range(n_layers):
-        # down sample
-        if i > 0:
-            gsize = grid_size[i]
-            if warmup:
-                ds_idx = torch.randperm(p.shape[0])[:int(p.shape[0] / gsize)].contiguous()
-            else:
-                ds_idx = grid_subsampling(p, gsize)
-            p = p[ds_idx]
-            p_gs = p_gs[ds_idx]
-            idx_ds.append(ds_idx)
-
-        # group
-        k = ks[i]
-        kdt = KDTree(p)
-        idx_group.append(kdt.knn(p, k, False)[0].long())
-        kdt_gs = KDTree(p_gs)
-        idx_gs_group.append(kdt_gs.knn(p_gs, k, False)[0].long())
-
-        # up sample
-        if i > 0:
-            us_idx = kdt.knn(gs_points.p, 1, False)[0].squeeze(-1)
-            idx_us.append(us_idx)
-
-    gs_points.__update_attr__('idx_ds', idx_ds)
-    gs_points.__update_attr__('idx_us', idx_us)
-    gs_points.__update_attr__('idx_group', idx_group)
-    gs_points.__update_attr__('idx_gs_group', idx_gs_group)
-    return gs_points
-
-
-def merge_gs_list(gs_list) -> NaiveGaussian3D:
-    assert len(gs_list) > 0
-    new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=gs_list[0].batch_size)
-
-    p_all = []
-    p_gs_all = []
-    f_all = []
-    y_all = []
-    idx_ds_all = []
-    idx_us_all = []
-    idx_group_all = []
-    idx_gs_group_all = []
-    pts_all = []
-    n_layers = len(gs_list[0].gs_points.idx_group)
-    pts_per_layer = [0] * n_layers
-    for i in range(len(gs_list)):
-        gs = gs_list[i]
-        p_all.append(gs.gs_points.p)
-        p_gs_all.append(gs.gs_points.p_gs)
-        f_all.append(gs.gs_points.f)
-        y_all.append(gs.gs_points.y)
-
-        idx_ds = gs.gs_points.idx_ds
-        idx_us = gs.gs_points.idx_us
-        idx_group = gs.gs_points.idx_group
-        idx_gs_group = gs.gs_points.idx_gs_group
-        pts = []
-        for layer_idx in range(n_layers):
-            if layer_idx < len(idx_us):
-                idx_ds[layer_idx].add_(pts_per_layer[layer_idx])
-                idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
-            idx_group[layer_idx].add_(pts_per_layer[layer_idx])
-            idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
-            pts.append(idx_group[layer_idx].shape[0])
-        idx_ds_all.append(idx_ds)
-        idx_us_all.append(idx_us)
-        idx_group_all.append(idx_group)
-        idx_gs_group_all.append(idx_gs_group)
-        pts_all.append(pts)
-        pts_per_layer = [pt + idx.shape[0] for (pt, idx) in zip(pts_per_layer, idx_group)]
-
-    p = torch.cat(p_all, dim=0)
-    p_gs = torch.cat(p_gs_all, dim=0)
-    f = torch.cat(f_all, dim=0)
-    y = torch.cat(y_all, dim=0)
-    idx_ds = [torch.cat(idx, dim=0) for idx in zip(*idx_ds_all)]
-    idx_us = [torch.cat(idx, dim=0) for idx in zip(*idx_us_all)]
-    idx_group = [torch.cat(idx, dim=0) for idx in zip(*idx_group_all)]
-    idx_gs_group = [torch.cat(idx, dim=0) for idx in zip(*idx_gs_group_all)]
-    new_gs.gs_points.__update_attr__('p', p)
-    new_gs.gs_points.__update_attr__('p_gs', p_gs)
-    new_gs.gs_points.__update_attr__('f', f)
-    new_gs.gs_points.__update_attr__('y', y)
-    new_gs.gs_points.__update_attr__('idx_ds', idx_ds)  # layer_idx: [1, 2, 3]
-    new_gs.gs_points.__update_attr__('idx_us', idx_us)  # layer_idx: [2, 1, 0]
-    new_gs.gs_points.__update_attr__('idx_group', idx_group)  # layer_idx: [0, 1, 2, 3]
-    new_gs.gs_points.__update_attr__('idx_gs_group', idx_gs_group)  # layer_idx: [0, 1, 2, 3]
-    pts_list = torch.tensor(pts_all, dtype=torch.int64)
-    pts_list = pts_list.view(-1, n_layers).transpose(0, 1).contiguous()  # batch_size * layer_idx: [0, 1, 2, 3]
-    new_gs.gs_points.__update_attr__('pts_list', pts_list)
-    return new_gs
+    for idx in range(len(gs_list)):
+        gs = gs_list[idx]
+        gs.projects(gs.gs_points.p, cam_seed=idx)
+        gs_list[idx].gs_points = make_gs_points(gs.gs_points, grid_size, ks, warmup=warmup)
+    gs = merge_gs_list(gs_list)
+    return gs
 
 
 def prepare_exp(cfg):
@@ -168,11 +65,12 @@ def prepare_exp(cfg):
 
 
 def warmup(model: nn.Module, warmup_loader):
+    model.train()
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
     for idx, gs_list in pbar:
         for gs in gs_list:
             gs.gs_points.to_cuda(non_blocking=True)
-        gs = fix_batch(cfg, gs_list, warmup=True)
+        gs = fix_batch(cfg, gs_list, train=False, warmup=True)
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
@@ -189,7 +87,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     for idx, gs_list in pbar:
         for gs in gs_list:
             gs.gs_points.to_cuda(non_blocking=True)
-        gs = fix_batch(cfg, gs_list, warmup=False)
+        gs = fix_batch(cfg, gs_list, train=True, warmup=False)
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
@@ -219,7 +117,7 @@ def validate(cfg, model, val_loader):
     for idx, gs_list in pbar:
         for gs in gs_list:
             gs.gs_points.to_cuda(non_blocking=True)
-        gs = fix_batch(cfg, gs_list, warmup=False)
+        gs = fix_batch(cfg, gs_list, train=False, warmup=False)
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
@@ -323,7 +221,6 @@ def main(cfg):
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
-    time_cost = 0.
     for epoch in range(start_epoch, cfg.epochs):
         timer.record(f'epoch_{epoch}_start')
         train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(

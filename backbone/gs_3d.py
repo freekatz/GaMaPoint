@@ -1,37 +1,37 @@
 from dataclasses import dataclass, field
 
+from pytorch3d.ops import sample_farthest_points
 import torch
-from fsspec.registry import default
-
-# from pytorch3d.ops import sample_farthest_points
+from torch_kdtree import build_kd_tree
 
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
+from utils.cutils import grid_subsampling
 
 
 def create_sampler(sampler='random', **kwargs):
     if sampler == 'random':
         return random_sample
-    # elif sampler == 'fps':
-    #     return fps_sample
+    elif sampler == 'fps':
+        return fps_sample
     else:
         raise NotImplementedError(
             f'sampler {sampler} not implemented')
 
 
-# def fps_sample(xyz, n_samples, **kwargs):
-#     """
-#     :param xyz: [B, N, 3]
-#     :return: [B, n_samples, 3], [B, n_samples]
-#     """
-#     random_start_point = kwargs.get('random_start', False)
-#     xyz_sampled, xyz_idx = sample_farthest_points(
-#         points=xyz,
-#         K=n_samples,
-#         random_start_point=random_start_point,
-#     )
-#     return xyz_sampled, xyz_idx
+def fps_sample(xyz, n_samples, **kwargs):
+    """
+    :param xyz: [B, N, 3]
+    :return: [B, n_samples, 3], [B, n_samples]
+    """
+    random_start_point = kwargs.get('random_start', False)
+    xyz_sampled, xyz_idx = sample_farthest_points(
+        points=xyz,
+        K=n_samples,
+        random_start_point=random_start_point,
+    )
+    return xyz_sampled, xyz_idx
 
 
 def random_sample(xyz, n_samples, **kwargs):
@@ -54,7 +54,7 @@ class GaussianOptions(dict):
     # camera field size, [width, height]
     cam_field_size: list = field(default_factory=list)
     # camera sampler
-    cam_sampler: str = 'random'
+    cam_sampler: str = 'fps'
     # generate camera method
     cam_gen_method: str = 'centroid'  # ['centroid', 'farthest']
 
@@ -64,7 +64,7 @@ class GaussianOptions(dict):
             n_cameras=4,
             cam_fovy=60.0,
             cam_field_size=[512, 512],
-            cam_sampler='random',
+            cam_sampler='fps',
             cam_gen_method='centroid'
         )
 
@@ -327,7 +327,7 @@ class NaiveGaussian3D:
         return cameras_all
 
     @torch.no_grad()
-    def projects(self, xyz, cam_seed=0, scale=2.):
+    def projects(self, xyz, cam_seed=0, scale=1.):
         """
         :param xyz: [N, 3]
         :param cam_seed: seed to generate camera id
@@ -335,7 +335,7 @@ class NaiveGaussian3D:
         :return: [N, 3]
         """
         cam_seed = cam_seed % self.batch_size
-        xyz_scaled = points_scaler(xyz, scale=scale)
+        xyz_scaled = points_scaler(xyz.unsqueeze(0), scale=scale).squeeze(0)
         cameras = self.generate_cameras(xyz_scaled)
         n_cameras = self.opt.n_cameras
         cam_width, cam_height = self.opt.cam_field_size
@@ -380,9 +380,10 @@ class NaiveGaussian3D:
         self.gs_points.__update_attr__('cam_extr', cam_extr)
 
         # positions in gs space
-        depths = points_scaler(self.gs_points.depths, scale=2.0)
+        depths = points_scaler(self.gs_points.depths.unsqueeze(0), scale=1.0).squeeze(0)
         uvc = torch.cat([uv.mul(depths), camid.mul(visible)], dim=1)
         p_gs = uvc.mean(dim=-1).squeeze(-1)  # [N, 3]
+        p_gs = points_scaler(p_gs.unsqueeze(0), scale=1.0).squeeze(0)
         self.gs_points.__update_attr__('p_gs', p_gs)
         return p_gs
 
@@ -435,3 +436,109 @@ class NaiveGaussian3D:
         cov2d = torch.stack(cov2d_all, dim=-1)
         cov2d = torch.reshape(cov2d, (-1, 3, n_cameras * 2))
         return cov2d
+
+
+def make_gs_points(gs_points, grid_size, ks, warmup=False) -> GaussianPoints:
+    n_layers = len(grid_size)
+    p = gs_points.p
+    p_gs = gs_points.p_gs
+
+    idx_ds = []
+    idx_us = []
+    idx_group = []
+    idx_gs_group = []
+
+    for i in range(n_layers):
+        # down sample
+        if i > 0:
+            gsize = grid_size[i]
+            if warmup:
+                ds_idx = torch.randperm(p.shape[0])[:int(p.shape[0] / gsize)].contiguous()
+            else:
+                ds_idx = grid_subsampling(p.detach().cpu(), gsize)
+            ds_idx = ds_idx.cuda()
+            p = p[ds_idx]
+            p_gs = p_gs[ds_idx]
+            idx_ds.append(ds_idx)
+
+        # group
+        k = ks[i]
+        kdt = build_kd_tree(p)
+        kdt_gs = build_kd_tree(p_gs)
+        idx_group.append(kdt.query(p, nr_nns_searches=k)[1].long())
+        idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k)[1].long())
+
+        # up sample
+        if i > 0:
+            us_idx = kdt.query(gs_points.p, 1)[1].squeeze(-1)
+            idx_us.append(us_idx)
+
+    gs_points.__update_attr__('idx_ds', idx_ds)
+    gs_points.__update_attr__('idx_us', idx_us)
+    gs_points.__update_attr__('idx_group', idx_group)
+    gs_points.__update_attr__('idx_gs_group', idx_gs_group)
+    return gs_points
+
+
+def merge_gs_list(gs_list) -> NaiveGaussian3D:
+    assert len(gs_list) > 0
+    new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=gs_list[0].batch_size)
+
+    p_all = []
+    p_gs_all = []
+    f_all = []
+    y_all = []
+    idx_ds_all = []
+    idx_us_all = []
+    idx_group_all = []
+    idx_gs_group_all = []
+    pts_all = []
+    n_layers = len(gs_list[0].gs_points.idx_group)
+    pts_per_layer = [0] * n_layers
+    for i in range(len(gs_list)):
+        gs = gs_list[i]
+        p_all.append(gs.gs_points.p)
+        p_gs_all.append(gs.gs_points.p_gs)
+        f_all.append(gs.gs_points.f)
+        y_all.append(gs.gs_points.y)
+
+        idx_ds = gs.gs_points.idx_ds
+        idx_us = gs.gs_points.idx_us
+        idx_group = gs.gs_points.idx_group
+        idx_gs_group = gs.gs_points.idx_gs_group
+        pts = []
+        for layer_idx in range(n_layers):
+            if layer_idx < len(idx_us):
+                idx_ds[layer_idx].add_(pts_per_layer[layer_idx])
+                idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
+            idx_group[layer_idx].add_(pts_per_layer[layer_idx])
+            idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
+            pts.append(idx_group[layer_idx].shape[0])
+        idx_ds_all.append(idx_ds)
+        idx_us_all.append(idx_us)
+        idx_group_all.append(idx_group)
+        idx_gs_group_all.append(idx_gs_group)
+        pts_all.append(pts)
+        pts_per_layer = [pt + idx.shape[0] for (pt, idx) in zip(pts_per_layer, idx_group)]
+
+    p = torch.cat(p_all, dim=0)
+    p_gs = torch.cat(p_gs_all, dim=0)
+    f = torch.cat(f_all, dim=0)
+    y = torch.cat(y_all, dim=0)
+    idx_ds = [torch.cat(idx, dim=0) for idx in zip(*idx_ds_all)]
+    idx_us = [torch.cat(idx, dim=0) for idx in zip(*idx_us_all)]
+    idx_group = [torch.cat(idx, dim=0) for idx in zip(*idx_group_all)]
+    idx_gs_group = [torch.cat(idx, dim=0) for idx in zip(*idx_gs_group_all)]
+    new_gs.gs_points.__update_attr__('p', p)
+    new_gs.gs_points.__update_attr__('p_gs', p_gs)
+    new_gs.gs_points.__update_attr__('f', f)
+    new_gs.gs_points.__update_attr__('y', y)
+    new_gs.gs_points.__update_attr__('idx_ds', idx_ds)  # layer_idx: [1, 2, 3]
+    new_gs.gs_points.__update_attr__('idx_us', idx_us)  # layer_idx: [2, 1, 0]
+    new_gs.gs_points.__update_attr__('idx_group', idx_group)  # layer_idx: [0, 1, 2, 3]
+    new_gs.gs_points.__update_attr__('idx_gs_group', idx_gs_group)  # layer_idx: [0, 1, 2, 3]
+    pts_list = torch.tensor(pts_all, dtype=torch.int64)
+    pts_list = pts_list.view(-1, n_layers).transpose(0, 1).contiguous()  # batch_size * layer_idx: [0, 1, 2, 3]
+    new_gs.gs_points.__update_attr__('pts_list', pts_list)
+    return new_gs
+
