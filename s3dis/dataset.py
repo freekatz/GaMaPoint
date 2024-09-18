@@ -6,7 +6,7 @@ import math
 from torch.utils.data import Dataset
 from pathlib import Path
 
-from backbone.ops.gs_3d import NaiveGaussian3D, GaussianOptions
+from backbone.gs_3d import NaiveGaussian3D, GaussianOptions
 from utils.cutils import grid_subsampling, KDTree, grid_subsampling_test
 
 
