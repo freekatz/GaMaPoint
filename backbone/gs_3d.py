@@ -339,6 +339,7 @@ class NaiveGaussian3D:
             cam_intr = cameras[j].intrinsics
             cam_extr = cameras[j].pose
             uv, depths = project_points(
+                # the batch size is 1
                 xyz_scaled.unsqueeze(0),
                 cam_intr.unsqueeze(0),
                 cam_extr.unsqueeze(0),

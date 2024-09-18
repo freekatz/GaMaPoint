@@ -18,14 +18,131 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from backbone import DelaSemSeg
+from backbone.gs_3d import NaiveGaussian3D, GaussianPoints
 from s3dis.configs import model_configs
-from s3dis.dataset import S3DIS, s3dis_collate_fn, s3dis_collate_test_fn
+from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params
 from utils.config import EasyConfig
+from utils.cutils import grid_subsampling, KDTree
 from utils.logger import setup_logger_dist
 from utils.metrics import Metric, AverageMeter
 from utils.random import set_random_seed
 from utils.timer import Timer
+
+
+def fix_batch(cfg, gs_list, warmup=False) -> NaiveGaussian3D:
+    assert len(gs_list) == cfg.batch_size
+    assert gs_list[0].gs_points.p.device == 'cuda'
+
+    for idx in range(len(gs_list)):
+        gs = gs_list[idx]
+        gs.projects(gs.gs_points.p, cam_seed=idx)
+        gs_list[idx].gs_points = make_gs_points(cfg, gs.gs_points, warmup=warmup)
+    gs = merge_gs_list(gs_list)
+    return gs
+
+
+def make_gs_points(cfg, gs_points, warmup=False) -> GaussianPoints:
+    n_layers = len(cfg.grid_size)
+    p = gs_points.p
+    p_gs = gs_points.p_gs
+
+    idx_ds = []
+    idx_us = []
+    idx_group = []
+    idx_gs_group = []
+    for i in range(n_layers):
+        # down sample
+        if i > 0:
+            grid_size = cfg.grid_size[i]
+            if warmup:
+                ds_idx = torch.randperm(p.shape[0])[:int(p.shape[0] / grid_size)].contiguous()
+            else:
+                ds_idx = grid_subsampling(p, grid_size)
+            p = p[ds_idx]
+            p_gs = p_gs[ds_idx]
+            idx_ds.append(ds_idx)
+
+        # group
+        k = cfg.k[i]
+        kdt = KDTree(p)
+        idx_group.append(kdt.knn(p, k, False)[0].long())
+        kdt_gs = KDTree(p_gs)
+        idx_gs_group.append(kdt_gs.knn(p_gs, k, False)[0].long())
+
+        # up sample
+        if i > 0:
+            us_idx = kdt.knn(gs_points.p, 1, False)[0].squeeze(-1)
+            idx_us.append(us_idx)
+
+    gs_points.__update_attr__('idx_ds', idx_ds)
+    gs_points.__update_attr__('idx_us', idx_us)
+    gs_points.__update_attr__('idx_group', idx_group)
+    gs_points.__update_attr__('idx_gs_group', idx_gs_group)
+    return gs_points
+
+
+def merge_gs_list(gs_list) -> NaiveGaussian3D:
+    assert len(gs_list) > 0
+    new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=gs_list[0].batch_size)
+
+    p_all = []
+    p_gs_all = []
+    f_all = []
+    y_all = []
+    idx_ds_all = []
+    idx_us_all = []
+    idx_group_all = []
+    idx_gs_group_all = []
+    pts_all = []
+    n_layers = len(gs_list[0].gs_points.idx_group)
+    pts_per_layer = [0] * n_layers
+    for i in range(len(gs_list)):
+        gs = gs_list[i]
+        p_all.append(gs.gs_points.p)
+        p_gs_all.append(gs.gs_points.p_gs)
+        f_all.append(gs.gs_points.f)
+        y_all.append(gs.gs_points.y)
+
+        idx_ds = gs.gs_points.idx_ds
+        idx_us = gs.gs_points.idx_us
+        idx_group = gs.gs_points.idx_group
+        idx_gs_group = gs.gs_points.idx_gs_group
+        pts = []
+        for layer_idx in range(n_layers):
+            if layer_idx < len(idx_us):
+                idx_ds[layer_idx].add_(pts_per_layer[layer_idx])
+                idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
+            idx_group[layer_idx].add_(pts_per_layer[layer_idx])
+            idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
+            pts.append(idx_group[layer_idx].shape[0])
+        idx_ds_all.append(idx_ds)
+        idx_us_all.append(idx_us)
+        idx_group_all.append(idx_group)
+        idx_gs_group_all.append(idx_gs_group)
+        pts_all.append(pts)
+        pts_per_layer = [pt + idx.shape[0] for (pt, idx) in zip(pts_per_layer, idx_group)]
+
+    p = torch.cat(p_all, dim=0)
+    p_gs = torch.cat(p_gs_all, dim=0)
+    f = torch.cat(f_all, dim=0)
+    y = torch.cat(y_all, dim=0)
+    idx_ds = [torch.cat(idx, dim=0) for idx in zip(*idx_ds_all)]
+    idx_us = [torch.cat(idx, dim=0) for idx in zip(*idx_us_all)]
+    idx_group = [torch.cat(idx, dim=0) for idx in zip(*idx_group_all)]
+    idx_gs_group = [torch.cat(idx, dim=0) for idx in zip(*idx_gs_group_all)]
+    new_gs.gs_points.__update_attr__('p', p)
+    new_gs.gs_points.__update_attr__('p_gs', p_gs)
+    new_gs.gs_points.__update_attr__('f', f)
+    new_gs.gs_points.__update_attr__('y', y)
+    new_gs.gs_points.__update_attr__('idx_ds', idx_ds)  # layer_idx: [1, 2, 3]
+    new_gs.gs_points.__update_attr__('idx_us', idx_us)  # layer_idx: [2, 1, 0]
+    new_gs.gs_points.__update_attr__('idx_group', idx_group)  # layer_idx: [0, 1, 2, 3]
+    new_gs.gs_points.__update_attr__('idx_gs_group', idx_gs_group)  # layer_idx: [0, 1, 2, 3]
+    pts_list = torch.tensor(pts_all, dtype=torch.int64)
+    pts_list = pts_list.view(-1, n_layers).transpose(0, 1).contiguous()  # batch_size * layer_idx: [0, 1, 2, 3]
+    new_gs.gs_points.__update_attr__('pts_list', pts_list)
+    return new_gs
 
 
 def prepare_exp(cfg):
@@ -45,7 +162,10 @@ def prepare_exp(cfg):
 
 def warmup(model: nn.Module, warmup_loader):
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
-    for idx, gs in pbar:
+    for idx, gs_list in pbar:
+        for gs in gs_list:
+            gs.gs_points.to_cuda(non_blocking=True)
+        gs = fix_batch(cfg, gs_list, warmup=False)
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
@@ -59,8 +179,10 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
-    for idx, gs in pbar:
-        gs.gs_points.to_cuda(non_blocking=True)
+    for idx, gs_list in pbar:
+        for gs in gs_list:
+            gs.gs_points.to_cuda(non_blocking=True)
+        gs = fix_batch(cfg, gs_list, warmup=False)
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
@@ -87,7 +209,10 @@ def validate(cfg, model, val_loader):
     model.eval()
     m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
-    for idx, gs in pbar:
+    for idx, gs_list in pbar:
+        for gs in gs_list:
+            gs.gs_points.to_cuda(non_blocking=True)
+        gs = fix_batch(cfg, gs_list, warmup=False)
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
@@ -95,10 +220,6 @@ def validate(cfg, model, val_loader):
         m.update(pred, target)
     acc, macc, miou, iou = m.calc()
     return miou, macc, iou, acc
-
-
-def fix_batch(cfg, batch):
-    pass
 
 
 def main(cfg):
@@ -115,11 +236,9 @@ def main(cfg):
             loop=cfg.batch_size,
             train=True,
             warmup=True,
-            k=cfg.s3dis_warmup_cfg.k,
-            grid_size=cfg.s3dis_warmup_cfg.grid_size,
             voxel_max=cfg.s3dis_warmup_cfg.voxel_max,
-            batch_size=cfg.batch_size,
-            gs_opts=cfg.s3dis_warmup_cfg.gs_opts,
+            batch_size=1,
+            gs_opts=cfg.s3dis_warmup_cfg.gs_opts
         ),
         batch_size=1,
         collate_fn=s3dis_collate_fn,
@@ -133,11 +252,9 @@ def main(cfg):
             loop=cfg.train_loop,
             train=True,
             warmup=False,
-            k=cfg.s3dis_cfg.k,
-            grid_size=cfg.s3dis_cfg.grid_size,
             voxel_max=cfg.s3dis_cfg.voxel_max,
             batch_size=cfg.batch_size,
-            gs_opts=cfg.s3dis_cfg.gs_opts,
+            gs_opts=cfg.s3dis_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
         collate_fn=s3dis_collate_fn,
@@ -154,14 +271,12 @@ def main(cfg):
             loop=cfg.val_loop,
             train=False,
             warmup=False,
-            k=cfg.s3dis_cfg.k,
-            grid_size=cfg.s3dis_cfg.grid_size,
             voxel_max=cfg.s3dis_cfg.voxel_max,
             batch_size=1,
-            gs_opts=cfg.s3dis_cfg.gs_opts,
+            gs_opts=cfg.s3dis_cfg.gs_opts
         ),
         batch_size=1,
-        collate_fn=s3dis_collate_test_fn,
+        collate_fn=s3dis_collate_fn,
         pin_memory=True,
         persistent_workers=True,
         num_workers=cfg.num_workers,
@@ -254,7 +369,7 @@ def main(cfg):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('s3dis training')
     # for prepare
-    parser.add_argument('--exp', type=str, required=False, default='')
+    parser.add_argument('--exp', type=str, required=False, default='s3dis')
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
     parser.add_argument('--model_size', type=str, required=False, default='s',
