@@ -68,6 +68,14 @@ class GaussianOptions(dict):
             cam_gen_method='centroid'
         )
 
+    def __str__(self):
+        return f'''GaussianOptions(
+            n_cameras={self.n_cameras},
+            cam_fovy={self.cam_fovy},
+            cam_field_size={self.cam_field_size},
+            cam_sampler={self.cam_sampler},
+            cam_gen_method={self.cam_gen_method})'''
+
 
 class GaussianPoints(object):
     def __init__(self, batch_size):

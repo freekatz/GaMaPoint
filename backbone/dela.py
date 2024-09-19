@@ -252,9 +252,8 @@ class DelaSemSeg(nn.Module):
         self.head = nn.Sequential(
             nn.BatchNorm1d(hid_dim, momentum=args.bn_momentum),
             args.act(),
-            # nn.Linear(hid_dim, out_dim),
+            nn.Linear(hid_dim, out_dim)
         )
-        self.conv = nn.Conv1d(hid_dim, out_dim, kernel_size=1, bias=True)
 
         self.apply(self._init_weights)
 

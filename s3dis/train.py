@@ -18,7 +18,7 @@ from tqdm import tqdm
 from backbone import DelaSemSeg
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
-from utils.ckpt_util import load_state, save_state, cal_model_params
+from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist
 from utils.metrics import Metric, AverageMeter
@@ -29,6 +29,8 @@ from utils.timer import Timer
 def prepare_exp(cfg):
     exp_root = 'exp'
     exp_id = len(glob(f'{exp_root}/{cfg.exp}-*'))
+    if cfg.mode == 'resume':
+        exp_id -= 1
     cfg.exp_name = f'{cfg.exp}-{exp_id:03d}'
     cfg.exp_dir = f'{exp_root}/{cfg.exp_name}'
     cfg.log_path = f'{cfg.exp_dir}/train.log'
@@ -82,7 +84,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
 
 
-def validate(cfg, model, val_loader):
+def validate(cfg, model, val_loader, epoch):
     model.eval()
     m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
@@ -101,7 +103,7 @@ def main(cfg):
     torch.set_float32_matmul_precision("high")
     torch.backends.cudnn.enabled = True
 
-    logging.info(f'cfg:\n{cfg.__str__()}')
+    logging.info(f'Config:\n{cfg.__str__()}')
 
     warmup_loader = DataLoader(
         S3DIS(
@@ -174,13 +176,20 @@ def main(cfg):
     start_epoch = 1
     best_epoch = 0
     best_miou = 0
-    if cfg.mode == 'pretrain':
-        model_dict = load_state(cfg.ckpt, model=model, optimizer=optimizer, scaler=scaler)
+    if cfg.mode == 'resume':
+        cfg.ckpt = cfg.last_ckpt_path
+        model_dict = resume_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        logging.info(f"Loading model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
-    cfg.epochs = cfg.epochs + start_epoch - 1
+        logging.info(f"Resume model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+    if cfg.mode == 'finetune' or cfg.mode == 'resume':
+        model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
+        start_epoch = model_dict['last_epoch'] + 1
+        best_epoch = model_dict['best_epoch']
+        best_miou = model_dict['best_miou']
+        cfg.epochs = cfg.epochs + start_epoch - 1
+        logging.info(f"Load model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     scheduler_steps = steps_per_epoch * start_epoch
 
     warmup(model, warmup_loader)
@@ -191,35 +200,32 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
     for epoch in range(start_epoch, cfg.epochs + 1):
-        timer.record(f'epoch_{epoch}_start')
+        timer.record(f'E{epoch}_start')
         train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
+        time_cost = timer.record(f'epoch_{epoch - 1}_end')
+        timer_meter.update(time_cost)
+        logging.info(f'E{epoch} Train results: '
+                     + f'\nlr={lr:.8f} train_miou={train_miou:.8f} time_cost={timer_meter.avg*1000:.8f}ms avg_time_cost={timer_meter.avg*1000:.8f}ms')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
                 val_miou, val_macc, val_ious, val_accs = validate(
-                    cfg, model, val_loader,
+                    cfg, model, val_loader, epoch,
                 )
             if val_miou > best_miou:
                 is_best = True
                 best_miou = val_miou
                 macc_when_best = val_macc
-            with np.printoptions(precision=8, suppress=True):
-                logging.info(f'Current ckpt val info: epoch={epoch}'
-                             + f'\n\tval_miou={val_miou:.8f} val_macc={val_macc:.8f} val_accs={val_accs.detach().cpu().numpy()}'
-                             + f'\n\tval_ious={val_ious.detach().cpu().numpy()}')
-
-        time_cost = timer.record(f'epoch_{epoch - 1}_end')
-        timer_meter.update(time_cost)
-        logging.info(f'Current ckpt train info: epoch={epoch} lr={lr:.8f}'
-                     + f'\n\ttrain_miou={train_miou:.8f} avg_time_cost={timer_meter.avg:.8f}'
-                     + f'\n\tval_miou={val_miou:.8f} best_val_miou={best_miou:.8f}')
-
+            with np.printoptions(precision=8, suppress=False):
+                logging.info(f'E{epoch} Val results: '
+                             + f'\nval_macc={val_macc:.8f} val_accs={val_accs.detach().cpu().numpy():.8f} val_miou={val_miou:.8f}'
+                             + f'\nval_ious={val_ious.detach().cpu().numpy()}')
         if is_best:
-            logging.info(f'Find a better ckpt: epoch={epoch}, best_val_miou={best_miou:.8f}')
+            logging.info(f'E{epoch} New best: best_val_miou={best_miou:.8f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
@@ -243,6 +249,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('s3dis training')
     # for prepare
     parser.add_argument('--exp', type=str, required=False, default='s3dis')
+    parser.add_argument('--mode', type=str, required=False, default='train', choices=['train', 'finetune', 'resume'])
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
     parser.add_argument('--model_size', type=str, required=False, default='s',
@@ -300,10 +307,8 @@ if __name__ == '__main__':
     cfg.gama_cfg = dela_args
     ## tmp code
 
-    if cfg.ckpt != '':
-        cfg.mode = 'pretrain'
-    else:
-        cfg.mode = 'train'
+    if cfg.mode == 'finetune':
+        assert cfg.ckpt != ''
     cfg.use_amp = not cfg.no_amp
 
     # s3dis

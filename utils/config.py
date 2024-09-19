@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from ast import literal_eval
+from copy import deepcopy
 from typing import Any, Dict, List, Tuple, Union
 from multimethod import multimethod
 import yaml
@@ -117,6 +118,9 @@ class EasyConfig(dict):
             self.__setattr__(arg_key, arg_value)
 
     def save(self, path):
-        # todo skip objects and opt output
+        cfg = deepcopy(self)
+        for k, v in cfg.items():
+            if not callable(v.__str__):
+                cfg.dict()[k] = ''
         with open(path, 'w') as f:
-            yaml.dump(self.dict(), f, sort_keys=True)
+            yaml.dump(cfg.dict(), f, sort_keys=True)
