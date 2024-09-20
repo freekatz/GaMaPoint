@@ -37,9 +37,11 @@ class SpatialEmbedding(nn.Module):
         nn.init.constant_(self.bn.weight, 0.5)
 
     def forward(self, f, group_idx):
+        assert len(f.shape) == 2
         N, K = group_idx.shape
         f = self.embed(f).view(N, K, -1)
         f = f.max(dim=1)[0]
+        f = self.proj(f)
         f = self.bn(f)
         return f
 
@@ -85,10 +87,11 @@ class SetAbstraction(nn.Module):
         self.alpha = nn.Parameter(torch.ones((1,), dtype=torch.float32) * 100)
 
     def forward(self, p, f, gs: NaiveGaussian3D):
+        assert len(f.shape) == 2
         if not self.is_head:
             idx = gs.gs_points.idx_ds[self.layer_index-1]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index-1]
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx).squeeze(0)[idx]
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
         p_nbr, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
         p_nbr = p_nbr - p.unsqueeze(1)
@@ -132,14 +135,15 @@ class Mlp(nn.Module):
         )
         nn.init.constant_(self.mlp[-1].weight, init_weight)
 
-    def forward(self, x):
+    def forward(self, f):
         """
-        :param x: [B, N, in_channels]
+        :param f: [B, N, in_channels]
         :return: [B, N, in_channels]
         """
-        B, N, C = x.shape
-        x = self.mlp(x.view(B * N, -1)).view(B, N, -1)
-        return x
+        assert len(f.shape) == 3
+        B, N, C = f.shape
+        f = self.mlp(f.view(B * N, -1)).view(B, N, -1)
+        return f
 
 
 class LocalAggregation(nn.Module):
@@ -162,6 +166,7 @@ class LocalAggregation(nn.Module):
         :param group_idx: [N, K]
         :return: [N, channels]
         """
+        assert len(f.shape) == 3
         B, N, C = f.shape
         x = self.proj(f)
         x = knn_edge_maxpooling(x.contiguous(), group_idx.contiguous(), self.training)
@@ -204,13 +209,15 @@ class InvResMLP(nn.Module):
         :param group_idx: [N, K]
         :return: [N, channels]
         """
+        assert len(f.shape) == 2
         f = f.unsqueeze(0)
+        group_idx = group_idx.unsqueeze(0)
         f = f + self.mlp(f)
         for i in range(self.res_blocks):
             f = f + self.blocks[i](f, group_idx)
             if i % 2 == 1:
-                f = f + self.mlps[i](f)
-        return f
+                f = f + self.mlps[i//2](f)
+        return f.squeeze(0)
 
 
 def make_hybrid_idx(n_layer, hybrid_type, ratio) -> list:
@@ -302,6 +309,7 @@ class PointMambaLayer(nn.Module):
         self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
+        assert len(f.shape) == 3
         cov3d = gs.gs_points.cov3d
 
         # get order
