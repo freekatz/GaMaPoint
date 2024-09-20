@@ -21,6 +21,7 @@ class Stage(nn.Module):
                  **kwargs
                  ):
         super().__init__()
+        self.layer_index = layer_index
         self.in_channels = in_channels
         self.channel_list = channel_list
         self.n_layers = len(channel_list)
@@ -79,7 +80,7 @@ class Stage(nn.Module):
 
     def __make_decode_layer(self, layer_index):
         in_channels = self.channel_list[-layer_index-1]
-        out_channels = self.head_channels
+        out_channels = self.out_channels
         proj = nn.Sequential(
             nn.BatchNorm1d(in_channels, momentum=self.bn_momentum),
             nn.Linear(in_channels, out_channels, bias=False),
@@ -91,7 +92,7 @@ class Stage(nn.Module):
         sa = self.encoders[0]
         if not self.is_head:
             # down sample
-            p, idx = gs.gs_points.down_sampling('p', self.layer_idx-1, need_idx=True)
+            p, idx = gs.gs_points.down_sampling('p', self.layer_index-1, need_idx=True)
             p_gs = p_gs[idx]
 
         # 1. set abstraction
@@ -99,7 +100,7 @@ class Stage(nn.Module):
 
         # 2. local aggregation
         res_mlp = self.encoders[1]
-        group_idx = gs.gs_points.idx_group[self.layer_idx]
+        group_idx = gs.gs_points.idx_group[self.layer_index]
         f = res_mlp(f, group_idx)
 
         # 3. global propagation
