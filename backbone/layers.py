@@ -309,7 +309,7 @@ class PointMambaLayer(nn.Module):
         self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
-        assert len(f.shape) == 3
+        assert len(f.shape) == 2
         cov3d = gs.gs_points.cov3d
 
         # get order

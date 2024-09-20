@@ -179,7 +179,7 @@ class Decoder(nn.Module):
                 f_list[i] = f_decode
             else:
                 f_list[i] = f_decode + f_list[i-1]
-        return f_list[-len(self.decoders)-1]
+        return f_list[-len(self.decoders)]
 
 
 class SegHead(nn.Module):
