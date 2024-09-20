@@ -1,6 +1,7 @@
 from torch import nn
 from torch.nn.init import trunc_normal_
 
+from backbone import MambaConfig
 from backbone.gs_3d import NaiveGaussian3D
 from backbone.layers import SetAbstraction, InvResMLP, PointMambaLayer
 
@@ -13,7 +14,9 @@ class Encoder(nn.Module):
                  res_blocks=[4, 4, 8, 4],
                  mlp_ratio=2.,
                  bn_momentum=0.,
+                 mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False, 'type': 'post', 'ratio': 0.5},
+                 **kwargs
                  ):
         super().__init__()
         self.in_channels = in_channels
@@ -24,6 +27,7 @@ class Encoder(nn.Module):
         self.res_blocks = res_blocks
         self.mlp_ratio = mlp_ratio
         self.bn_momentum = bn_momentum
+        self.mamba_config = mamba_config
         self.hybrid_args = hybrid_args
 
         self.encoders = nn.ModuleList([
@@ -34,8 +38,8 @@ class Encoder(nn.Module):
     def __make_encode_layer(self, layer_index) -> nn.ModuleList:
         in_channels = self.in_channels
         if layer_index > 0:
-            in_channels = self.channels[layer_index - 1]
-        out_channels = self.channels[layer_index]
+            in_channels = self.channel_list[layer_index - 1]
+        out_channels = self.channel_list[layer_index]
         encoder = []
 
         sa = SetAbstraction(
@@ -128,6 +132,7 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self,
                  channel_list=[64, 128, 256, 512],
+                 **kwargs
                  ):
         super().__init__()
         self.channel_list = channel_list
@@ -170,6 +175,7 @@ class SegHead(nn.Module):
                  decoder: Decoder,
                  num_classes=13,
                  bn_momentum=0.,
+                 **kwargs
                  ):
         super().__init__()
         self.encoder = encoder
@@ -200,6 +206,7 @@ class ClsHead(nn.Module):
                  encoder: Encoder,
                  num_classes=13,
                  bn_momentum=0.,
+                 **kwargs
                  ):
         super().__init__()
         self.encoder = encoder

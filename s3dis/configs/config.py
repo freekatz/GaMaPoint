@@ -1,7 +1,7 @@
-from types import SimpleNamespace
+from utils import EasyConfig
 
 
-class BaseConfig(SimpleNamespace):
+class BaseConfig(EasyConfig):
     name = 'BaseConfig'
 
     def __str__(self):
