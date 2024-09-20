@@ -38,4 +38,5 @@ class GaMaConfig(BaseConfig):
     stage_cfg.channel_list = [64, 128, 256, 512]
     stage_cfg.out_channels = 256
     stage_cfg.bn_momentum = bn_momentum
+    stage_cfg.task_type = 'seg'
 
