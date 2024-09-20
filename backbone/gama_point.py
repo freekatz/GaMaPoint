@@ -51,12 +51,13 @@ class Encoder(nn.Module):
         encoder.append(sa)
 
         res_blocks = self.res_blocks[layer_index]
-        for i in range(0, res_blocks):
-            encoder.append(InvResMLP(
-                channels=out_channels,
-                mlp_ratio=self.mlp_ratio,
-                bn_momentum=self.bn_momentum,
-            ))
+        res_mlp = InvResMLP(
+            channels=out_channels,
+            res_blocks=res_blocks,
+            mlp_ratio=self.mlp_ratio,
+            bn_momentum=self.bn_momentum,
+        )
+        encoder.append(res_mlp)
 
         mamba_config = self.mamba_config
         mamba_config.n_layer = self.mamba_blocks[layer_index]
@@ -111,23 +112,21 @@ class Encoder(nn.Module):
             if layer_idx > 0:
                 # down sample
                 p, idx = gs.gs_points.down_sampling('p', layer_idx-1, need_idx=True)
-                p_gs= p_gs[idx]
-                f = f[idx]
+                p_gs = p_gs[idx]
 
             # 1. set abstraction
             f = sa(p, f, gs)
 
             # 2. local aggregation
-            if self.res_blocks[layer_idx] > 0:
-                inv_mlp = self.encoders[layer_idx][1:-1]
-                group_idx = gs.gs_points.idx_group[layer_idx]
-                for mlp in inv_mlp:
-                    f = mlp(f, group_idx)
+            res_mlp = self.encoders[layer_idx][1]
+            group_idx = gs.gs_points.idx_group[layer_idx]
+            f = res_mlp(f, group_idx)
 
             # 3. global propagation
             if layer_idx > 0:
-                pm = self.encoders[layer_idx][-1]
-                f_out = pm(p, p_gs, f, gs)
+                # pm = self.encoders[layer_idx][2]
+                # f_out = pm(p, p_gs, f, gs)
+                f_out = f
             else:
                 f_out = f
 
@@ -178,6 +177,7 @@ class Decoder(nn.Module):
             else:
                 f_list[i] = self.decoders[i](f_list[i])[us_idx]
         return f_list[-len(self.decoders)-1]
+
 
 class SegHead(nn.Module):
     def __init__(self,

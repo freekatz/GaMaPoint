@@ -20,17 +20,19 @@ class SpatialEmbedding(nn.Module):
                  **kwargs
                  ):
         super().__init__()
-
+        assert len(hidden_channels) == 3
         self.embed = nn.Sequential(
-            nn.Linear(in_channels, hidden_channels // 2, bias=False),
-            nn.BatchNorm1d(hidden_channels // 2, momentum=bn_momentum),
+            nn.Linear(in_channels, hidden_channels[0], bias=False),
+            nn.BatchNorm1d(hidden_channels[0], momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(hidden_channels // 2, hidden_channels, bias=False),
-            nn.BatchNorm1d(hidden_channels, momentum=bn_momentum),
+            nn.Linear(hidden_channels[0], hidden_channels[1], bias=False),
+            nn.BatchNorm1d(hidden_channels[1], momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(hidden_channels, hidden_channels * 2, bias=False),
-            nn.Linear(hidden_channels * 2, out_channels, bias=False),
+            nn.Linear(hidden_channels[1], hidden_channels[2], bias=False),
         )
+        self.proj = nn.Identity() \
+            if hidden_channels[2] == out_channels \
+            else nn.Linear(hidden_channels[2], out_channels, bias=False)
         self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
         nn.init.constant_(self.bn.weight, 0.5)
 
@@ -61,10 +63,12 @@ class SetAbstraction(nn.Module):
                 nn.Linear(in_channels, out_channels, bias=False),
                 nn.BatchNorm1d(out_channels, momentum=bn_momentum)
             )
+            self.la = LocalAggregation(in_channels, out_channels, bn_momentum, 0.3)
             nn.init.constant_(self.skip_proj[1].weight, 0.3)
 
         nbr_in_channels = 3+in_channels if is_head else 3
-        nbr_hidden_channels = 32 if is_head else 16
+        hidden_channels = 32 if is_head else 16
+        nbr_hidden_channels = [hidden_channels, hidden_channels//2, out_channels if is_head else 32]
         nbr_out_channels = out_channels
         self.spe = SpatialEmbedding(
             nbr_in_channels,
@@ -82,7 +86,9 @@ class SetAbstraction(nn.Module):
 
     def forward(self, p, f, gs: NaiveGaussian3D):
         if not self.is_head:
-            f = self.skip_proj(f)
+            idx = gs.gs_points.idx_ds[self.layer_index-1]
+            pre_group_idx = gs.gs_points.idx_group[self.layer_index-1]
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx).squeeze(0)[idx]
 
         p_nbr, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
         p_nbr = p_nbr - p.unsqueeze(1)
@@ -165,20 +171,32 @@ class LocalAggregation(nn.Module):
 
 class InvResMLP(nn.Module):
     def __init__(self,
-                 channels: int,
+                 channels,
+                 res_blocks,
                  mlp_ratio,
                  bn_momentum,
                  **kwargs
                  ):
         super().__init__()
+        self.res_blocks = res_blocks
 
         self.mlp = Mlp(channels, mlp_ratio, bn_momentum, 0.2)
-        self.proj = nn.Linear(channels, channels, bias=False)
-        self.la = LocalAggregation(
-            channels,
-            channels,
-            bn_momentum,
-        )
+        self.blocks = nn.ModuleList([
+            LocalAggregation(
+                channels,
+                channels,
+                bn_momentum,
+            )
+            for _ in range(res_blocks)
+        ])
+        self.mlps = nn.ModuleList([
+            Mlp(
+                channels,
+                mlp_ratio,
+                bn_momentum,
+            )
+            for _ in range(res_blocks // 2)
+        ])
 
     def forward(self, f, group_idx):
         """
@@ -186,8 +204,12 @@ class InvResMLP(nn.Module):
         :param group_idx: [N, K]
         :return: [N, channels]
         """
-        f = f + self.mlp(f.unsqueeze(0))
-        f = self.proj(f.squeeze(0)) + self.la(f, group_idx.unsqueeze(0)).squeeze(0)
+        f = f.unsqueeze(0)
+        f = f + self.mlp(f)
+        for i in range(self.res_blocks):
+            f = f + self.blocks[i](f, group_idx)
+            if i % 2 == 1:
+                f = f + self.mlps[i](f)
         return f
 
 
@@ -275,8 +297,8 @@ class PointMambaLayer(nn.Module):
         super().__init__()
         self.layer_index = layer_index
         self.config = config
-        self.mixer = create_mixer(config, channels, hybrid_args)
 
+        self.mixer = create_mixer(config, channels, hybrid_args)
         self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
@@ -296,12 +318,8 @@ class PointMambaLayer(nn.Module):
 
         # todo
         mask = None
-
-        # extract global feature
         f_global = self.mixer(input_ids=f.unsqueeze(0),
                               mask=mask, gs=gs, order=order)
-
-        # fuse local and global
         alpha = self.alpha.sigmoid()
         f = f_global.squeeze(0) * alpha + f * (1 - alpha)
         return f
