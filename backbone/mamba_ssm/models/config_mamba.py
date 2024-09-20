@@ -4,7 +4,7 @@ from utils.dict_utils import ObjDict
 
 
 @dataclass
-class MambaConfig(ObjDict):
+class MambaConfig(dict):
 
     d_model: int = 256
     d_intermediate: int = 0

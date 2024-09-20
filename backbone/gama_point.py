@@ -153,11 +153,11 @@ class Decoder(nn.Module):
 
         self.decoders = nn.ModuleList([
             self.__make_decode_layer(layer_index=layer_index)
-            for layer_index in range(1, self.n_layers)
+            for layer_index in range(0, self.n_layers)
         ])
 
     def __make_decode_layer(self, layer_index):
-        in_channels = self.channel_list[layer_index-1]
+        in_channels = self.channel_list[layer_index]
         out_channels = self.out_channels
         proj = nn.Sequential(
             nn.BatchNorm1d(in_channels, momentum=self.bn_momentum),
@@ -171,11 +171,14 @@ class Decoder(nn.Module):
         f_list = f_list[::-1]
         idx_us = gs.gs_points.idx_us[::-1]
         for i in range(len(self.decoders)):
-            us_idx = idx_us[i]
-            if i > 0:
-                f_list[i] = self.decoders[i](f_list[i])[us_idx] + f_list[i-1]
+            f_decode = self.decoders[i](f_list[i])
+            if i < len(self.decoders) - 1:
+                us_idx = idx_us[i]
+                f_decode = f_decode[us_idx]
+            if i == 0:
+                f_list[i] = f_decode
             else:
-                f_list[i] = self.decoders[i](f_list[i])[us_idx]
+                f_list[i] = f_decode + f_list[i-1]
         return f_list[-len(self.decoders)-1]
 
 

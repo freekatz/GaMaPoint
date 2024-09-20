@@ -47,7 +47,7 @@ def random_sample(xyz, n_samples, **kwargs):
 
 
 @dataclass
-class GaussianOptions(ObjDict):
+class GaussianOptions(dict):
     # camera numbers outside in points
     n_cameras: int = 4
     # camera field of view in degree along y-axis.
