@@ -132,11 +132,13 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self,
                  channel_list=[64, 128, 256, 512],
+                 bn_momentum=0.,
                  **kwargs
                  ):
         super().__init__()
         self.channel_list = channel_list
         self.n_layers = len(channel_list)
+        self.bn_momentum = bn_momentum
 
         self.decoders = nn.ModuleList([
             self.__make_decode_layer(layer_index=layer_index)
@@ -187,7 +189,7 @@ class SegHead(nn.Module):
             nn.Linear(decoder.out_channels, num_classes),
         )
 
-        self.apply(self._init_weights)
+        self.apply(self.__init_weights)
 
     def __init_weights(self, m):
         if isinstance(m, nn.Linear):

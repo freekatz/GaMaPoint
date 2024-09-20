@@ -1,4 +1,6 @@
 import copy
+import json
+import pickle
 
 
 class ObjDict(dict):
@@ -20,4 +22,11 @@ class ObjDict(dict):
             else:
                 copy_dict[key] = value
         return ObjDict(copy_dict)
+
+    def __getstate__(self):
+        return pickle.dumps(self.__dict__)
+
+    def __setstate__(self, state):
+        self.__dict__ = pickle.loads(state)
+
 

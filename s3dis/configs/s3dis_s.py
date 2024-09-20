@@ -39,4 +39,5 @@ class GaMaConfig(BaseConfig):
     decoder_cfg = BaseConfig()
     decoder_cfg.name = 'DecoderConfig'
     decoder_cfg.channel_list = [64, 128, 256, 512]
+    decoder_cfg.bn_momentum = bn_momentum
 
