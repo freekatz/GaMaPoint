@@ -1,10 +1,12 @@
 import time
 
+from utils.dict_utils import ObjDict
+
 
 class Timer:
     def __init__(self, dec=1):
         self.dec = dec
-        self.rec = dict()
+        self.rec = ObjDict()
         self.start_time = time.time()
 
     def start(self):

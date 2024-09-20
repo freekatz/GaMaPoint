@@ -11,6 +11,7 @@ from einops import repeat
 from mamba_ssm.modules.mlp import GatedMLP
 from mamba_ssm.modules.block import Block
 
+from utils.dict_utils import ObjDict
 from ..custom.order import Order, BaseOrder
 from ..custom.structured_mask import StructuredMask
 from ...gs_3d import NaiveGaussian3D
@@ -155,7 +156,7 @@ class MixerModel(nn.Module):
 
         self.n_layer = n_layer
         self.layers = nn.ModuleList()
-        self.layers_name = dict()
+        self.layers_name = ObjDict()
         for i in range(n_layer):
             layer_idx = i
             block, block_type = create_block(

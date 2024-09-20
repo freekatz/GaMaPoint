@@ -5,3 +5,4 @@ from .metrics import *
 from .ckpt_util import *
 from .timer import Timer
 from .mem_utils import MemTracker
+from .dict_utils import ObjDict

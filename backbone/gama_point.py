@@ -1,7 +1,7 @@
 from torch import nn
 from torch.nn.init import trunc_normal_
 
-from backbone import MambaConfig
+from backbone.mamba_ssm.models import MambaConfig
 from backbone.gs_3d import NaiveGaussian3D
 from backbone.layers import SetAbstraction, InvResMLP, PointMambaLayer
 

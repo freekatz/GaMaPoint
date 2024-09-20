@@ -3,15 +3,17 @@ from dataclasses import dataclass
 import torch.autograd
 from einops import repeat
 
+from utils.dict_utils import ObjDict
+
 
 @dataclass
 class StructuredMask:
-    def __init__(self, mask_type: str, mask_params: dict):
+    def __init__(self, mask_type: str, mask_params: ObjDict):
         self.mask_type = mask_type
         self.mask_params = mask_params
 
     @classmethod
-    def get_mask_fn(cls, mask_type, mask_params: dict):
+    def get_mask_fn(cls, mask_type, mask_params: ObjDict):
         fn = todo_fn()
         if mask_type == 'cov3d':
             fn = cov3d_fn(**mask_params)

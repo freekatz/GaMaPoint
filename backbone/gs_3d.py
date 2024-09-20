@@ -8,6 +8,7 @@ from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d,
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
 from utils.cutils import grid_subsampling, KDTree
+from utils.dict_utils import ObjDict
 
 
 def create_sampler(sampler='random', **kwargs):
@@ -46,7 +47,7 @@ def random_sample(xyz, n_samples, **kwargs):
 
 
 @dataclass
-class GaussianOptions(dict):
+class GaussianOptions(ObjDict):
     # camera numbers outside in points
     n_cameras: int = 4
     # camera field of view in degree along y-axis.
