@@ -30,7 +30,7 @@ class GaMaConfig(BaseConfig):
     encoder_cfg.name = 'EncoderConfig'
     encoder_cfg.in_channels = 4
     encoder_cfg.channel_list = [64, 128, 256, 512]
-    encoder_cfg.mamba_blocks = [2, 2, 4, 2]
+    encoder_cfg.mamba_blocks = [1, 1, 2, 1]
     encoder_cfg.res_blocks = [4, 4, 8, 4]
     encoder_cfg.mlp_ratio = 2.
     encoder_cfg.bn_momentum = bn_momentum
@@ -39,5 +39,6 @@ class GaMaConfig(BaseConfig):
     decoder_cfg = BaseConfig()
     decoder_cfg.name = 'DecoderConfig'
     decoder_cfg.channel_list = [64, 128, 256, 512]
+    decoder_cfg.out_channels = 256
     decoder_cfg.bn_momentum = bn_momentum
 

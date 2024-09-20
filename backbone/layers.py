@@ -28,8 +28,8 @@ class SpatialEmbedding(nn.Module):
             nn.Linear(hidden_channels // 2, hidden_channels, bias=False),
             nn.BatchNorm1d(hidden_channels, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(hidden_channels, hidden_channels, bias=False),
-            nn.Linear(hidden_channels, out_channels, bias=False),
+            nn.Linear(hidden_channels, hidden_channels * 2, bias=False),
+            nn.Linear(hidden_channels * 2, out_channels, bias=False),
         )
         self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
         nn.init.constant_(self.bn.weight, 0.5)
@@ -54,6 +54,7 @@ class SetAbstraction(nn.Module):
         self.layer_index = layer_index
         is_head = self.layer_index == 0
         self.is_head = is_head
+        self.in_channels = in_channels
 
         if not is_head:
             self.skip_proj = nn.Sequential(
@@ -64,7 +65,7 @@ class SetAbstraction(nn.Module):
 
         nbr_in_channels = 3+in_channels if is_head else 3
         nbr_hidden_channels = 32 if is_head else 16
-        nbr_out_channels = out_channels if is_head else 32
+        nbr_out_channels = out_channels
         self.spe = SpatialEmbedding(
             nbr_in_channels,
             nbr_hidden_channels,
@@ -79,12 +80,12 @@ class SetAbstraction(nn.Module):
         )
         self.alpha = nn.Parameter(torch.ones((1,), dtype=torch.float32) * 100)
 
-    def forward(self, f, gs: NaiveGaussian3D):
+    def forward(self, p, f, gs: NaiveGaussian3D):
         if not self.is_head:
             f = self.skip_proj(f)
 
         p_nbr, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
-        p_nbr = p_nbr - p_nbr.unsqueeze(1)
+        p_nbr = p_nbr - p.unsqueeze(1)
         if self.is_head:
             f_nbr = f[group_idx]
             f_nbr = torch.cat([p_nbr, f_nbr], dim=-1).view(-1, 3 + self.in_channels)
@@ -145,7 +146,7 @@ class LocalAggregation(nn.Module):
                  ):
         super().__init__()
 
-        self.proj_pre = nn.Linear(in_channels, out_channels, bias=False)
+        self.proj = nn.Linear(in_channels, out_channels, bias=False)
         self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
         nn.init.constant_(self.bn.weight, init_weight)
 
@@ -157,7 +158,7 @@ class LocalAggregation(nn.Module):
         """
         B, N, C = f.shape
         x = self.proj(f)
-        x = knn_edge_maxpooling(x, group_idx, self.training)
+        x = knn_edge_maxpooling(x.contiguous(), group_idx.contiguous(), self.training)
         x = self.bn(x.view(B * N, -1)).view(B, N, -1)
         return x
 
@@ -186,7 +187,7 @@ class InvResMLP(nn.Module):
         :return: [N, channels]
         """
         f = f + self.mlp(f.unsqueeze(0))
-        f = self.proj(f.squeeze(0)) + self.la(f, group_idx).squeeze(0)
+        f = self.proj(f.squeeze(0)) + self.la(f, group_idx.unsqueeze(0)).squeeze(0)
         return f
 
 
@@ -278,14 +279,13 @@ class PointMambaLayer(nn.Module):
 
         self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
 
-    def forward(self, f, gs: NaiveGaussian3D):
+    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         cov3d = gs.gs_points.cov3d
-        p_gs = gs.gs_points.p
 
         # get order
-        cam_order = p_gs[:, :, 2]
-        idx = torch.argsort(cam_order, dim=1, descending=True)
-        order = Order(idx)
+        cam_order = p_gs[:, 2]
+        idx = torch.argsort(cam_order, dim=0, descending=True)
+        order = Order(idx.unsqueeze(0))
         # apply mask
         mask = None
         if self.config.use_mask:

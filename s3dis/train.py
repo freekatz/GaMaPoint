@@ -118,7 +118,7 @@ def main(cfg):
         ),
         batch_size=1,
         collate_fn=s3dis_collate_fn,
-        pin_memory=cfg.pin_memory,
+        pin_memory=True,
         num_workers=cfg.num_workers,
     )
     train_loader = DataLoader(
@@ -135,7 +135,7 @@ def main(cfg):
         batch_size=cfg.batch_size,
         collate_fn=s3dis_collate_fn,
         shuffle=True,
-        pin_memory=cfg.pin_memory,
+        pin_memory=True,
         persistent_workers=True,
         drop_last=True,
         num_workers=cfg.num_workers,
@@ -153,7 +153,7 @@ def main(cfg):
         ),
         batch_size=1,
         collate_fn=s3dis_collate_fn,
-        pin_memory=cfg.pin_memory,
+        pin_memory=True,
         persistent_workers=True,
         num_workers=cfg.num_workers,
     )
@@ -275,7 +275,6 @@ if __name__ == '__main__':
     parser.add_argument('--val_area', type=str, required=False, default='5')
     parser.add_argument('--batch_size', type=int, required=False, default=8)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
-    parser.add_argument('--pin_memory', action='store_true')
 
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=100)

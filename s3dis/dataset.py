@@ -120,7 +120,7 @@ class S3DIS(Dataset):
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx)
-        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k, warmup=self.warmup)
+        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k)
         return gs
 
     def __getitem_test__(self, idx):
@@ -143,7 +143,7 @@ class S3DIS(Dataset):
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx)
-        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k, warmup=self.warmup)
+        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k)
         return gs
 
     def xyz_transform(self, xyz):

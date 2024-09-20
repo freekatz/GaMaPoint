@@ -10,7 +10,7 @@ class Encoder(nn.Module):
     def __init__(self,
                  in_channels=4,
                  channel_list=[64, 128, 256, 512],
-                 mamba_blocks=[2, 2, 4, 2],
+                 mamba_blocks=[1, 1, 2, 1],
                  res_blocks=[4, 4, 8, 4],
                  mlp_ratio=2.,
                  bn_momentum=0.,
@@ -72,17 +72,19 @@ class Encoder(nn.Module):
 
     def forward_cls_feat(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
+        p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
         f_out = f
         for layer_idx in range(0, self.n_layers):
             sa = self.encoders[layer_idx][0]
             if layer_idx > 0:
                 # down sample
-                p, idx = gs.gs_points.down_sampling('p', layer_idx, need_idx=True)
+                p, idx = gs.gs_points.down_sampling('p', layer_idx-1, need_idx=True)
+                p_gs= p_gs[idx]
                 f = f[idx]
 
             # 1. set abstraction
-            f = sa(f, gs)
+            f = sa(p, f, gs)
 
             # 2. local aggregation
             if self.res_blocks[layer_idx] > 0:
@@ -92,23 +94,28 @@ class Encoder(nn.Module):
                     f = mlp(f, group_idx)
 
             # 3. global propagation
-            pm = self.encoders[layer_idx][-1]
-            f_out = pm(f, gs)
+            if layer_idx > 0:
+                pm = self.encoders[layer_idx][-1]
+                f_out = pm(p, p_gs, f, gs)
+            else:
+                f_out = f
         return p, f_out
 
     def forward_seg_feat(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
+        p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
-        p_list, f_list = [], []
+        p_list, f_list = [p], [f]
         for layer_idx in range(0, self.n_layers):
             sa = self.encoders[layer_idx][0]
             if layer_idx > 0:
                 # down sample
-                p, idx = gs.gs_points.down_sampling('p', layer_idx, need_idx=True)
+                p, idx = gs.gs_points.down_sampling('p', layer_idx-1, need_idx=True)
+                p_gs= p_gs[idx]
                 f = f[idx]
 
             # 1. set abstraction
-            f = sa(f, gs)
+            f = sa(p, f, gs)
 
             # 2. local aggregation
             if self.res_blocks[layer_idx] > 0:
@@ -118,8 +125,11 @@ class Encoder(nn.Module):
                     f = mlp(f, group_idx)
 
             # 3. global propagation
-            pm = self.encoders[layer_idx][-1]
-            f_out = pm(f, gs)
+            if layer_idx > 0:
+                pm = self.encoders[layer_idx][-1]
+                f_out = pm(p, p_gs, f, gs)
+            else:
+                f_out = f
 
             f_list.append(f_out)
             p_list.append(p)
@@ -132,11 +142,13 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self,
                  channel_list=[64, 128, 256, 512],
+                 out_channels=256,
                  bn_momentum=0.,
                  **kwargs
                  ):
         super().__init__()
-        self.channel_list = channel_list
+        self.channel_list = channel_list[::-1]
+        self.out_channels = out_channels
         self.n_layers = len(channel_list)
         self.bn_momentum = bn_momentum
 
@@ -144,11 +156,10 @@ class Decoder(nn.Module):
             self.__make_decode_layer(layer_index=layer_index)
             for layer_index in range(1, self.n_layers)
         ])
-        self.out_channels = channel_list[-1]
 
     def __make_decode_layer(self, layer_index):
-        in_channels = self.channel_list[layer_index]
-        out_channels = self.channel_list[layer_index-1]
+        in_channels = self.channel_list[layer_index-1]
+        out_channels = self.out_channels
         proj = nn.Sequential(
             nn.BatchNorm1d(in_channels, momentum=self.bn_momentum),
             nn.Linear(in_channels, out_channels, bias=False),
@@ -157,19 +168,16 @@ class Decoder(nn.Module):
         return proj
 
     def forward(self, p_list, f_list, gs: NaiveGaussian3D):
-        for layer_idx in range(0, self.n_layers):
-            p, f = p_list[-layer_idx-1], f_list[-layer_idx-1]
-            if layer_idx < self.n_layers - 1:
-                p, us_idx = gs.gs_points.up_sampling('p', layer_idx, need_idx=True)
-                f = f[us_idx]
-            if layer_idx > 0:
-                f = self.decoder[layer_idx](f) + f_list[-layer_idx-2]
-                f_list[-layer_idx-1] = f
-        for i in range(-1, -len(self.decoders) - 1, -1):
-            us_idx = gs.gs_points.idx_us[-len(self.decoder) - i - 1]
-            f_list[i-1] = f_list[i-1] + self.decoders[i](f_list[i][us_idx])
-        return f_list[-len(self.decoder) - 1]
-
+        p_list = p_list[::-1]
+        f_list = f_list[::-1]
+        idx_us = gs.gs_points.idx_us[::-1]
+        for i in range(len(self.decoders)):
+            us_idx = idx_us[i]
+            if i > 0:
+                f_list[i] = self.decoders[i](f_list[i])[us_idx] + f_list[i-1]
+            else:
+                f_list[i] = self.decoders[i](f_list[i])[us_idx]
+        return f_list[-len(self.decoders)-1]
 
 class SegHead(nn.Module):
     def __init__(self,

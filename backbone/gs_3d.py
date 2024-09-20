@@ -447,7 +447,7 @@ class NaiveGaussian3D:
         return cov2d
 
 
-def make_gs_points(gs_points, grid_size, ks, warmup=False) -> GaussianPoints:
+def make_gs_points(gs_points, grid_size, ks) -> GaussianPoints:
     n_layers = len(grid_size)
     p = gs_points.p
     p_gs = gs_points.p_gs
@@ -461,13 +461,10 @@ def make_gs_points(gs_points, grid_size, ks, warmup=False) -> GaussianPoints:
         # down sample
         if i > 0:
             gsize = grid_size[i]
-            if warmup:
-                ds_idx = torch.randperm(p.shape[0])[:int(p.shape[0] / gsize)].contiguous()
+            if p.is_cuda:
+                ds_idx = grid_subsampling(p.detach().cpu(), gsize)
             else:
-                if p.is_cuda:
-                    ds_idx = grid_subsampling(p.detach().cpu(), gsize)
-                else:
-                    ds_idx = grid_subsampling(p, gsize)
+                ds_idx = grid_subsampling(p, gsize)
             p = p[ds_idx]
             p_gs = p_gs[ds_idx]
             idx_ds.append(ds_idx)
