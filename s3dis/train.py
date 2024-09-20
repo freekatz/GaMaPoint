@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import DelaSemSeg
+from backbone import SegHead, Encoder, Decoder
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -160,7 +160,18 @@ def main(cfg):
 
     steps_per_epoch = len(train_loader)
 
-    model = DelaSemSeg(cfg.gama_cfg).to('cuda')
+    encoder = Encoder(
+        **cfg.gama_cfg.encoder_cfg,
+    ).to('cuda')
+    decoder = Decoder(
+        **cfg.gama_cfg.decoder_cfg,
+    ).to('cuda')
+    model = SegHead(
+        encoder=encoder,
+        decoder=decoder,
+        num_classes=cfg.gama_cfg.num_classes,
+        bn_momentum=cfg.gama_cfg.bn_momentum,
+    ).to('cuda')
     model_size, trainable_model_size = cal_model_params(model)
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
     logging.info('Number of trainable params: %.4f M' % (trainable_model_size / 1e6))
@@ -207,8 +218,9 @@ def main(cfg):
         lr = optimizer.param_groups[0]['lr']
         time_cost = timer.record(f'epoch_{epoch - 1}_end')
         timer_meter.update(time_cost)
-        logging.info(f'E{epoch} Train results: '
-                     + f'\nlr={lr:.8f} train_miou={train_miou:.8f} time_cost={timer_meter.avg*1000:.8f}ms avg_time_cost={timer_meter.avg*1000:.8f}ms')
+        logging.info(f'@E{epoch} Train results: '
+                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} train_miou={train_miou:.4f} '
+                     + f'time_cost={timer_meter.avg:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
@@ -220,12 +232,13 @@ def main(cfg):
                 is_best = True
                 best_miou = val_miou
                 macc_when_best = val_macc
-            with np.printoptions(precision=8, suppress=False):
-                logging.info(f'E{epoch} Val results: '
-                             + f'\nval_macc={val_macc:.8f} val_accs={val_accs.detach().cpu().numpy():.8f} val_miou={val_miou:.8f}'
+            with np.printoptions(precision=4, suppress=True):
+                logging.info(f'@E{epoch} Val results: '
+                             + f'\nval_macc={val_macc:.4f} val_accs={val_accs.detach().cpu().numpy():.4f} '
+                             + f'val_miou={val_miou:.4f}  best_val_miou={best_miou:.4f}'
                              + f'\nval_ious={val_ious.detach().cpu().numpy()}')
         if is_best:
-            logging.info(f'E{epoch} New best: best_val_miou={best_miou:.8f}')
+            logging.info(f'@E{epoch} New best: best_val_miou={best_miou:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
@@ -241,8 +254,8 @@ def main(cfg):
             writer.add_scalar('train_miou', train_miou, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
-            writer.add_scalar('time_cost_ms', timer_meter.avg*1000, epoch)
-            writer.add_scalar('time_cost_epoch_ms', time_cost*1000, epoch)
+            writer.add_scalar('time_cost', timer_meter.avg, epoch)
+            writer.add_scalar('time_cost_epoch', time_cost, epoch)
 
 
 if __name__ == '__main__':
@@ -283,29 +296,6 @@ if __name__ == '__main__':
     cfg.s3dis_cfg = s3dis_cfg
     cfg.s3dis_warmup_cfg = s3dis_warmup_cfg
     cfg.gama_cfg = gama_cfg
-
-    ## tmp code
-    from types import SimpleNamespace
-    dela_args = SimpleNamespace()
-    dela_args.ks = cfg.s3dis_cfg.k
-    dela_args.depths = [4, 4, 8, 4]
-    dela_args.dims = [64, 128, 256, 512]
-    dela_args.nbr_dims = [32, 32]
-    dela_args.head_dim = 256
-    dela_args.num_classes = 13
-    drop_path = 0.1
-    drop_rates = torch.linspace(0., drop_path, sum(dela_args.depths)).split(dela_args.depths)
-    dela_args.drop_paths = [dpr.tolist() for dpr in drop_rates]
-    dela_args.head_drops = torch.linspace(0., 0.15, len(dela_args.depths)).tolist()
-    dela_args.bn_momentum = 0.02
-    dela_args.act = nn.GELU
-    dela_args.mlp_ratio = 2
-    # gradient checkpoint
-    dela_args.use_cp = False
-
-    dela_args.cor_std = [1.6, 3.2, 6.4, 12.8]
-    cfg.gama_cfg = dela_args
-    ## tmp code
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''

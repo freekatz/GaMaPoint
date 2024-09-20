@@ -100,6 +100,7 @@ class EasyConfig(dict):
         return hashlib.sha256(buffer.encode()).hexdigest()
 
     def __str__(self) -> str:
+        # todo opt
         texts = []
         for key, value in self.items():
             if isinstance(value, EasyConfig):
