@@ -83,22 +83,19 @@ class Encoder(nn.Module):
             if layer_idx > 0:
                 # down sample
                 p, idx = gs.gs_points.down_sampling('p', layer_idx-1, need_idx=True)
-                p_gs= p_gs[idx]
-                f = f[idx]
+                p_gs = p_gs[idx]
 
             # 1. set abstraction
             f = sa(p, f, gs)
 
             # 2. local aggregation
-            if self.res_blocks[layer_idx] > 0:
-                inv_mlp = self.encoders[layer_idx][1:-1]
-                group_idx = gs.gs_points.idx_group[layer_idx]
-                for mlp in inv_mlp:
-                    f = mlp(f, group_idx)
+            res_mlp = self.encoders[layer_idx][1]
+            group_idx = gs.gs_points.idx_group[layer_idx]
+            f = res_mlp(f, group_idx)
 
             # 3. global propagation
             if layer_idx > 0:
-                pm = self.encoders[layer_idx][-1]
+                pm = self.encoders[layer_idx][2]
                 f_out = pm(p, p_gs, f, gs)
             else:
                 f_out = f
@@ -126,9 +123,8 @@ class Encoder(nn.Module):
 
             # 3. global propagation
             if layer_idx > 0:
-                # pm = self.encoders[layer_idx][2]
-                # f_out = pm(p, p_gs, f, gs)
-                f_out = f
+                pm = self.encoders[layer_idx][2]
+                f_out = pm(p, p_gs, f, gs)
             else:
                 f_out = f
 

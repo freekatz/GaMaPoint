@@ -334,5 +334,3 @@ class PointMambaLayer(nn.Module):
         f = f_global.squeeze(0) * alpha + f * (1 - alpha)
         return f
 
-
-C笔记
