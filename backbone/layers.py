@@ -11,38 +11,69 @@ from backbone.mamba_ssm.models import MambaConfig, MixerModel
 from utils.cutils import knn_edge_maxpooling
 
 
-class SpatialEmbedding(nn.Module):
+class SetAbstraction(nn.Module):
     def __init__(self,
+                 layer_index,
                  in_channels,
-                 hidden_channels,
                  out_channels,
                  bn_momentum,
                  **kwargs
                  ):
         super().__init__()
-        assert len(hidden_channels) == 3
-        self.embed = nn.Sequential(
-            nn.Linear(in_channels, hidden_channels[0], bias=False),
-            nn.BatchNorm1d(hidden_channels[0], momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(hidden_channels[0], hidden_channels[1], bias=False),
-            nn.BatchNorm1d(hidden_channels[1], momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(hidden_channels[1], hidden_channels[2], bias=False),
-        )
-        self.proj = nn.Identity() \
-            if hidden_channels[2] == out_channels \
-            else nn.Linear(hidden_channels[2], out_channels, bias=False)
-        self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
-        nn.init.constant_(self.bn.weight, 0.5)
+        self.layer_index = layer_index
+        is_head = self.layer_index == 0
+        self.is_head = is_head
+        self.in_channels = in_channels
 
-    def forward(self, f, group_idx):
+        if not is_head:
+            self.skip_proj = nn.Sequential(
+                nn.Linear(in_channels, out_channels, bias=False),
+                nn.BatchNorm1d(out_channels, momentum=bn_momentum)
+            )
+            self.la = LocalAggregation(in_channels, out_channels, bn_momentum, 0.3)
+            nn.init.constant_(self.skip_proj[1].weight, 0.3)
+
+        nbr_in_channels = 3+in_channels if is_head else 3
+        nbr_hidden_channels = 32 if is_head else 16
+        nbr_out_channels = out_channels if is_head else 32
+        self.spe = nn.Sequential(
+            nn.Linear(nbr_in_channels, nbr_hidden_channels // 2, bias=False),
+            nn.BatchNorm1d(nbr_hidden_channels // 2, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(nbr_hidden_channels // 2, nbr_hidden_channels, bias=False),
+            nn.BatchNorm1d(nbr_hidden_channels, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(nbr_hidden_channels, nbr_out_channels, bias=False),
+        )
+        nn.init.constant_(self.nbr_bn.weight, 0.8 if is_head else 0.2)
+        self.proj = nn.Identity() if is_head else nn.Linear(nbr_out_channels, out_channels, bias=False)
+        self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
+
+    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
+        if not self.is_head:
+            idx = gs.gs_points.idx_ds[self.layer_index-1]
+            pre_group_idx = gs.gs_points.idx_group[self.layer_index-1]
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
+
+        p_nbr, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
+        p_nbr = p_nbr - p.unsqueeze(1)
+        if self.is_head:
+            f_nbr = f[group_idx]
+            f_nbr = torch.cat([p_nbr, f_nbr], dim=-1).view(-1, 3 + self.in_channels)
+        else:
+            f_nbr = p_nbr.view(-1, 3)
+
         N, K = group_idx.shape
-        f = self.embed(f).view(N, K, -1)
-        f = f.max(dim=1)[0]
-        f = self.proj(f)
-        f = self.bn(f)
+        spe_fn = lambda x: self.spe(x).view(N, K, -1).max(dim=1)[0]
+        f_nbr = spe_fn(f_nbr)
+        f_nbr = self.proj(f_nbr)
+        f_nbr = self.bn(f_nbr)
+
+        if self.is_head:
+            f = f_nbr
+        else:
+            f = f + f_nbr
         return f
 
 

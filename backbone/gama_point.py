@@ -4,7 +4,7 @@ from torch.nn.init import trunc_normal_
 
 from backbone.mamba_ssm.models import MambaConfig
 from backbone.gs_3d import NaiveGaussian3D
-from backbone.layers import InvResMLP, PointMambaLayer, SpatialEmbedding, LocalAggregation
+from backbone.layers import InvResMLP, PointMambaLayer, SpatialEmbedding, LocalAggregation, SetAbstraction
 
 
 class Stage(nn.Module):
@@ -42,22 +42,10 @@ class Stage(nn.Module):
         self.is_head = is_head
         self.is_tail = is_tail
 
-        if not is_head:
-            self.skip_proj = nn.Sequential(
-                nn.Linear(in_channels, out_channels, bias=False),
-                nn.BatchNorm1d(out_channels, momentum=bn_momentum)
-            )
-            self.la = LocalAggregation(in_channels, out_channels, bn_momentum, 0.3)
-            nn.init.constant_(self.skip_proj[1].weight, 0.3)
-
-        nbr_in_channels = 3+in_channels if is_head else 3
-        hidden_channels = 32 if is_head else 16
-        nbr_hidden_channels = [hidden_channels, hidden_channels//2, out_channels if is_head else 32]
-        nbr_out_channels = out_channels
-        self.spe = SpatialEmbedding(
-            nbr_in_channels,
-            nbr_hidden_channels,
-            nbr_out_channels,
+        self.sa = SetAbstraction(
+            layer_index,
+            in_channels,
+            out_channels,
             bn_momentum,
         )
 
@@ -95,20 +83,9 @@ class Stage(nn.Module):
             # down sample
             p, idx = gs.gs_points.down_sampling('p', self.layer_index-1, need_idx=True)
             p_gs = p_gs[idx]
-            pre_group_idx = gs.gs_points.idx_group[self.layer_index-1]
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
         # 1. set abstraction
-        p_nbr, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
-        p_nbr = p_nbr - p.unsqueeze(1)
-        if self.is_head:
-            f_nbr = f[group_idx]
-            f_nbr = torch.cat([p_nbr, f_nbr], dim=-1).view(-1, 3 + self.in_channels)
-        else:
-            f_nbr = p_nbr.view(-1, 3)
-
-        f_nbr = self.spe(f_nbr, group_idx)
-        f = f_nbr if self.is_head else f + f_nbr
+        f = self.sa(p, p_gs, f, gs)
 
         # 2. local aggregation
         res_mlp = self.encoders[1]
@@ -169,32 +146,4 @@ class SegHead(nn.Module):
         f = self.stage(p, p_gs, f, gs)
         return self.head(f)
 
-
-# class ClsHead(nn.Module):
-#     def __init__(self,
-#                  stage: Stage,
-#                  num_classes=13,
-#                  bn_momentum=0.,
-#                  **kwargs
-#                  ):
-#         super().__init__()
-#         self.stage = stage
-#
-#         self.head = nn.Sequential(
-#             nn.BatchNorm1d(stage.out_channels, momentum=bn_momentum),
-#             nn.GELU(),
-#             nn.Linear(stage.out_channels, num_classes),
-#         )
-#
-#         self.apply(self._init_weights)
-#
-#     def __init_weights(self, m):
-#         if isinstance(m, nn.Linear):
-#             trunc_normal_(m.weight, std=.02)
-#             if isinstance(m, nn.Linear) and m.bias is not None:
-#                 nn.init.constant_(m.bias, 0)
-#
-#     def forward(self, gs):
-#         _, f = self.encoder.forward_cls_feat(gs)
-#         return self.head(f)
 
