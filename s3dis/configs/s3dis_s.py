@@ -1,7 +1,5 @@
 import __init__
 
-from types import SimpleNamespace
-
 from backbone.gs_3d import GaussianOptions
 from s3dis.configs.config import BaseConfig
 
@@ -25,18 +23,20 @@ class S3disWarmupConfig(BaseConfig):
 class GaMaConfig(BaseConfig):
     name = 'GaMaConfig'
     num_classes = 13
-    bn_momentum = 0.
-    stage_cfg = BaseConfig()
-    stage_cfg.name = 'StageConfig'
-    stage_cfg.in_channels = 4
-    stage_cfg.channel_list = [64, 128, 256, 512]
-    stage_cfg.mamba_blocks = [1, 1, 2, 1]
-    stage_cfg.res_blocks = [4, 4, 8, 4]
-    stage_cfg.mlp_ratio = 2.
-    stage_cfg.bn_momentum = bn_momentum
-    stage_cfg.hybrid_args = {'hybrid': False, 'type': 'post', 'ratio': 0.5}
-    stage_cfg.channel_list = [64, 128, 256, 512]
-    stage_cfg.out_channels = 256
-    stage_cfg.bn_momentum = bn_momentum
-    stage_cfg.task_type = 'seg'
+    bn_momentum = 0.02
+    encoder_cfg = BaseConfig()
+    encoder_cfg.name = 'EncoderConfig'
+    encoder_cfg.in_channels = 4
+    encoder_cfg.channel_list = [64, 128, 256, 512]
+    encoder_cfg.mamba_blocks = [1, 1, 2, 1]
+    encoder_cfg.res_blocks = [4, 4, 8, 4]
+    encoder_cfg.mlp_ratio = 2.
+    encoder_cfg.bn_momentum = bn_momentum
+    encoder_cfg.hybrid_args = {'hybrid': False, 'type': 'post', 'ratio': 0.5}
+
+    decoder_cfg = BaseConfig()
+    decoder_cfg.name = 'DecoderConfig'
+    decoder_cfg.channel_list = [64, 128, 256, 512]
+    decoder_cfg.out_channels = 256
+    decoder_cfg.bn_momentum = bn_momentum
 

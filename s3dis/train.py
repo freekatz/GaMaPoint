@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import SegHead, Stage
+from backbone import SegHead, Encoder, Decoder
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -160,11 +160,15 @@ def main(cfg):
 
     steps_per_epoch = len(train_loader)
 
-    stage = Stage(
-        **cfg.gama_cfg.stage_cfg,
+    encoder = Encoder(
+        **cfg.gama_cfg.encoder_cfg,
+    ).to('cuda')
+    decoder = Decoder(
+        **cfg.gama_cfg.decoder_cfg,
     ).to('cuda')
     model = SegHead(
-        stage=stage,
+        encoder=encoder,
+        decoder=decoder,
         num_classes=cfg.gama_cfg.num_classes,
         bn_momentum=cfg.gama_cfg.bn_momentum,
     ).to('cuda')
