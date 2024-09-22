@@ -358,5 +358,5 @@ class PointMambaLayer(nn.Module):
         alpha = self.alpha.sigmoid()
         f = f_global * alpha + f * (1 - alpha)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
-        return f
+        return f.squeeze(0)
 
