@@ -89,10 +89,11 @@ class SetAbstraction(nn.Module):
             bn_momentum=bn_momentum,
         )
         self.spe_gs = SpatialEmbedding(
-            nbr_in_channels,
-            nbr_hidden_channels,
-            nbr_out_channels,
-            bn_momentum,
+            is_head=is_head,
+            in_channels=in_channels,
+            hidden_channels=nbr_hidden_channels,
+            out_channels=nbr_out_channels,
+            bn_momentum=bn_momentum,
         )
         self.alpha = nn.Parameter(torch.ones((1,), dtype=torch.float32) * 100)
 
