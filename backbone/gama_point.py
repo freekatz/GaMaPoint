@@ -126,7 +126,8 @@ class Encoder(nn.Module):
             # 2. local aggregation
             res_mlp = self.encoders[layer_idx][1]
             group_idx = gs.gs_points.idx_group[layer_idx]
-            f = res_mlp(f, group_idx)
+            pts = gs.gs_points.pts_list[layer_idx]
+            f = res_mlp(f, group_idx, pts)
 
             # 3. global propagation
             if layer_idx > 0:
