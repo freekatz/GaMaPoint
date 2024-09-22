@@ -79,7 +79,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
 
         m.update(pred, target)
         loss_meter.update(loss.item())
-        pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] Loss {loss_meter.avg:.4f}")
+        pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] Loss {loss_meter.avg:.4f} mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
     return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
 

@@ -1,3 +1,6 @@
+import torch
+from timm.layers import DropPath
+
 import __init__
 
 from torch import nn
@@ -16,6 +19,7 @@ class Encoder(nn.Module):
                  res_blocks=[4, 4, 8, 4],
                  mlp_ratio=2.,
                  bn_momentum=0.,
+                 drop_paths=None,
                  mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False, 'type': 'post', 'ratio': 0.5},
                  **kwargs
@@ -29,6 +33,8 @@ class Encoder(nn.Module):
         self.res_blocks = res_blocks
         self.mlp_ratio = mlp_ratio
         self.bn_momentum = bn_momentum
+        assert drop_paths is not None
+        self.drop_paths = drop_paths
         self.mamba_config = mamba_config
         self.hybrid_args = hybrid_args
 
@@ -52,12 +58,12 @@ class Encoder(nn.Module):
         )
         encoder.append(sa)
 
-        res_blocks = self.res_blocks[layer_index]
         res_mlp = InvResMLP(
             channels=out_channels,
-            res_blocks=res_blocks,
+            res_blocks=self.res_blocks[layer_index],
             mlp_ratio=self.mlp_ratio,
             bn_momentum=self.bn_momentum,
+            drop_path=self.drop_paths[layer_index],
         )
         encoder.append(res_mlp)
 
@@ -95,8 +101,9 @@ class Encoder(nn.Module):
 
             # 3. global propagation
             if layer_idx > 0:
-                pm = self.encoders[layer_idx][2]
-                f_out = pm(p, p_gs, f, gs)
+                # pm = self.encoders[layer_idx][2]
+                # f_out = pm(p, p_gs, f, gs)
+                f_out = f
             else:
                 f_out = f
         return p, f_out
@@ -141,6 +148,7 @@ class Decoder(nn.Module):
                  channel_list=[64, 128, 256, 512],
                  out_channels=256,
                  bn_momentum=0.,
+                 head_drops=None,
                  **kwargs
                  ):
         super().__init__()
@@ -148,6 +156,8 @@ class Decoder(nn.Module):
         self.out_channels = out_channels
         self.n_layers = len(channel_list)
         self.bn_momentum = bn_momentum
+        assert head_drops is not None
+        self.head_drops = head_drops
 
         self.decoders = nn.ModuleList([
             self.__make_decode_layer(layer_index=layer_index)
@@ -157,22 +167,31 @@ class Decoder(nn.Module):
     def __make_decode_layer(self, layer_index):
         in_channels = self.channel_list[layer_index]
         out_channels = self.out_channels
+        decoder = []
+
         proj = nn.Sequential(
             nn.BatchNorm1d(in_channels, momentum=self.bn_momentum),
             nn.Linear(in_channels, out_channels, bias=False),
         )
+        decoder.append(proj)
         nn.init.constant_(proj[0].weight, 0.25)
-        return proj
+
+        drop = DropPath(self.drop_paths[layer_index])
+        decoder.append(drop)
+        return nn.ModuleList(decoder)
 
     def forward(self, p_list, f_list, gs: NaiveGaussian3D):
         p_list = p_list[::-1]
         f_list = f_list[::-1]
         idx_us = gs.gs_points.idx_us[::-1]
         for i in range(len(self.decoders)):
-            f_decode = self.decoders[i](f_list[i])
+            proj = self.decoders[i][0]
+            f_decode = proj(f_list[i])
             if i < len(self.decoders) - 1:
                 us_idx = idx_us[i]
                 f_decode = f_decode[us_idx]
+            drop = self.decoders[i][1]
+            f_decode = drop(f_decode)
             if i == 0:
                 f_list[i] = f_decode
             else:

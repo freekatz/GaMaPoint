@@ -76,11 +76,15 @@ class Metric():
         self.intersection += (pred & label).sum(dim=1)
         self.union += (pred | label).sum(dim=1)
 
+    def calc_macc(self):
+        macc = self.intersection / self.count
+        macc = macc.mean()
+        return macc
+
     def calc(self, digits=4):
         acc = self.intersection.sum() / self.count.sum()
         self.acc = round(acc.item(), digits)
-        macc = self.intersection / self.count
-        macc = macc.mean()
+        macc = self.calc_macc()
         self.macc = round(macc.item(), digits)
         iou = self.intersection / self.union
         self.iou = [round(i.item(), digits) for i in iou]

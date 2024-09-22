@@ -1,3 +1,5 @@
+from timm.layers import DropPath
+
 import __init__
 
 import logging
@@ -15,6 +17,7 @@ from utils.cutils import knn_edge_maxpooling
 
 class SpatialEmbedding(nn.Module):
     def __init__(self,
+                 is_head,
                  in_channels,
                  hidden_channels,
                  out_channels,
@@ -22,21 +25,26 @@ class SpatialEmbedding(nn.Module):
                  **kwargs
                  ):
         super().__init__()
-        assert len(hidden_channels) == 3
+        # in -- h1 -- h2 -- h3 -- out
+        # head: 7, 32, 16, out, out
+        # other: 3, 16, 8, 32, out
+        if is_head:
+            embed_out_channels = out_channels
+        else:
+            embed_out_channels = hidden_channels * 2
         self.embed = nn.Sequential(
-            nn.Linear(in_channels, hidden_channels[0], bias=False),
-            nn.BatchNorm1d(hidden_channels[0], momentum=bn_momentum),
+            nn.Linear(in_channels, hidden_channels, bias=False),
+            nn.BatchNorm1d(hidden_channels, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(hidden_channels[0], hidden_channels[1], bias=False),
-            nn.BatchNorm1d(hidden_channels[1], momentum=bn_momentum),
+            nn.Linear(hidden_channels, hidden_channels//2, bias=False),
+            nn.BatchNorm1d(hidden_channels//2, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(hidden_channels[1], hidden_channels[2], bias=False),
+            nn.Linear(hidden_channels//2, embed_out_channels, bias=False),
         )
-        self.proj = nn.Identity() \
-            if hidden_channels[2] == out_channels \
-            else nn.Linear(hidden_channels[2], out_channels, bias=False)
+        self.proj = nn.Identity() if is_head \
+            else nn.Linear(embed_out_channels, out_channels, bias=False)
         self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
-        nn.init.constant_(self.bn.weight, 0.5)
+        nn.init.constant_(self.bn.weight, 0.8 if is_head else 0.2)
 
     def forward(self, f, group_idx):
         assert len(f.shape) == 2
@@ -71,14 +79,14 @@ class SetAbstraction(nn.Module):
             nn.init.constant_(self.skip_proj[1].weight, 0.3)
 
         nbr_in_channels = 3+in_channels if is_head else 3
-        hidden_channels = 32 if is_head else 16
-        nbr_hidden_channels = [hidden_channels, hidden_channels//2, out_channels if is_head else 32]
+        nbr_hidden_channels = 32 if is_head else 16
         nbr_out_channels = out_channels
         self.spe = SpatialEmbedding(
-            nbr_in_channels,
-            nbr_hidden_channels,
-            nbr_out_channels,
-            bn_momentum,
+            is_head=is_head,
+            in_channels=in_channels,
+            hidden_channels=nbr_hidden_channels,
+            out_channels=nbr_out_channels,
+            bn_momentum=bn_momentum,
         )
         self.spe_gs = SpatialEmbedding(
             nbr_in_channels,
@@ -182,6 +190,7 @@ class InvResMLP(nn.Module):
                  res_blocks,
                  mlp_ratio,
                  bn_momentum,
+                 drop_path,
                  **kwargs
                  ):
         super().__init__()
@@ -204,21 +213,34 @@ class InvResMLP(nn.Module):
             )
             for _ in range(res_blocks // 2)
         ])
+        self.drop_paths = nn.ModuleList([
+            DropPath(d) for d in drop_path
+        ])
 
-    def forward(self, f, group_idx):
+    def drop_path(self, f, mlp_idx, pts):
+        if not self.training:
+            return f
+        f_all = []
+        for f_batch in torch.split(f, pts, dim=1):
+            f_all.append(self.drop_paths[mlp_idx](f_batch))
+        return torch.cat(f_all, dim=1)
+
+    def forward(self, f, group_idx, pts):
         """
         :param f: [N, channels]
         :param group_idx: [N, K]
         :return: [N, channels]
         """
         assert len(f.shape) == 2
+        assert pts is not None
+
         f = f.unsqueeze(0)
         group_idx = group_idx.unsqueeze(0)
-        f = f + self.mlp(f)
+        f = f + self.drop_path(self.mlp(f), 0, pts)
         for i in range(self.res_blocks):
-            f = f + self.blocks[i](f, group_idx)
+            f = f + self.drop_path(self.blocks[i](f, group_idx), i, pts)
             if i % 2 == 1:
-                f = f + self.mlps[i//2](f)
+                f = f + self.drop_path(self.mlps[i//2](f), i, pts)
         return f.squeeze(0)
 
 
