@@ -283,7 +283,6 @@ def create_mixer(
     attn_cfg = config.attn_cfg
     rms_norm = config.get('rms_norm', True)
     residual_in_fp32 = config.get('residual_in_fp32', True)
-    fused_add_norm = config.get('fused_add_norm', True)
 
     hybrid = hybrid_args.get('hybrid', False)
     hybrid_type = hybrid_args.get('type')
@@ -314,7 +313,6 @@ def create_mixer(
         attn_cfg=attn_cfg,
         rms_norm=rms_norm,
         residual_in_fp32=residual_in_fp32,
-        fused_add_norm=fused_add_norm,
     )
 
 
@@ -324,6 +322,7 @@ class PointMambaLayer(nn.Module):
                  channels: int,
                  config: MambaConfig,
                  hybrid_args: dict,
+                 bn_momentum: float,
                  **kwargs,
                  ):
         super().__init__()
@@ -332,9 +331,12 @@ class PointMambaLayer(nn.Module):
 
         self.mixer = create_mixer(config, channels, hybrid_args)
         self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
+        self.bn = nn.BatchNorm1d(channels, momentum=bn_momentum)
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
+        f = f.unsqueeze(0)
+        B, N, C = f.shape
         cov3d = gs.gs_points.cov3d
 
         # get order
@@ -351,9 +353,10 @@ class PointMambaLayer(nn.Module):
 
         # todo
         mask = None
-        f_global = self.mixer(input_ids=f.unsqueeze(0),
+        f_global = self.mixer(input_ids=f,
                               mask=mask, gs=gs, order=order)
         alpha = self.alpha.sigmoid()
-        f = f_global.squeeze(0) * alpha + f * (1 - alpha)
+        f = f_global * alpha + f * (1 - alpha)
+        f = self.bn(f.view(B * N, -1)).view(B, N, -1)
         return f
 

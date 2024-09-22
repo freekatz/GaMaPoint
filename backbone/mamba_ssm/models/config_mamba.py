@@ -13,7 +13,6 @@ class MambaConfig(dict):
     attn_cfg: ObjDict = field(default_factory=ObjDict)
     rms_norm: bool = True
     residual_in_fp32: bool = True
-    fused_add_norm: bool = True
     scan_method: str = ''  # ["random", "random2", "bidi"]
     use_mask: bool = True
 
@@ -24,7 +23,6 @@ class MambaConfig(dict):
                 attn_cfg=ObjDict(num_heads=4),
                 rms_norm=True,
                 residual_in_fp32=True,
-                fused_add_norm=True,
                 scan_method='',
                 use_mask=True,
             )

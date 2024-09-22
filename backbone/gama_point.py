@@ -75,6 +75,7 @@ class Encoder(nn.Module):
             channels=out_channels,
             config=mamba_config,
             hybrid_args=self.hybrid_args,
+            bn_momentum=self.bn_momentum,
         )
         encoder.append(pm)
         return nn.ModuleList(encoder)
