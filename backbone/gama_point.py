@@ -127,12 +127,13 @@ class Encoder(nn.Module):
             res_mlp = self.encoders[layer_idx][1]
             group_idx = gs.gs_points.idx_group[layer_idx]
             pts = gs.gs_points.pts_list[layer_idx]
-            f = res_mlp(f, group_idx, pts)
+            f = res_mlp(f, group_idx, pts.tolist())
 
             # 3. global propagation
             if layer_idx > 0:
-                pm = self.encoders[layer_idx][2]
-                f_out = pm(p, p_gs, f, gs)
+                # pm = self.encoders[layer_idx][2]
+                # f_out = pm(p, p_gs, f, gs)
+                f_out = f
             else:
                 f_out = f
 
