@@ -83,14 +83,14 @@ class SetAbstraction(nn.Module):
         nbr_out_channels = out_channels
         self.spe = SpatialEmbedding(
             is_head=is_head,
-            in_channels=in_channels,
+            in_channels=nbr_in_channels,
             hidden_channels=nbr_hidden_channels,
             out_channels=nbr_out_channels,
             bn_momentum=bn_momentum,
         )
         self.spe_gs = SpatialEmbedding(
             is_head=is_head,
-            in_channels=in_channels,
+            in_channels=nbr_in_channels,
             hidden_channels=nbr_hidden_channels,
             out_channels=nbr_out_channels,
             bn_momentum=bn_momentum,

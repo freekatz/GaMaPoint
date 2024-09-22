@@ -176,7 +176,7 @@ class Decoder(nn.Module):
         decoder.append(proj)
         nn.init.constant_(proj[0].weight, 0.25)
 
-        drop = DropPath(self.drop_paths[layer_index])
+        drop = DropPath(self.head_drops[layer_index])
         decoder.append(drop)
         return nn.ModuleList(decoder)
 
