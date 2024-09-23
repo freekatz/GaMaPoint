@@ -1,12 +1,10 @@
-from timm.layers import DropPath
-
-import __init__
 
 import logging
 import math
 
 import torch
 from torch import nn
+from timm.layers import DropPath
 
 from backbone.gs_3d import NaiveGaussian3D
 from backbone.mamba_ssm.custom import StructuredMask

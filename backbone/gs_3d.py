@@ -1,5 +1,3 @@
-import __init__
-
 from dataclasses import dataclass, field
 
 from pytorch3d.ops import sample_farthest_points
