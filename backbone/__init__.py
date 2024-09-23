@@ -1,1 +1,2 @@
-from .gama_points import *
+from .gama_point import *
+from .gs_3d import *

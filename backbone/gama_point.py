@@ -131,16 +131,16 @@ class LocalAggregation(nn.Module):
 
     def forward(self, f, group_idx):
         """
-        :param f: [N, channels]
-        :param group_idx: [N, K]
-        :return: [N, channels]
+        :param f: [B, N, channels]
+        :param group_idx: [B, N, K]
+        :return: [B, N, channels]
         """
         assert len(f.shape) == 3
         B, N, C = f.shape
-        x = self.proj(f)
-        x = knn_edge_maxpooling(x.contiguous(), group_idx.contiguous(), self.training)
-        x = self.bn(x.view(B * N, -1)).view(B, N, -1)
-        return x
+        f = self.proj(f)
+        f = knn_edge_maxpooling(f, group_idx, self.training)
+        f = self.bn(f.view(B * N, -1)).view(B, N, -1)
+        return f
 
 
 class Mlp(nn.Module):
@@ -213,21 +213,20 @@ class InvResMLP(nn.Module):
 
     def forward(self, f, group_idx, pts):
         """
-        :param f: [N, channels]
-        :param group_idx: [N, K]
-        :return: [N, channels]
+        :param f: [B, N, channels]
+        :param group_idx: [B, N, K]
+        :return: [B, N, channels]
         """
-        assert len(f.shape) == 2
+        assert len(f.shape) == 3
+        assert len(group_idx.shape) == 3
         assert pts is not None
 
-        f = f.unsqueeze(0)
-        group_idx = group_idx.unsqueeze(0)
         f = f + self.drop_path(self.mlp(f), 0, pts)
         for i in range(self.res_blocks):
             f = f + self.drop_path(self.blocks[i](f, group_idx), i, pts)
             if i % 2 == 1:
                 f = f + self.drop_path(self.mlps[i // 2](f), i, pts)
-        return f.squeeze(0)
+        return f
 
 
 class Stage(nn.Module):
@@ -254,7 +253,7 @@ class Stage(nn.Module):
         self.is_head = is_head
         is_tail = self.layer_index == len(channel_list) - 1
         self.is_tail = is_tail
-        self.in_channels = in_channels if is_head else channel_list[layer_index-1]
+        self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
 
@@ -358,7 +357,7 @@ class Stage(nn.Module):
         f = f_nbr if self.is_head else f_nbr + f
 
         pts = gs.gs_points.pts_list[self.layer_index]
-        f = self.res_mlp(f, group_idx, pts.tolist())
+        f = self.res_mlp(f.unsqueeze(0), group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
 
         if not self.is_tail:
             f_out_sub, c_sub = self.sub_stage(p, p_gs, f, gs)
@@ -418,3 +417,4 @@ class SegHead(nn.Module):
         if self.training:
             return self.head(f), closs
         return self.head(f)
+
