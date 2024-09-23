@@ -293,13 +293,14 @@ def create_mixer(
 
     expand = ssm_cfg.get('expand', 2)
     ssm_cfg.d_state = min(d_model * expand, 1024)
-    ssm_cfg.headdim = min(d_model // num_heads, 128)
+    ssm_cfg.headdim = min(d_model // num_heads, 192)
     attn_layer_idx = [] if not hybrid else make_hybrid_idx(n_layer, hybrid_type, hybrid_ratio)
 
-    if d_model // ssm_cfg.headdim > num_heads:
+    min_heads = max(d_model // ssm_cfg.headdim, 8)
+    if num_heads < min_heads:
         logging.warning(
-            f'num heads {d_model // ssm_cfg.headdim} > {num_heads}, will replace with {d_model // ssm_cfg.headdim}')
-        num_heads = d_model // ssm_cfg.headdim
+            f'num heads {num_heads} > min heads {min_heads}, will replace with {min_heads}')
+        num_heads = min_heads
     attn_cfg.num_heads = num_heads
     attn_cfg = attn_cfg if hybrid else None
     return MixerModel(
