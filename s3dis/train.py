@@ -1,5 +1,3 @@
-from torch.optim.lr_scheduler import CosineAnnealingLR
-
 import __init__
 
 import argparse
@@ -75,10 +73,9 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         else:
             loss.backward()
             optimizer.step()
-        # scheduler.step(scheduler_steps)
-        # scheduler_steps += 1
-        scheduler.step()
         optimizer.zero_grad(set_to_none=True)
+        scheduler.step(scheduler_steps)
+        scheduler_steps += 1
 
         m.update(pred, target)
         loss_meter.update(loss.item())
@@ -199,23 +196,20 @@ def main(cfg):
         logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
 
     scheduler_steps = steps_per_epoch * start_epoch
-    # scheduler = CosineLRScheduler(optimizer,
-    #                               t_initial=cfg.epochs * steps_per_epoch,
-    #                               lr_min=cfg.lr / 10000,
-    #                               warmup_t=cfg.warmup_epochs * steps_per_epoch,
-    #                               warmup_lr_init=cfg.lr / 20)
-    scheduler = CosineAnnealingLR(
-        optimizer,
-        T_max=(cfg.epochs-start_epoch+1) * steps_per_epoch,
-    )
-
-    warmup(model, warmup_loader)
+    scheduler = CosineLRScheduler(optimizer,
+                                  t_initial=cfg.epochs * steps_per_epoch,
+                                  lr_min=cfg.lr / 10000,
+                                  cycle_decay=cfg.lr_decay,
+                                  warmup_t=cfg.warmup_epochs * steps_per_epoch,
+                                  warmup_lr_init=cfg.lr / 20)
 
     val_miou, val_macc, val_ious, val_accs = 0., 0., [], []
     macc_when_best = 0.
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
+
+    warmup(model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
         train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
@@ -286,8 +280,9 @@ if __name__ == '__main__':
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=100)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
-    parser.add_argument("--lr", type=float, required=False, default=3e-3)
-    parser.add_argument("--decay", type=float, required=False, default=1e-2)
+    parser.add_argument("--lr", type=float, required=False, default=0.001)
+    parser.add_argument("--lr_decay", type=float, required=False, default=0.98)
+    parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')
 

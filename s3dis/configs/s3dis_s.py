@@ -40,7 +40,7 @@ class GaMaConfig(BaseConfig):
     drop_rates = torch.linspace(0., drop_path, sum(encoder_cfg.res_blocks)).split(encoder_cfg.res_blocks)
     encoder_cfg.drop_paths = [d.tolist() for d in drop_rates]
     encoder_cfg.mamba_cfg = MambaConfig.default()
-    encoder_cfg.hybrid_args = {'hybrid': False, 'type': 'post', 'ratio': 0.5}
+    encoder_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
 
     decoder_cfg = BaseConfig()
     decoder_cfg.name = 'DecoderConfig'
