@@ -137,7 +137,6 @@ class Encoder(nn.Module):
             # 3. global propagation
             pm = self.encoders[layer_idx][3]
             f_out = pm(p, p_gs, f, gs)
-            # f_out = fp_gs, f, gs)
             # f_out = f
 
             f_list.append(f_out)

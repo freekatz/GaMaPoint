@@ -186,7 +186,6 @@ def main(cfg):
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        cfg.epochs = cfg.epochs + start_epoch - 1
         logging.info(f"Resume model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     if cfg.mode == 'finetune':
         model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
