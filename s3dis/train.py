@@ -216,12 +216,12 @@ def main(cfg):
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
-        time_cost = timer.record(f'epoch_{epoch - 1}_end')
+        time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
                      + f'\nlr={lr:.6f} train_loss={train_loss:.4f} '
-                     + f'train_macc={train_miou:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
-                     + f'time_cost={timer_meter.avg:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
+                     + f'train_macc={train_macc:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
+                     + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
@@ -255,8 +255,8 @@ def main(cfg):
             writer.add_scalar('train_miou', train_miou, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
-            writer.add_scalar('time_cost', timer_meter.avg, epoch)
-            writer.add_scalar('time_cost_epoch', time_cost, epoch)
+            writer.add_scalar('time_cost_avg', timer_meter.avg, epoch)
+            writer.add_scalar('time_cost', time_cost, epoch)
 
 
 if __name__ == '__main__':
