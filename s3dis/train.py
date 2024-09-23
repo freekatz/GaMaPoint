@@ -280,7 +280,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, required=False, default=100)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
     parser.add_argument("--lr", type=float, required=False, default=0.001)
-    parser.add_argument("--lr_decay", type=float, required=False, default=0.98)
+    parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')

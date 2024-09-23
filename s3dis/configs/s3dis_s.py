@@ -1,6 +1,6 @@
-import torch
-
 import __init__
+
+import torch
 
 from backbone.gs_3d import GaussianOptions
 from backbone.mamba_ssm.models import MambaConfig
@@ -39,6 +39,7 @@ class GaMaConfig(BaseConfig):
     encoder_cfg.bn_momentum = bn_momentum
     drop_rates = torch.linspace(0., drop_path, sum(encoder_cfg.res_blocks)).split(encoder_cfg.res_blocks)
     encoder_cfg.drop_paths = [d.tolist() for d in drop_rates]
+    encoder_cfg.res_drops = torch.linspace(0., 0.15, len(encoder_cfg.res_blocks)).tolist()
     encoder_cfg.mamba_cfg = MambaConfig.default()
     encoder_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
 
@@ -47,3 +48,4 @@ class GaMaConfig(BaseConfig):
     decoder_cfg.channel_list = channel_list
     decoder_cfg.out_channels = 256
     decoder_cfg.bn_momentum = bn_momentum
+

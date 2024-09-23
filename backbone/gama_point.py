@@ -1,8 +1,4 @@
-import torch
 from timm.layers import DropPath
-
-import __init__
-
 from torch import nn
 from torch.nn.init import trunc_normal_
 
@@ -20,6 +16,7 @@ class Encoder(nn.Module):
                  mlp_ratio=2.,
                  bn_momentum=0.,
                  drop_paths=None,
+                 res_drops=None,
                  mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False, 'type': 'post', 'ratio': 0.5},
                  **kwargs
@@ -35,6 +32,8 @@ class Encoder(nn.Module):
         self.bn_momentum = bn_momentum
         assert drop_paths is not None
         self.drop_paths = drop_paths
+        assert res_drops is not None
+        self.res_drops = res_drops
         self.mamba_config = mamba_config
         self.hybrid_args = hybrid_args
 
@@ -66,6 +65,9 @@ class Encoder(nn.Module):
             drop_path=self.drop_paths[layer_index],
         )
         encoder.append(res_mlp)
+
+        drop = DropPath(self.res_drops[layer_index])
+        encoder.append(drop)
 
         mamba_config = self.mamba_config
         mamba_config.n_layer = self.mamba_blocks[layer_index]
@@ -100,9 +102,11 @@ class Encoder(nn.Module):
             group_idx = gs.gs_points.idx_group[layer_idx]
             pts = gs.gs_points.pts_list[layer_idx]
             f = res_mlp(f, group_idx, pts.tolist())
+            drop = self.encoders[layer_idx][2]
+            f = drop(f)
 
             # 3. global propagation
-            pm = self.encoders[layer_idx][2]
+            pm = self.encoders[layer_idx][3]
             f_out = pm(p, p_gs, f, gs)
             # f_out = f
         return p, f_out
@@ -127,10 +131,13 @@ class Encoder(nn.Module):
             group_idx = gs.gs_points.idx_group[layer_idx]
             pts = gs.gs_points.pts_list[layer_idx]
             f = res_mlp(f, group_idx, pts.tolist())
+            drop = self.encoders[layer_idx][2]
+            f = drop(f)
 
             # 3. global propagation
-            pm = self.encoders[layer_idx][2]
+            pm = self.encoders[layer_idx][3]
             f_out = pm(p, p_gs, f, gs)
+            # f_out = fp_gs, f, gs)
             # f_out = f
 
             f_list.append(f_out)
