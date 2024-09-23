@@ -146,7 +146,6 @@ class Decoder(nn.Module):
                  channel_list=[64, 128, 256, 512],
                  out_channels=256,
                  bn_momentum=0.,
-                 head_drops=None,
                  **kwargs
                  ):
         super().__init__()
@@ -154,8 +153,6 @@ class Decoder(nn.Module):
         self.out_channels = out_channels
         self.n_layers = len(channel_list)
         self.bn_momentum = bn_momentum
-        assert head_drops is not None
-        self.head_drops = head_drops
 
         self.decoders = nn.ModuleList([
             self.__make_decode_layer(layer_index=layer_index)
@@ -173,9 +170,6 @@ class Decoder(nn.Module):
         )
         decoder.append(proj)
         nn.init.constant_(proj[0].weight, 0.25)
-
-        drop = DropPath(self.head_drops[layer_index])
-        decoder.append(drop)
         return nn.ModuleList(decoder)
 
     def forward(self, p_list, f_list, gs: NaiveGaussian3D):
@@ -188,8 +182,6 @@ class Decoder(nn.Module):
             if i < len(self.decoders) - 1:
                 us_idx = idx_us[i]
                 f_decode = f_decode[us_idx]
-            drop = self.decoders[i][1]
-            f_decode = drop(f_decode)
             if i == 0:
                 f_list[i] = f_decode
             else:

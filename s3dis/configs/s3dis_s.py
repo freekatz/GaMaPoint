@@ -47,6 +47,3 @@ class GaMaConfig(BaseConfig):
     decoder_cfg.channel_list = channel_list
     decoder_cfg.out_channels = 256
     decoder_cfg.bn_momentum = bn_momentum
-    decoder_cfg.head_drops = torch.linspace(0., 0.15, len(encoder_cfg.res_blocks)).tolist()
-
-

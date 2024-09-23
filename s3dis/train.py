@@ -1,3 +1,5 @@
+from torch.optim.lr_scheduler import CosineAnnealingLR
+
 import __init__
 
 import argparse
@@ -176,14 +178,6 @@ def main(cfg):
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
     logging.info('Number of trainable params: %.4f M' % (trainable_model_size / 1e6))
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.decay)
-    scheduler = CosineLRScheduler(optimizer,
-                                  t_initial=cfg.epochs * steps_per_epoch,
-                                  lr_min=cfg.lr / 10000,
-                                  warmup_t=cfg.warmup_epochs * steps_per_epoch,
-                                  warmup_lr_init=cfg.lr / 20)
-    scaler = GradScaler()
-
     start_epoch = 1
     best_epoch = 0
     best_miou = 0
@@ -201,6 +195,18 @@ def main(cfg):
         best_miou = model_dict['best_miou']
         logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     scheduler_steps = steps_per_epoch * start_epoch
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.decay)
+    # scheduler = CosineLRScheduler(optimizer,
+    #                               t_initial=cfg.epochs * steps_per_epoch,
+    #                               lr_min=cfg.lr / 10000,
+    #                               warmup_t=cfg.warmup_epochs * steps_per_epoch,
+    #                               warmup_lr_init=cfg.lr / 20)
+    scheduler = CosineAnnealingLR(
+        optimizer,
+        T_max=cfg.epochs * steps_per_epoch,
+    )
+    scaler = GradScaler()
 
     warmup(model, warmup_loader)
 
