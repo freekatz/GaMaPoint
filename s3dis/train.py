@@ -76,8 +76,9 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss.backward()
             optimizer.step()
         optimizer.zero_grad(set_to_none=True)
-        scheduler.step(scheduler_steps)
-        scheduler_steps += 1
+        # scheduler.step(scheduler_steps)
+        # scheduler_steps += 1
+        scheduler.step()
 
         m.update(pred, target)
         loss_meter.update(loss.item())
@@ -178,6 +179,8 @@ def main(cfg):
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
     logging.info('Number of trainable params: %.4f M' % (trainable_model_size / 1e6))
 
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.decay)
+    scaler = GradScaler()
     start_epoch = 1
     best_epoch = 0
     best_miou = 0
@@ -194,9 +197,8 @@ def main(cfg):
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
         logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
-    scheduler_steps = steps_per_epoch * start_epoch
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.decay)
+    scheduler_steps = steps_per_epoch * start_epoch
     # scheduler = CosineLRScheduler(optimizer,
     #                               t_initial=cfg.epochs * steps_per_epoch,
     #                               lr_min=cfg.lr / 10000,
@@ -206,7 +208,6 @@ def main(cfg):
         optimizer,
         T_max=cfg.epochs * steps_per_epoch,
     )
-    scaler = GradScaler()
 
     warmup(model, warmup_loader)
 
