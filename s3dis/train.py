@@ -218,7 +218,7 @@ def main(cfg):
         time_cost = timer.record(f'epoch_{epoch - 1}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
-                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f}'
+                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} '
                      + f'train_macc={train_miou:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
                      + f'time_cost={timer_meter.avg:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 

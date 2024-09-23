@@ -102,12 +102,9 @@ class Encoder(nn.Module):
             f = res_mlp(f, group_idx, pts.tolist())
 
             # 3. global propagation
-            if layer_idx > 0:
-                pm = self.encoders[layer_idx][2]
-                f_out = pm(p, p_gs, f, gs)
-                # f_out = f
-            else:
-                f_out = f
+            pm = self.encoders[layer_idx][2]
+            f_out = pm(p, p_gs, f, gs)
+            # f_out = f
         return p, f_out
 
     def forward_seg_feat(self, gs: NaiveGaussian3D):
@@ -132,12 +129,9 @@ class Encoder(nn.Module):
             f = res_mlp(f, group_idx, pts.tolist())
 
             # 3. global propagation
-            if layer_idx > 0:
-                pm = self.encoders[layer_idx][2]
-                f_out = pm(p, p_gs, f, gs)
-                # f_out = f
-            else:
-                f_out = f
+            pm = self.encoders[layer_idx][2]
+            f_out = pm(p, p_gs, f, gs)
+            # f_out = f
 
             f_list.append(f_out)
             p_list.append(p)
