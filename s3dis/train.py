@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import __init__
 
 import argparse
@@ -16,6 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from backbone import SegHead, Stage
+from backbone.dela import DelaSemSeg
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -168,13 +171,35 @@ def main(cfg):
 
     steps_per_epoch = len(train_loader)
 
-    stage = Stage(
-        **cfg.gama_cfg.stage_cfg,
-    ).to('cuda')
-    model = SegHead(
-        stage=stage,
-        num_classes=cfg.gama_cfg.num_classes,
-        bn_momentum=cfg.gama_cfg.bn_momentum,
+    # stage = Stage(
+    #     **cfg.gama_cfg.stage_cfg,
+    # ).to('cuda')
+    # model = SegHead(
+    #     stage=stage,
+    #     num_classes=cfg.gama_cfg.num_classes,
+    #     bn_momentum=cfg.gama_cfg.bn_momentum,
+    # ).to('cuda')
+
+    dela_args = SimpleNamespace()
+    dela_args.ks = [24, 24, 24, 24]
+    dela_args.depths = [4, 4, 8, 4]
+    dela_args.dims = [64, 128, 256, 512]
+    dela_args.nbr_dims = [32, 32]
+    dela_args.head_dim = 256
+    dela_args.num_classes = 13
+    drop_path = 0.1
+    drop_rates = torch.linspace(0., drop_path, sum(dela_args.depths)).split(dela_args.depths)
+    dela_args.drop_paths = [dpr.tolist() for dpr in drop_rates]
+    dela_args.head_drops = torch.linspace(0., 0.15, len(dela_args.depths)).tolist()
+    dela_args.bn_momentum = 0.02
+    dela_args.act = nn.GELU
+    dela_args.mlp_ratio = 2
+    # gradient checkpoint
+    dela_args.use_cp = False
+
+    dela_args.cor_std = [1.6, 3.2, 6.4, 12.8]
+    model = DelaSemSeg(
+        dela_args
     ).to('cuda')
     model_size, trainable_model_size = cal_model_params(model)
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
