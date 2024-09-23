@@ -68,6 +68,9 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         with autocast():
             pred = model(gs)
             loss = F.cross_entropy(pred, target)
+        # scheduler.step(scheduler_steps)
+        # scheduler_steps += 1
+        scheduler.step()
         if cfg.use_amp:
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -76,9 +79,6 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss.backward()
             optimizer.step()
         optimizer.zero_grad(set_to_none=True)
-        # scheduler.step(scheduler_steps)
-        # scheduler_steps += 1
-        scheduler.step()
 
         m.update(pred, target)
         loss_meter.update(loss.item())
