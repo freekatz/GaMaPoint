@@ -107,24 +107,9 @@ class PointMambaLayer(nn.Module):
         assert len(f.shape) == 2
         f = f.unsqueeze(0)
         B, N, C = f.shape
-        cov3d = gs.gs_points.cov3d
-
-        # get order
-        cam_order = p_gs[:, 2]
-        idx = torch.argsort(cam_order, dim=0, descending=True)
-        order = Order(idx.unsqueeze(0))
-        # apply mask
-        mask = None
-        if self.config.use_mask:
-            mask = StructuredMask(
-                mask_type='cov3d',
-                mask_params={'cov3d': cov3d, 'd_model': self.config.d_model}
-            )
-
-        # todo
         mask = None
         f_global = self.mixer(input_ids=f,
-                              mask=mask, gs=gs, order=order)
+                              mask=mask, gs=None, order=None)
         alpha = self.alpha.sigmoid()
         f = f_global * alpha + f * (1 - alpha)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
@@ -375,8 +360,6 @@ class Stage(nn.Module):
         pts = gs.gs_points.pts_list[self.layer_index]
         f = self.res_mlp(f, group_idx, pts.tolist())
 
-        f_out = self.pm(p, p_gs, f, gs)
-
         if not self.is_tail:
             f_out_sub, c_sub = self.sub_stage(p, p_gs, f, gs)
         else:
@@ -393,6 +376,7 @@ class Stage(nn.Module):
             closs = F.mse_loss(rel_p, rel_cor)
             c_sub = c_sub + closs if c_sub is not None else closs
 
+        f_out = self.pm(p, p_gs, f, gs)
         f_out = self.post_proj(f_out)
         if not self.is_head:
             us_idx = gs.gs_points.idx_us[self.layer_index - 1]
