@@ -31,9 +31,9 @@ class GaMaConfig(BaseConfig):
     encoder_cfg = BaseConfig()
     encoder_cfg.name = 'EncoderConfig'
     encoder_cfg.in_channels = 4
-    encoder_cfg.channel_list = [64, 128, 256, 512]
-    encoder_cfg.mamba_blocks = [1, 1, 2, 1]
-    encoder_cfg.res_blocks = [4, 4, 8, 4]
+    encoder_cfg.channel_list = [64, 192, 384, 768]
+    encoder_cfg.mamba_blocks = [1, 1, 1, 1]
+    encoder_cfg.res_blocks = [2, 2, 4, 2]
     encoder_cfg.mlp_ratio = 2.
     encoder_cfg.bn_momentum = bn_momentum
     drop_rates = torch.linspace(0., drop_path, sum(encoder_cfg.res_blocks)).split(encoder_cfg.res_blocks)
