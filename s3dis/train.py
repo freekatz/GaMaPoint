@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import SegHead, Encoder, Decoder
+from backbone import SegHead, Stage
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -49,27 +49,32 @@ def warmup(model: nn.Module, warmup_loader):
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred = model(gs)
-            loss = F.cross_entropy(pred, target)
+            pred, cross = model(gs)
+            loss = F.cross_entropy(pred, target) + cross
         loss.backward()
 
 
 def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps):
     model.train()
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
+    steps_per_epoch = len(train_loader)
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
+    cross_loss_meter = AverageMeter()
     for idx, gs in pbar:
+        lam = scheduler_steps/(epoch*steps_per_epoch)
+        lam = 3e-3 ** lam * .25
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred = model(gs)
-            loss = F.cross_entropy(pred, target)
+            pred, cross = model(gs)
+            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls)
         if cfg.use_amp:
-            scaler.scale(loss).backward()
+            scaler.scale(loss + cross*lam).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
+            loss = loss + cross*lam
             loss.backward()
             optimizer.step()
         optimizer.zero_grad(set_to_none=True)
@@ -78,9 +83,13 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
 
         m.update(pred, target)
         loss_meter.update(loss.item())
-        pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] Loss {loss_meter.avg:.4f} mACC {m.calc_macc():.4f}")
+        cross_loss_meter.update(cross.item())
+        pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
+                             + f"Loss {loss_meter.avg:.4f} "
+                             + f"CrossLoss {cross_loss_meter.avg:.4f} "
+                             + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
-    return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
+    return loss_meter.avg, cross_loss_meter.avg, miou, macc, iou, acc, scheduler_steps
 
 
 def validate(cfg, model, val_loader, epoch):
@@ -159,15 +168,11 @@ def main(cfg):
 
     steps_per_epoch = len(train_loader)
 
-    encoder = Encoder(
-        **cfg.gama_cfg.encoder_cfg,
-    ).to('cuda')
-    decoder = Decoder(
-        **cfg.gama_cfg.decoder_cfg,
+    stage = Stage(
+        **cfg.gama_cfg.stage_cfg,
     ).to('cuda')
     model = SegHead(
-        encoder=encoder,
-        decoder=decoder,
+        stage=stage,
         num_classes=cfg.gama_cfg.num_classes,
         bn_momentum=cfg.gama_cfg.bn_momentum,
     ).to('cuda')
@@ -210,14 +215,14 @@ def main(cfg):
     warmup(model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
+        train_loss, train_cross_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
-                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} '
+                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} train_cross_loss={train_cross_loss:.4f} '
                      + f'train_macc={train_macc:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
                      + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
@@ -250,6 +255,7 @@ def main(cfg):
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
             writer.add_scalar('val_macc', val_macc, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
+            writer.add_scalar('train_cross_loss', train_cross_loss, epoch)
             writer.add_scalar('train_miou', train_miou, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
@@ -278,7 +284,7 @@ if __name__ == '__main__':
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=100)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
-    parser.add_argument("--lr", type=float, required=False, default=0.001)
+    parser.add_argument("--lr", type=float, required=False, default=1e-3)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
