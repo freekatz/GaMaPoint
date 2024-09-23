@@ -259,18 +259,18 @@ class Stage(nn.Module):
                  head_drops=None,
                  mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False},
-                 cor_std=None,
+                 cross_std=None,
                  **kwargs
                  ):
         super().__init__()
-        assert cor_std is not None
+        assert cross_std is not None
         self.layer_index = layer_index
         is_head = self.layer_index == 0
         self.is_head = is_head
         is_tail = self.layer_index == len(channel_list) - 1
         self.is_tail = is_tail
-        self.in_channels = in_channels if is_head else channel_list[layer_index]
-        self.out_channels = channel_list[layer_index] if is_head else channel_list[layer_index - 1]
+        self.in_channels = in_channels if is_head else channel_list[layer_index-1]
+        self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
 
         if not is_head:
@@ -301,10 +301,10 @@ class Stage(nn.Module):
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
-            res_blocks=self.res_blocks[layer_index],
-            mlp_ratio=self.mlp_ratio,
-            bn_momentum=self.bn_momentum,
-            drop_path=self.drop_paths[layer_index],
+            res_blocks=res_blocks[layer_index],
+            mlp_ratio=mlp_ratio,
+            bn_momentum=bn_momentum,
+            drop_path=drop_paths[layer_index],
         )
 
         mamba_config.n_layer = mamba_blocks[layer_index]
@@ -317,7 +317,7 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
         )
 
-        self.cor_std = 1 / cor_std[layer_index]
+        self.cor_std = 1 / cross_std[layer_index]
         self.cor_head = nn.Sequential(
             nn.Linear(self.out_channels, 32, bias=False),
             nn.BatchNorm1d(32, momentum=bn_momentum),
@@ -329,7 +329,7 @@ class Stage(nn.Module):
             nn.BatchNorm1d(self.out_channels, momentum=bn_momentum),
             nn.Linear(self.out_channels, head_channels, bias=False),
         )
-        nn.init.constant_(self.postproj[0].weight, (channel_list[0] / self.out_channels) ** 0.5)
+        nn.init.constant_(self.post_proj[0].weight, (channel_list[0] / self.out_channels) ** 0.5)
         self.head_drop = DropPath(head_drops[layer_index])
 
         if not is_tail:
@@ -344,12 +344,15 @@ class Stage(nn.Module):
                 bn_momentum=bn_momentum,
                 drop_paths=drop_paths,
                 head_drops=head_drops,
+                mamba_config=mamba_config,
+                hybrid_args=hybrid_args,
+                cross_std=cross_std
             )
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
         if not self.is_head:
-            p, idx = gs.gs_points.down_sampling('p', self.layer_idx - 1, need_idx=True)
+            p, idx = gs.gs_points.down_sampling('p', self.layer_index - 1, need_idx=True)
             p_gs = p_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
@@ -369,12 +372,12 @@ class Stage(nn.Module):
         f_nbr = self.nbr_bn(f_nbr)
         f = f_nbr if self.is_head else f_nbr + f
 
-        pts = gs.gs_points.pts_list[self.layer_idx]
+        pts = gs.gs_points.pts_list[self.layer_index]
         f = self.res_mlp(f, group_idx, pts.tolist())
 
-        f_out = self.pm(f)
+        f_out = self.pm(p, p_gs, f, gs)
 
-        if not self.last:
+        if not self.is_tail:
             f_out_sub, c_sub = self.sub_stage(p, p_gs, f, gs)
         else:
             f_out_sub = c_sub = None
@@ -391,8 +394,8 @@ class Stage(nn.Module):
             c_sub = c_sub + closs if c_sub is not None else closs
 
         f_out = self.post_proj(f_out)
-        if not self.first:
-            us_idx = gs.gs_points.idx_us[self.layer_idx]
+        if not self.is_head:
+            us_idx = gs.gs_points.idx_us[self.layer_index - 1]
             f_out = f_out[us_idx]
         f_out = self.head_drop(f_out)
         f_out = f_out_sub + f_out if f_out_sub is not None else f_out
@@ -417,7 +420,7 @@ class SegHead(nn.Module):
 
         self.apply(self.__init_weights)
 
-    def _init_weights(self, m):
+    def __init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
