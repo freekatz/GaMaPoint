@@ -7,8 +7,7 @@ from torch_kdtree import build_kd_tree
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
-from utils.cutils import grid_subsampling, KDTree
-from utils.dict_utils import ObjDict
+from utils.cutils import grid_subsampling
 
 
 def create_sampler(sampler='random', **kwargs):

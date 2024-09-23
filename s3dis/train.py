@@ -51,8 +51,8 @@ def warmup(model: nn.Module, warmup_loader):
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred, cross = model(gs)
-            loss = F.cross_entropy(pred, target) + cross
+            pred = model(gs)
+            loss = F.cross_entropy(pred, target)
         loss.backward()
 
 
@@ -62,7 +62,6 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     steps_per_epoch = len(train_loader)
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
-    cross_loss_meter = AverageMeter()
     for idx, gs in pbar:
         lam = scheduler_steps/(epoch*steps_per_epoch)
         lam = 3e-3 ** lam * .25
@@ -71,27 +70,24 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred, cross = model(gs)
+            pred = model(gs)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss + cross*lam).backward()
+            scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = loss + cross*lam
             loss.backward()
             optimizer.step()
 
         m.update(pred, target)
         loss_meter.update(loss.item())
-        cross_loss_meter.update(cross.item())
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
-                             + f"CrossLoss {cross_loss_meter.avg:.4f} "
                              + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
-    return loss_meter.avg, cross_loss_meter.avg, miou, macc, iou, acc, scheduler_steps
+    return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
 
 
 def validate(cfg, model, val_loader, epoch):
@@ -216,14 +212,14 @@ def main(cfg):
     warmup(model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_cross_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
+        train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
-                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} train_cross_loss={train_cross_loss:.4f} '
+                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} '
                      + f'train_macc={train_macc:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
                      + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
@@ -256,7 +252,6 @@ def main(cfg):
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
             writer.add_scalar('val_macc', val_macc, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
-            writer.add_scalar('train_cross_loss', train_cross_loss, epoch)
             writer.add_scalar('train_miou', train_miou, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
