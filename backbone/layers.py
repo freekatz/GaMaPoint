@@ -299,7 +299,7 @@ def create_mixer(
     min_heads = max(d_model // ssm_cfg.headdim, 8)
     if num_heads < min_heads:
         logging.warning(
-            f'num heads {num_heads} > min heads {min_heads}, will replace with {min_heads}')
+            f'num heads {num_heads} < min heads {min_heads}, will replace with {min_heads}')
         num_heads = min_heads
     attn_cfg.num_heads = num_heads
     attn_cfg = attn_cfg if hybrid else None
