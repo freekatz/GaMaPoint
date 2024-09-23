@@ -206,7 +206,7 @@ def main(cfg):
     #                               warmup_lr_init=cfg.lr / 20)
     scheduler = CosineAnnealingLR(
         optimizer,
-        T_max=cfg.epochs * steps_per_epoch,
+        T_max=(cfg.epochs-start_epoch+1) * steps_per_epoch,
     )
 
     warmup(model, warmup_loader)
