@@ -21,9 +21,8 @@ from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist
-from utils.metrics import Metric, AverageMeter
+from utils.metrics import Timer, Metric, AverageMeter
 from utils.random import set_random_seed
-from utils.timer import Timer
 
 
 def prepare_exp(cfg):
