@@ -64,11 +64,14 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     for idx, gs in pbar:
         lam = scheduler_steps/(epoch*steps_per_epoch)
         lam = 3e-3 ** lam * .25
+        scheduler.step(scheduler_steps)
+        scheduler_steps += 1
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
             pred, cross = model(gs)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls)
+        optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
             scaler.scale(loss + cross*lam).backward()
             scaler.step(optimizer)
@@ -77,9 +80,6 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss = loss + cross*lam
             loss.backward()
             optimizer.step()
-        optimizer.zero_grad(set_to_none=True)
-        scheduler.step(scheduler_steps)
-        scheduler_steps += 1
 
         m.update(pred, target)
         loss_meter.update(loss.item())
@@ -198,7 +198,7 @@ def main(cfg):
         best_miou = model_dict['best_miou']
         logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
 
-    scheduler_steps = steps_per_epoch * start_epoch
+    scheduler_steps = steps_per_epoch * (start_epoch - 1)
     scheduler = CosineLRScheduler(optimizer,
                                   t_initial=cfg.epochs * steps_per_epoch,
                                   lr_min=cfg.lr / 10000,
