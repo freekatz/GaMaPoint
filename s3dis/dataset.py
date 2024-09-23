@@ -116,6 +116,7 @@ class S3DIS(Dataset):
         feature = torch.cat([colors, height], dim=1)
 
         # todo data transform pipe here
+        xyz.mul_(40)
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
@@ -140,6 +141,7 @@ class S3DIS(Dataset):
         feature = torch.cat([colors, xyz[:, 2:]], dim=1)
 
         # todo data transform pipe here
+        xyz.mul_(40)
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
