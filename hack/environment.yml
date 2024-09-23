@@ -1,4 +1,4 @@
-name: openpoints
+name: gama_points
 channels:
   - pytorch
   - nvidia

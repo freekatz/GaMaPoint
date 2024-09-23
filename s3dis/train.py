@@ -193,14 +193,13 @@ def main(cfg):
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        logging.info(f"Resume model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
-    if cfg.mode == 'finetune' or cfg.mode == 'resume':
+        cfg.epochs = cfg.epochs + start_epoch - 1
+        logging.info(f"Resume model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+    if cfg.mode == 'finetune':
         model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
-        start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        cfg.epochs = cfg.epochs + start_epoch - 1
-        logging.info(f"Load model from {cfg.ckpt}, best_miou={best_miou}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     scheduler_steps = steps_per_epoch * start_epoch
 
     warmup(model, warmup_loader)
@@ -219,7 +218,8 @@ def main(cfg):
         time_cost = timer.record(f'epoch_{epoch - 1}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
-                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} train_miou={train_miou:.4f} '
+                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f}'
+                     + f'train_macc={train_miou:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
                      + f'time_cost={timer_meter.avg:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
         is_best = False
