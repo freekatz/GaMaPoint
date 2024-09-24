@@ -129,7 +129,7 @@ class ScanNetV2(Dataset):
                  ):
         dataset_dir = Path(dataset_dir)
         data_list = scan_train_list if train else scan_val_list
-        self.data_paths = [dataset_dir / f"{p}.pt" for p in data_list]
+        self.data_paths = [f"{dataset_dir}/{p}.pt" for p in data_list]
         self.loop = loop
         self.train = train
         self.warmup = warmup
