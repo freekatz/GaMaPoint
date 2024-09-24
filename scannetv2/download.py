@@ -4,6 +4,7 @@
 # -*- coding: utf-8 -*-
 import argparse
 import os
+import time
 import urllib.request  #(for python3)
 #import urllib
 import tempfile
@@ -60,6 +61,7 @@ def download_file(url, out_file):
         urllib.request.urlretrieve(url, out_file_tmp)
         #urllib.urlretrieve(url, out_file_tmp)
         os.rename(out_file_tmp, out_file)
+        time.sleep(1)
     else:
         print('WARNING: skipping download of existing file ' + out_file)
 
