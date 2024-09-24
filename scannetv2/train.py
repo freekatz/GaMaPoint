@@ -217,7 +217,7 @@ def main(cfg):
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
-                     + f'\nlr={lr:.6f} train_loss={train_loss:.4f} '
+                     + f'lr={lr:.6f} train_loss={train_loss:.4f} '
                      + f'train_macc={train_macc:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
                      + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
@@ -233,7 +233,7 @@ def main(cfg):
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
                 logging.info(f'@E{epoch} val results: '
-                             + f'\nval_macc={val_macc:.4f} val_accs={val_accs.detach().cpu().numpy():.4f} '
+                             + f'val_macc={val_macc:.4f} val_accs={val_accs.detach().cpu().numpy():.4f} '
                              + f'val_miou={val_miou:.4f}  best_val_miou={best_miou:.4f}'
                              + f'\nval_ious={val_ious.detach().cpu().numpy()}')
         if is_best:
