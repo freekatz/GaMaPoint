@@ -78,9 +78,6 @@ class GaussianOptions(dict):
 
 
 class GaussianPoints(object):
-    def __init__(self, batch_size):
-        self.batch_size = batch_size
-
     def __set_attr__(self, key, value):
         assert not self.__is_attr_exists__(key)
         self.__dict__[key] = value
@@ -246,10 +243,10 @@ class NaiveGaussian3D:
         self.batch_size = batch_size
         self.device = device
 
-        self.gs_points = GaussianPoints(batch_size)
+        self.gs_points = GaussianPoints()
 
     def init_points(self):
-        self.gs_points = GaussianPoints(self.batch_size)
+        self.gs_points = GaussianPoints()
 
     def generate_cameras(self, xyz):
         """
@@ -397,19 +394,18 @@ class NaiveGaussian3D:
 
     @torch.no_grad()
     def cov3d(self, xyz_padded):
+        # todo support manual idx
         """
         :param xyz_padded: [N, n_neighbors, 3]
         :return: [N, 3, 3]
         """
         visible = self.gs_points.visible
-        visible = torch.reshape(visible, (self.batch_size, -1, 1))
-        xyz_padded = torch.reshape(xyz_padded, (self.batch_size, -1, xyz_padded.shape[1], 3))
-        cov3d = compute_cov3d(xyz_padded, visible)
-        cov3d = torch.reshape(cov3d, (-1, 3, 3))
+        cov3d = compute_cov3d(xyz_padded.unsqueeze(0), visible.unsqueeze(0)).squeeze(0)
         return cov3d
 
     @torch.no_grad()
     def cov2d(self, xyz, cov3d):
+        # todo support manual idx
         """
         :param xyz: [N, 3]
         :param cov3d: [N, 3, 3]
@@ -417,16 +413,11 @@ class NaiveGaussian3D:
         """
         n_cameras = self.opt.n_cameras
         cam_width, cam_height = self.opt.cam_field_size
-        uv = self.gs_points.uv
-        visible = self.gs_points.visible
-        cam_intr = self.gs_points.cam_intr
-        cam_extr = self.gs_points.cam_extr
-
-        xyz = torch.reshape(xyz, (self.batch_size, -1, 3))
-        uv = torch.reshape(uv, (self.batch_size, -1, 2))
-        visible = torch.reshape(visible, (self.batch_size, -1, 1))
-        cam_intr = torch.repeat_interleave(cam_intr, self.batch_size, dim=0)
-        cam_extr = torch.repeat_interleave(cam_extr, self.batch_size, dim=0)
+        uv = self.gs_points.uv.unsqueeze(0)
+        visible = self.gs_points.visible.unsqueeze(0)
+        cam_intr = self.gs_points.cam_intr.unsqueeze(0)
+        cam_extr = self.gs_points.cam_extr.unsqueeze(0)
+        xyz = xyz.unsqueeze(0)
 
         cov2d_all = []
         for j in range(n_cameras * 2):
@@ -441,8 +432,7 @@ class NaiveGaussian3D:
                 visible=visible[:, :, j].squeeze(-1),
             )
             cov2d_all.append(cov2d)
-        cov2d = torch.stack(cov2d_all, dim=-1)
-        cov2d = torch.reshape(cov2d, (-1, 3, n_cameras * 2))
+        cov2d = torch.stack(cov2d_all, dim=-1).squeeze(0)
         return cov2d
 
 

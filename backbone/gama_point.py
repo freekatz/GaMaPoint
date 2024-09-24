@@ -42,11 +42,9 @@ class Stage(nn.Module):
             self.la = LocalAggregation(self.in_channels, self.out_channels, bn_momentum, 0.3)
             nn.init.constant_(self.skip_proj[1].weight, 0.3)
 
-        # 7 -- 16 -- 32 -- out_channels -- out_channels
-        # 3 -- 8 -- 16 -- 32 -- out_channels
         nbr_in_channels = 3 + self.in_channels if is_head else 3
-        nbr_hidden_channels = 32 if is_head else 16
-        nbr_out_channels = self.out_channels if is_head else 32
+        nbr_hidden_channels = channel_list[0] if is_head else channel_list[0]//2
+        nbr_out_channels = self.out_channels if is_head else channel_list[0]
         self.nbr_embed = nn.Sequential(
             nn.Linear(nbr_in_channels, nbr_hidden_channels // 2, bias=False),
             nn.BatchNorm1d(nbr_hidden_channels // 2, momentum=bn_momentum),
