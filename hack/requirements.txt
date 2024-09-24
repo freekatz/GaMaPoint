@@ -18,6 +18,7 @@ packaging
 pandas
 pickleshare
 pillow
+plyfile
 protobuf
 pyvista
 pyyaml

@@ -16,8 +16,8 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from backbone import SegHead, Stage
-from s3dis.configs import model_configs
-from s3dis.dataset import S3DIS, s3dis_collate_fn
+from scannetv2.configs import model_configs
+from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist
@@ -107,34 +107,34 @@ def main(cfg):
     logging.info(f'Config:\n{cfg.__str__()}')
 
     warmup_loader = DataLoader(
-        S3DIS(
+        ScanNetV2(
             dataset_dir=cfg.dataset,
             area=f'!{cfg.val_area}',
             loop=cfg.batch_size,
             train=True,
             warmup=True,
-            voxel_max=cfg.s3dis_warmup_cfg.voxel_max,
+            voxel_max=cfg.scannetv2_warmup_cfg.voxel_max,
             batch_size=1,
-            gs_opts=cfg.s3dis_warmup_cfg.gs_opts
+            gs_opts=cfg.scannetv2_warmup_cfg.gs_opts
         ),
         batch_size=1,
-        collate_fn=s3dis_collate_fn,
+        collate_fn=scannetv2_collate_fn,
         pin_memory=True,
         num_workers=cfg.num_workers,
     )
     train_loader = DataLoader(
-        S3DIS(
+        ScanNetV2(
             dataset_dir=cfg.dataset,
             area=f'!{cfg.val_area}',
             loop=cfg.train_loop,
             train=True,
             warmup=False,
-            voxel_max=cfg.s3dis_cfg.voxel_max,
+            voxel_max=cfg.scannetv2_cfg.voxel_max,
             batch_size=cfg.batch_size,
-            gs_opts=cfg.s3dis_cfg.gs_opts
+            gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
-        collate_fn=s3dis_collate_fn,
+        collate_fn=scannetv2_collate_fn,
         shuffle=True,
         pin_memory=True,
         persistent_workers=True,
@@ -142,18 +142,18 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     val_loader = DataLoader(
-        S3DIS(
+        ScanNetV2(
             dataset_dir=cfg.dataset,
             area=cfg.val_area,
             loop=cfg.val_loop,
             train=False,
             warmup=False,
-            voxel_max=cfg.s3dis_cfg.voxel_max,
+            voxel_max=cfg.scannetv2_cfg.voxel_max,
             batch_size=1,
-            gs_opts=cfg.s3dis_cfg.gs_opts
+            gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
         batch_size=1,
-        collate_fn=s3dis_collate_fn,
+        collate_fn=scannetv2_collate_fn,
         pin_memory=True,
         persistent_workers=True,
         num_workers=cfg.num_workers,
@@ -255,9 +255,9 @@ def main(cfg):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('s3dis training')
+    parser = argparse.ArgumentParser('scannetv2 training')
     # for prepare
-    parser.add_argument('--exp', type=str, required=False, default='s3dis')
+    parser.add_argument('--exp', type=str, required=False, default='scannetv2')
     parser.add_argument('--mode', type=str, required=False, default='train', choices=['train', 'finetune', 'resume'])
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
@@ -288,9 +288,9 @@ if __name__ == '__main__':
     cfg = EasyConfig()
     cfg.load_args(args)
 
-    s3dis_cfg, s3dis_warmup_cfg, gama_cfg = model_configs[cfg.model_size]
-    cfg.s3dis_cfg = s3dis_cfg
-    cfg.s3dis_warmup_cfg = s3dis_warmup_cfg
+    scannetv2_cfg, scannetv2_warmup_cfg, gama_cfg = model_configs[cfg.model_size]
+    cfg.scannetv2_cfg = scannetv2_cfg
+    cfg.scannetv2_warmup_cfg = scannetv2_warmup_cfg
     cfg.gama_cfg = gama_cfg
 
     if cfg.mode == 'finetune':
