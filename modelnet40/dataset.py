@@ -8,7 +8,7 @@ import math
 from torch.utils.data import Dataset
 from pathlib import Path
 
-from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list
+from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list, fps_sample
 from utils.cutils import grid_subsampling, grid_subsampling_test
 
 
@@ -18,7 +18,8 @@ class ModelNet40(Dataset):
                  train=True,
                  warmup=False,
                  voxel_max=1024,
-                 k=[24, 24, 24, 24],
+                 k=[20, 20, 20],
+                 strides=[1, 4, 4],
                  batch_size=32,
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
@@ -29,6 +30,7 @@ class ModelNet40(Dataset):
         self.warmup = warmup
         self.voxel_max = voxel_max
         self.k = k
+        self.strides = strides
         self.batch_size = batch_size
         self.gs_opts = gs_opts
 
@@ -45,14 +47,17 @@ class ModelNet40(Dataset):
         return self.datas.shape[0]
 
     def __getitem__(self, idx):
-        xyz = self.datas[idx][:self.voxel_max]
+        xyz, ds_idx = fps_sample(self.datas[idx], self.voxel_max)
+        label = self.label[idx][ds_idx]
 
-        # todo data transform pipe here
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
-        gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx)
-        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.strides, up_sample=False)
         return gs
 
+def modelnet40_collate_fn(batch):
+    gs_list = list(batch)
+    new_gs = merge_gs_list(gs_list)
+    return new_gs

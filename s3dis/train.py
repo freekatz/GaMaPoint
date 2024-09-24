@@ -114,6 +114,8 @@ def main(cfg):
             train=True,
             warmup=True,
             voxel_max=cfg.s3dis_warmup_cfg.voxel_max,
+            k=cfg.s3dis_warmup_cfg.k,
+            grid_size=cfg.s3dis_warmup_cfg.grid_size,
             batch_size=1,
             gs_opts=cfg.s3dis_warmup_cfg.gs_opts
         ),
@@ -130,6 +132,8 @@ def main(cfg):
             train=True,
             warmup=False,
             voxel_max=cfg.s3dis_cfg.voxel_max,
+            k=cfg.s3dis_cfg.k,
+            grid_size=cfg.s3dis_cfg.grid_size,
             batch_size=cfg.batch_size,
             gs_opts=cfg.s3dis_cfg.gs_opts
         ),
@@ -149,6 +153,8 @@ def main(cfg):
             train=False,
             warmup=False,
             voxel_max=cfg.s3dis_cfg.voxel_max,
+            k=cfg.s3dis_cfg.k,
+            grid_size=cfg.s3dis_cfg.grid_size,
             batch_size=1,
             gs_opts=cfg.s3dis_cfg.gs_opts
         ),

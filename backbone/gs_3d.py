@@ -436,8 +436,10 @@ class NaiveGaussian3D:
         return cov2d
 
 
-def make_gs_points(gs_points, grid_size, ks) -> GaussianPoints:
-    n_layers = len(grid_size)
+def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True) -> GaussianPoints:
+    assert (grid_size is not None and strides is not None) is False
+    assert (grid_size is None and strides is None) is False
+    n_layers = len(ks)
     p = gs_points.p
     p_gs = gs_points.p_gs
 
@@ -449,11 +451,15 @@ def make_gs_points(gs_points, grid_size, ks) -> GaussianPoints:
     for i in range(n_layers):
         # down sample
         if i > 0:
-            gsize = grid_size[i]
-            if p.is_cuda:
-                ds_idx = grid_subsampling(p.detach().cpu(), gsize)
+            if grid_size is not None:
+                gsize = grid_size[i]
+                if p.is_cuda:
+                    ds_idx = grid_subsampling(p.detach().cpu(), gsize)
+                else:
+                    ds_idx = grid_subsampling(p, gsize)
             else:
-                ds_idx = grid_subsampling(p, gsize)
+                stride = strides[i]
+                _, ds_idx = fps_sample(p, p.shape[0]//stride)
             p = p[ds_idx]
             p_gs = p_gs[ds_idx]
             idx_ds.append(ds_idx)
@@ -466,7 +472,7 @@ def make_gs_points(gs_points, grid_size, ks) -> GaussianPoints:
         idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k)[1].long())
 
         # up sample
-        if i > 0:
+        if i > 0 and up_sample:
             us_idx = kdt.query(gs_points.p, 1)[1].squeeze(-1)
             idx_us.append(us_idx)
 
@@ -477,7 +483,7 @@ def make_gs_points(gs_points, grid_size, ks) -> GaussianPoints:
     return gs_points
 
 
-def merge_gs_list(gs_list) -> NaiveGaussian3D:
+def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     assert len(gs_list) > 0
     new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=gs_list[0].batch_size)
 
@@ -505,9 +511,10 @@ def merge_gs_list(gs_list) -> NaiveGaussian3D:
         idx_gs_group = gs.gs_points.idx_gs_group
         pts = []
         for layer_idx in range(n_layers):
-            if layer_idx < len(idx_us):
+            if layer_idx < len(idx_ds):
                 idx_ds[layer_idx].add_(pts_per_layer[layer_idx])
-                idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
+                if up_sample:
+                    idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
             idx_group[layer_idx].add_(pts_per_layer[layer_idx])
             idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
             pts.append(idx_group[layer_idx].shape[0])

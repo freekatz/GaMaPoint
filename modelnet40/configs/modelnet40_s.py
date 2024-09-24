@@ -10,6 +10,7 @@ from modelnet40.configs.config import BaseConfig
 class ModelNet40Config(BaseConfig):
     name = 'ModelNet40Config'
     k = [20, 20, 20]
+    strides = [1, 4, 4]
     voxel_max=1024
     gs_opts = GaussianOptions.default()
 
@@ -17,6 +18,7 @@ class ModelNet40Config(BaseConfig):
 class ModelNet40WarmupConfig(BaseConfig):
     name = 'ModelNet40WarmupConfig'
     k = [20, 20, 20]
+    strides = [1, 4, 4]
     voxel_max=1024
     gs_opts = GaussianOptions.default()
 

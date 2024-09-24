@@ -15,9 +15,9 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import SegHead, Stage
+from backbone import ClsHead, Stage
 from modelnet40.configs import model_configs
-from modelnet40.dataset import S3DIS, modelnet40_collate_fn
+from modelnet40.dataset import ModelNet40, modelnet40_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist
@@ -107,13 +107,13 @@ def main(cfg):
     logging.info(f'Config:\n{cfg.__str__()}')
 
     warmup_loader = DataLoader(
-        S3DIS(
+        ModelNet40(
             dataset_dir=cfg.dataset,
-            area=f'!{cfg.val_area}',
-            loop=cfg.batch_size,
             train=True,
             warmup=True,
             voxel_max=cfg.modelnet40_warmup_cfg.voxel_max,
+            k=cfg.modelnet40_warmup_cfg.k,
+            strides=cfg.modelnet40_warmup_cfg.strides,
             batch_size=1,
             gs_opts=cfg.modelnet40_warmup_cfg.gs_opts
         ),
@@ -123,13 +123,13 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     train_loader = DataLoader(
-        S3DIS(
+        ModelNet40(
             dataset_dir=cfg.dataset,
-            area=f'!{cfg.val_area}',
-            loop=cfg.train_loop,
             train=True,
             warmup=False,
             voxel_max=cfg.modelnet40_cfg.voxel_max,
+            k=cfg.modelnet40_cfg.k,
+            strides=cfg.modelnet40_cfg.strides,
             batch_size=cfg.batch_size,
             gs_opts=cfg.modelnet40_cfg.gs_opts
         ),
@@ -142,13 +142,13 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     val_loader = DataLoader(
-        S3DIS(
+        ModelNet40(
             dataset_dir=cfg.dataset,
-            area=cfg.val_area,
-            loop=cfg.val_loop,
             train=False,
             warmup=False,
             voxel_max=cfg.modelnet40_cfg.voxel_max,
+            k=cfg.modelnet40_cfg.k,
+            strides=cfg.modelnet40_cfg.strides,
             batch_size=1,
             gs_opts=cfg.modelnet40_cfg.gs_opts
         ),
@@ -162,7 +162,7 @@ def main(cfg):
     stage = Stage(
         **cfg.gama_cfg.stage_cfg,
     ).to('cuda')
-    model = SegHead(
+    model = ClsHead(
         stage=stage,
         num_classes=cfg.gama_cfg.num_classes,
         bn_momentum=cfg.gama_cfg.bn_momentum,
@@ -298,7 +298,7 @@ if __name__ == '__main__':
     cfg.use_amp = not cfg.no_amp
 
     # modelnet40
-    cfg.num_classes = 13
+    cfg.num_classes = 40
     cfg.ignore_index = None
 
     prepare_exp(cfg)

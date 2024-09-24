@@ -47,8 +47,8 @@ class S3DIS(Dataset):
                  train=True,
                  warmup=False,
                  voxel_max=24000,
-                 grid_size=[0.04, 0.08, 0.16, 0.32],
                  k=[24, 24, 24, 24],
+                 grid_size=[0.04, 0.08, 0.16, 0.32],
                  batch_size=8,
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
@@ -58,8 +58,8 @@ class S3DIS(Dataset):
         self.train = train
         self.warmup = warmup
         self.voxel_max = voxel_max
-        self.grid_size = grid_size
         self.k = k
+        self.grid_size = grid_size
         self.batch_size = batch_size
         self.gs_opts = gs_opts
 
@@ -115,13 +115,12 @@ class S3DIS(Dataset):
         height = xyz[:, 2:]
         feature = torch.cat([colors, height], dim=1)
 
-        # todo data transform pipe here
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx)
-        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None, up_sample=True)
         return gs
 
     def __getitem_test__(self, idx):
@@ -139,13 +138,12 @@ class S3DIS(Dataset):
         colors.mul_(1 / 250.)
         feature = torch.cat([colors, xyz[:, 2:]], dim=1)
 
-        # todo data transform pipe here
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx)
-        gs.gs_points = make_gs_points(gs.gs_points, self.grid_size, self.k)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None, up_sample=True)
         return gs
 
     def xyz_transform(self, xyz):
@@ -160,7 +158,6 @@ class S3DIS(Dataset):
 
     def color_transform(self, colors):
         if self.train and random.random() < 0.2:
-            # todo remove
             colors.fill_(0.)
         else:
             # color transforms

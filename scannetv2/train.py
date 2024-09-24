@@ -109,11 +109,12 @@ def main(cfg):
     warmup_loader = DataLoader(
         ScanNetV2(
             dataset_dir=cfg.dataset,
-            area=f'!{cfg.val_area}',
             loop=cfg.batch_size,
             train=True,
             warmup=True,
             voxel_max=cfg.scannetv2_warmup_cfg.voxel_max,
+            k=cfg.scannetv2_warmup_cfg.k,
+            grid_size=cfg.scannetv2_warmup_cfg.grid_size,
             batch_size=1,
             gs_opts=cfg.scannetv2_warmup_cfg.gs_opts
         ),
@@ -125,11 +126,12 @@ def main(cfg):
     train_loader = DataLoader(
         ScanNetV2(
             dataset_dir=cfg.dataset,
-            area=f'!{cfg.val_area}',
             loop=cfg.train_loop,
             train=True,
             warmup=False,
             voxel_max=cfg.scannetv2_cfg.voxel_max,
+            k=cfg.scannetv2_cfg.k,
+            grid_size=cfg.scannetv2_cfg.grid_size,
             batch_size=cfg.batch_size,
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
@@ -144,11 +146,12 @@ def main(cfg):
     val_loader = DataLoader(
         ScanNetV2(
             dataset_dir=cfg.dataset,
-            area=cfg.val_area,
             loop=cfg.val_loop,
             train=False,
             warmup=False,
             voxel_max=cfg.scannetv2_cfg.voxel_max,
+            k=cfg.scannetv2_cfg.k,
+            grid_size=cfg.scannetv2_cfg.grid_size,
             batch_size=1,
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
@@ -266,9 +269,8 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
-    parser.add_argument('--train_loop', type=int, required=False, default=30)
+    parser.add_argument('--train_loop', type=int, required=False, default=6)
     parser.add_argument('--val_loop', type=int, required=False, default=1)
-    parser.add_argument('--val_area', type=str, required=False, default='5')
     parser.add_argument('--batch_size', type=int, required=False, default=8)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
@@ -297,8 +299,8 @@ if __name__ == '__main__':
         assert cfg.ckpt != ''
     cfg.use_amp = not cfg.no_amp
 
-    # s3dis
-    cfg.num_classes = 13
+    # scannetv2
+    cfg.num_classes = 20
     cfg.ignore_index = None
 
     prepare_exp(cfg)
