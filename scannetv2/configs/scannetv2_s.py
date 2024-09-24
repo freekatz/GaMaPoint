@@ -18,7 +18,7 @@ class ScanNetV2Config(BaseConfig):
 class ScanNetV2WarmupConfig(BaseConfig):
     name = 'ScanNetV2WarmupConfig'
     k = [24, 24, 24, 24, 24]
-    grid_size = [0.02, 2, 3.5, 3.5, 4]
+    grid_size = [0.02, 0.04, 0.08, 0.16, 0.32]
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
 

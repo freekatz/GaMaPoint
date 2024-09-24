@@ -18,7 +18,7 @@ class S3disConfig(BaseConfig):
 class S3disWarmupConfig(BaseConfig):
     name = 'S3disWarmupConfig'
     k = [24, 24, 24, 24]
-    grid_size = [0.04, 3.5, 3.5, 3.5]
+    grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
 

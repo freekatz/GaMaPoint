@@ -144,13 +144,12 @@ class LocalAggregation(nn.Module):
 class Mlp(nn.Module):
     def __init__(self,
                  in_channels,
-                 mlp_ratio,
+                 hidden_channels,
                  bn_momentum,
                  init_weight=0.,
                  **kwargs
                  ):
         super().__init__()
-        hidden_channels = round(in_channels * mlp_ratio)
         self.mlp = nn.Sequential(
             nn.Linear(in_channels, hidden_channels),
             nn.GELU(),
@@ -182,7 +181,8 @@ class InvResMLP(nn.Module):
         super().__init__()
         self.res_blocks = res_blocks
 
-        self.mlp = Mlp(channels, mlp_ratio, bn_momentum, 0.2)
+        hidden_channels = round(channels * mlp_ratio)
+        self.mlp = Mlp(channels, hidden_channels, bn_momentum, 0.2)
         self.blocks = nn.ModuleList([
             LocalAggregation(
                 channels,
@@ -194,7 +194,7 @@ class InvResMLP(nn.Module):
         self.mlps = nn.ModuleList([
             Mlp(
                 channels,
-                mlp_ratio,
+                hidden_channels,
                 bn_momentum,
             )
             for _ in range(res_blocks // 2)
