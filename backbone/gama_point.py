@@ -114,8 +114,8 @@ class Stage(nn.Module):
             p_gs = p_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             pre_gs_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
-            pre_group_idx_all = torch.cat([pre_group_idx, pre_gs_group_idx], dim=1)
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx_all.unsqueeze(0)).squeeze(0)[idx]
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0),
+                                                 pre_gs_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
         group_idx = gs.gs_points.idx_group[self.layer_index]
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
@@ -133,9 +133,8 @@ class Stage(nn.Module):
         f_group = self.spe(f_group, group_idx)
         f = f_group if self.is_head else f_group + f
 
-        group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
         pts = gs.gs_points.pts_list[self.layer_index]
-        f = self.res_mlp(f.unsqueeze(0), group_idx_all.unsqueeze(0), pts.tolist()).squeeze(0)
+        f = self.res_mlp(f.unsqueeze(0), group_idx.unsqueeze(0), gs_group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
         f = self.pm(p, f, gs)
         if not self.is_tail:
             f_sub = self.sub_stage(p, p_gs, f, gs)

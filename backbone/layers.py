@@ -56,16 +56,19 @@ class LocalAggregation(nn.Module):
         self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
         nn.init.constant_(self.bn.weight, init_weight)
 
-    def forward(self, f, group_idx):
+    def forward(self, f, group_idx, gs_group_idx):
         """
         :param f: [B, N, channels]
         :param group_idx: [B, N, K]
+        :param gs_group_idx: [B, N, K]
         :return: [B, N, channels]
         """
         assert len(f.shape) == 3
         B, N, C = f.shape
         f = self.proj(f)
         f = knn_edge_maxpooling(f, group_idx, self.training)
+        f_gs = knn_edge_maxpooling(f, gs_group_idx, self.training)
+        f = f + f_gs
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
         return f
 
@@ -138,10 +141,11 @@ class InvResMLP(nn.Module):
             return f
         return torch.cat([self.drop_paths[block_index](x) for x in torch.split(f, pts, dim=1)], dim=1)
 
-    def forward(self, f, group_idx, pts):
+    def forward(self, f, group_idx, gs_group_idx, pts):
         """
         :param f: [B, N, channels]
         :param group_idx: [B, N, K]
+        :param gs_group_idx: [B, N, K]
         :return: [B, N, channels]
         """
         assert len(f.shape) == 3
@@ -150,7 +154,7 @@ class InvResMLP(nn.Module):
 
         f = f + self.drop_path(self.mlp(f), 0, pts)
         for i in range(self.res_blocks):
-            f = f + self.drop_path(self.blocks[i](f, group_idx), i, pts)
+            f = f + self.drop_path(self.blocks[i](f, group_idx, gs_group_idx), i, pts)
             if i % 2 == 1:
                 f = f + self.drop_path(self.mlps[i // 2](f), i, pts)
         return f
