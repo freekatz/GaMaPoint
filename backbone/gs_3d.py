@@ -351,6 +351,7 @@ class NaiveGaussian3D:
 
         uv_all, depths_all, visible_all, camid_all = [], [], [], []
         cam_intr_all, cam_extr_all = [], []
+        xyz_scaled = repeat(xyz_scaled, 'n c -> b n c', b=cam_batch)
         for j in range(n_cameras * 2 // cam_batch):
             cam_intr_batch = []
             cam_extr_batch = []
@@ -361,7 +362,6 @@ class NaiveGaussian3D:
                 camid[j, ...] = cameras[j*cam_batch + i].camid + cam_seed * n_cameras * 2
                 cam_intr_batch.append(cam_intr)
                 cam_extr_batch.append(cam_extr)
-            xyz_scaled = repeat(xyz_scaled, 'n c -> b n c', b=cam_batch)
             cam_intr = torch.stack(cam_intr_batch, dim=0)
             cam_extr = torch.stack(cam_extr_batch, dim=0)
             uv, depths = project_points(
