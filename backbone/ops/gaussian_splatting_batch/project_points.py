@@ -15,7 +15,7 @@ def project_points(
         a pytorch implementation support batch @msplat
 
     Args:
-        xyz (torch.Tensor): points, [B, N, 3]
+        xyz (torch.Tensor): points, [B, N, 3] or [N, 3]
         intr (torch.Tensor): camera intrinsics, [B, 4]
         extr (torch.Tensor): camera pose, [B, 4, 4]
         W (int): view width of camera field size.
@@ -27,7 +27,8 @@ def project_points(
         uv (torch.Tensor): 2D positions for each point in the image, [B, N, 2]
         depth (torch.Tensor): depth for each point, [B, N, 1]
     """
-    B = xyz.shape[0]
+    assert len(intr.shape) == 2
+    B = intr.shape[0]
     device = xyz.device
 
     K = torch.eye(3, device=device)
