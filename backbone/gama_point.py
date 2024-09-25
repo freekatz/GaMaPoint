@@ -3,9 +3,8 @@ import torch.nn as nn
 from torch.nn.init import trunc_normal_
 from timm.models.layers import DropPath
 
-from backbone.ops import points_scaler
 from backbone.gs_3d import NaiveGaussian3D
-from backbone.layers import LocalAggregation, InvResMLP, PointMambaLayer, SpatialEmbedding, SetAbstraction
+from backbone.layers import InvResMLP, PointMambaLayer, SetAbstraction
 from backbone.mamba_ssm.models import MambaConfig
 
 
