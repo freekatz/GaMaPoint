@@ -341,6 +341,7 @@ class NaiveGaussian3D:
         :param cam_batch: batch size of cameras to project
         :return: [N, 3]
         """
+        assert len(xyz.shape) == 2
         cam_seed = cam_seed % self.batch_size
         n_cameras = self.opt.n_cameras
         assert n_cameras * 2 % cam_batch == 0
