@@ -33,13 +33,12 @@ class Stage(nn.Module):
         self.is_head = is_head
         is_tail = self.layer_index == len(channel_list) - 1
         self.is_tail = is_tail
-        self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
 
         self.sa = SetAbstraction(
             layer_index=layer_index,
-            in_channels=self.in_channels,
+            in_channels=in_channels,
             channel_list=channel_list,
             bn_momentum=bn_momentum,
         )
