@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.nn.init import trunc_normal_
 from timm.models.layers import DropPath
 
+from backbone.ops import points_scaler
 from backbone.gs_3d import NaiveGaussian3D
 from backbone.layers import LocalAggregation, InvResMLP, PointMambaLayer
 from backbone.mamba_ssm.models import MambaConfig
@@ -105,43 +106,43 @@ class Stage(nn.Module):
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
         if not self.is_head:
-            p, idx = gs.gs_points.down_sampling('p', self.layer_index - 1, need_idx=True)
+            idx = gs.gs_points.idx_group[self.layer_index - 1]
+            p = p[idx]
             p_gs = p_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
-        p_nbr, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
-        p_nbr = p_nbr - p.unsqueeze(1)
+        p_group, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
+        p_group = p_group - p.unsqueeze(1)
         if self.is_head:
-            f_nbr = f[group_idx]
-            f_nbr = torch.cat([p_nbr, f_nbr], dim=-1).view(-1, 3 + self.in_channels)
+            f_group = f[group_idx]
+            f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
         else:
-            f_nbr = p_nbr.view(-1, 3)
+            f_group = p_group.view(-1, 3)
 
         N, K = group_idx.shape
         nbr_embed_fn = lambda f: self.nbr_embed(f).view(N, K, -1).max(dim=1)[0]
-        f_nbr = nbr_embed_fn(f_nbr)
-        f_nbr = self.nbr_proj(f_nbr)
-        f_nbr = self.nbr_bn(f_nbr)
-        f = f_nbr if self.is_head else f_nbr + f
+        f_group = nbr_embed_fn(f_group)
+        f_group = self.nbr_proj(f_group)
+        f_group = self.nbr_bn(f_group)
+        f = f_group if self.is_head else f_group + f
 
         pts = gs.gs_points.pts_list[self.layer_index]
         f = self.res_mlp(f.unsqueeze(0), group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
-
+        f = self.pm(p, f, gs)
         if not self.is_tail:
-            f_out_sub = self.sub_stage(p, p_gs, f, gs)
+            f_sub = self.sub_stage(p, f, gs)
         else:
-            f_out_sub = None
+            f_sub = None
 
-        f_out = self.pm(p, p_gs, f, gs)
         if self.task_type == 'seg':
-            f_out = self.post_proj(f_out)
+            f = self.post_proj(f)
             if not self.is_head:
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
-                f_out = f_out[us_idx]
-            f_out = self.head_drop(f_out)
-        f_out = f_out_sub + f_out if f_out_sub is not None else f_out
-        return f_out
+                f = f[us_idx]
+            f = self.head_drop(f)
+        f = f_sub + f if f_sub is not None else f
+        return f
 
 
 class SegHead(nn.Module):

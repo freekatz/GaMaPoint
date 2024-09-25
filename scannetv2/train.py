@@ -50,7 +50,7 @@ def warmup(model: nn.Module, warmup_loader):
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
-            loss = F.cross_entropy(pred, target)
+            loss = F.cross_entropy(pred, target, ignore_index=20)
         loss.backward()
 
 
@@ -64,9 +64,10 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         scheduler_steps += 1
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
+        mask = target != 20
         with autocast():
             pred = model(gs)
-            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls)
+            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=20)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
             scaler.scale(loss).backward()
@@ -76,7 +77,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss.backward()
             optimizer.step()
 
-        m.update(pred, target)
+        m.update(pred[mask], target[mask])
         loss_meter.update(loss.item())
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
@@ -92,9 +93,10 @@ def validate(cfg, model, val_loader, epoch):
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
+        mask = target != 20
         with autocast():
             pred = model(gs)
-        m.update(pred, target)
+        m.update(pred[mask], target[mask])
     acc, macc, miou, iou = m.calc()
     return miou, macc, iou, acc
 
