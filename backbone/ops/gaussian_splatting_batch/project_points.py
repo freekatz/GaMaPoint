@@ -41,7 +41,9 @@ def project_points(
     R = extr[:, :3, :3]
     t = extr[:, :3, -1].unsqueeze(dim=-1)
 
-    pt_cam = torch.matmul(R, xyz.permute(0, 2, 1)) + t
+    xyz_t = xyz.permute(0, 2, 1) if len(xyz.shape) == 3 else xyz.permute(1, 0)
+    pt_cam = torch.matmul(R, xyz_t)
+    pt_cam = pt_cam + t
     # Apply camera intrinsic matrix
     p_proj = torch.matmul(K[:, :], pt_cam)
 
