@@ -354,7 +354,7 @@ class NaiveGaussian3D:
         for j in range(n_cameras * 2 // cam_batch):
             cam_intr_batch = []
             cam_extr_batch = []
-            camid = torch.zeros((cam_batch, xyz_scaled.shape[1], 1), device=self.device)
+            camid = torch.zeros((cam_batch, xyz_scaled.shape[0], 1), device=self.device)
             for i in range(cam_batch):
                 cam_intr = cameras[j*cam_batch + i].intrinsics
                 cam_extr = cameras[j*cam_batch + i].pose
