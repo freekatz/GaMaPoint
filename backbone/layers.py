@@ -12,35 +12,74 @@ from backbone.mamba_ssm.models import MambaConfig, MixerModel
 from utils.cutils import knn_edge_maxpooling
 
 
-class SpatialEmbedding(nn.Module):
+class SetAbstraction(nn.Module):
     def __init__(self,
-                 in_channels,
-                 hidden_channels,
-                 embed_channels,
-                 out_channels,
-                 bn_momentum,
+                 layer_index=0,
+                 in_channels=4,
+                 channel_list=[64, 128, 256, 512],
+                 bn_momentum=0.02,
                  ):
         super().__init__()
-        self.embed = nn.Sequential(
-            nn.Linear(in_channels, hidden_channels // 2, bias=False),
-            nn.BatchNorm1d(hidden_channels // 2, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(hidden_channels // 2, hidden_channels, bias=False),
-            nn.BatchNorm1d(hidden_channels, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(hidden_channels, embed_channels, bias=False),
-        )
-        self.proj = nn.Identity() if embed_channels == out_channels else nn.Linear(embed_channels, out_channels, bias=False)
-        self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
-        nn.init.constant_(self.bn.weight, 0.8 if embed_channels==out_channels else 0.2)
+        self.layer_index = layer_index
+        is_head = self.layer_index == 0
+        self.is_head = is_head
+        is_tail = self.layer_index == len(channel_list) - 1
+        self.is_tail = is_tail
+        self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
+        self.out_channels = channel_list[layer_index]
 
-    def forward(self, f, group_idx):
-        N, K = group_idx.shape
-        embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
-        f = embed_fn(f)
-        f = self.proj(f)
-        f = self.bn(f)
-        return f
+        if not is_head:
+            self.skip_proj = nn.Sequential(
+                nn.Linear(self.in_channels, self.out_channels, bias=False),
+                nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
+            )
+            self.la = LocalAggregation(self.in_channels, self.out_channels, bn_momentum, 0.3)
+            nn.init.constant_(self.skip_proj[1].weight, 0.3)
+
+        embed_in_channels = 3 + 3 + self.in_channels if is_head else 3 + 3
+        embed_hidden_channels = channel_list[0] if is_head else channel_list[0] // 2
+        embed_out_channels = self.out_channels if is_head else channel_list[0]
+
+        self.embed = nn.Sequential(
+            nn.Linear(embed_in_channels, embed_hidden_channels // 2, bias=False),
+            nn.BatchNorm1d(embed_hidden_channels // 2, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(embed_hidden_channels // 2, embed_hidden_channels, bias=False),
+            nn.BatchNorm1d(embed_hidden_channels, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(embed_hidden_channels, embed_out_channels, bias=False),
+        )
+        self.proj = nn.Identity() if is_head else nn.Linear(embed_out_channels, self.out_channels, bias=False)
+        self.bn = nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
+        nn.init.constant_(self.bn.weight, 0.8 if is_head else 0.2)
+
+    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
+        assert len(f.shape) == 2
+        if not self.is_head:
+            idx = gs.gs_points.idx_ds[self.layer_index - 1]
+            p = p[idx]
+            p_gs = p_gs[idx]
+            pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
+
+        group_idx = gs.gs_points.idx_group[self.layer_index]
+        gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
+        p_group = p[group_idx]
+        p_group = p_group - p.unsqueeze(1)
+        if self.is_head:
+            f_group = f[group_idx]
+            f_gs_group = f[gs_group_idx]
+            p_gs_group = p_gs[gs_group_idx]
+            f_group = torch.cat([p_group, p_gs_group, f_group + f_gs_group], dim=-1).view(-1, 3 + 3 + self.in_channels)
+        else:
+            p_gs_group = p_gs[gs_group_idx]
+            f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 3 + 3)
+
+        f_group = self.embed(f_group).max(dim=1)[0]
+        f_group = self.proj(f_group)
+        f_group = self.bn(f_group)
+        f = f_group if self.is_head else f_group + f
+        return p, p_gs, f, gs
 
 
 class LocalAggregation(nn.Module):
@@ -56,19 +95,16 @@ class LocalAggregation(nn.Module):
         self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
         nn.init.constant_(self.bn.weight, init_weight)
 
-    def forward(self, f, group_idx, gs_group_idx):
+    def forward(self, f, group_idx):
         """
         :param f: [B, N, channels]
         :param group_idx: [B, N, K]
-        :param gs_group_idx: [B, N, K]
         :return: [B, N, channels]
         """
         assert len(f.shape) == 3
         B, N, C = f.shape
         f = self.proj(f)
         f = knn_edge_maxpooling(f, group_idx, self.training)
-        f_gs = knn_edge_maxpooling(f, gs_group_idx, self.training)
-        f = f + f_gs
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
         return f
 
@@ -141,11 +177,10 @@ class InvResMLP(nn.Module):
             return f
         return torch.cat([self.drop_paths[block_index](x) for x in torch.split(f, pts, dim=1)], dim=1)
 
-    def forward(self, f, group_idx, gs_group_idx, pts):
+    def forward(self, f, group_idx, pts):
         """
         :param f: [B, N, channels]
         :param group_idx: [B, N, K]
-        :param gs_group_idx: [B, N, K]
         :return: [B, N, channels]
         """
         assert len(f.shape) == 3
@@ -154,7 +189,7 @@ class InvResMLP(nn.Module):
 
         f = f + self.drop_path(self.mlp(f), 0, pts)
         for i in range(self.res_blocks):
-            f = f + self.drop_path(self.blocks[i](f, group_idx, gs_group_idx), i, pts)
+            f = f + self.drop_path(self.blocks[i](f, group_idx), i, pts)
             if i % 2 == 1:
                 f = f + self.drop_path(self.mlps[i // 2](f), i, pts)
         return f
@@ -193,9 +228,9 @@ def create_mixer(
 ):
     config.d_model = d_model
     n_layer = config.n_layer
-    d_intermediate = config.d_intermediate
     ssm_cfg = config.ssm_cfg
     attn_cfg = config.attn_cfg
+    d_intermediate = config.get('d_intermediate', 0)
     rms_norm = config.get('rms_norm', True)
     residual_in_fp32 = config.get('residual_in_fp32', True)
 
@@ -246,17 +281,13 @@ class PointMambaLayer(nn.Module):
         self.config = config
 
         self.mixer = create_mixer(config, channels, hybrid_args)
-        self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
         self.bn = nn.BatchNorm1d(channels, momentum=bn_momentum)
 
-    def forward(self, p, f, gs: NaiveGaussian3D):
+    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
         f = f.unsqueeze(0)
         B, N, C = f.shape
         mask = None
-        f_global = self.mixer(input_ids=f,
-                              mask=mask, gs=None, order=None)
-        alpha = self.alpha.sigmoid()
-        f = f_global * alpha + f * (1 - alpha)
+        f = f + self.mixer(input_ids=f, mask=mask, gs=gs, order=None)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
         return f.squeeze(0)

@@ -5,7 +5,7 @@ from timm.models.layers import DropPath
 
 from backbone.ops import points_scaler
 from backbone.gs_3d import NaiveGaussian3D
-from backbone.layers import LocalAggregation, InvResMLP, PointMambaLayer, SpatialEmbedding
+from backbone.layers import LocalAggregation, InvResMLP, PointMambaLayer, SpatialEmbedding, SetAbstraction
 from backbone.mamba_ssm.models import MambaConfig
 
 
@@ -38,32 +38,12 @@ class Stage(nn.Module):
         self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
 
-        if not is_head:
-            self.skip_proj = nn.Sequential(
-                nn.Linear(self.in_channels, self.out_channels, bias=False),
-                nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
-            )
-            self.la = LocalAggregation(self.in_channels, self.out_channels, bn_momentum, 0.3)
-            nn.init.constant_(self.skip_proj[1].weight, 0.3)
-
-        nbr_in_channels = 3 + 3 + self.in_channels if is_head else 3 + 3
-        nbr_hidden_channels = channel_list[0] if is_head else channel_list[0]//2
-        nbr_out_channels = self.out_channels if is_head else channel_list[0]
-        self.spe = SpatialEmbedding(
-            in_channels=nbr_in_channels,
-            hidden_channels=nbr_hidden_channels,
-            embed_channels=nbr_out_channels,
-            out_channels=self.out_channels,
+        self.sa = SetAbstraction(
+            layer_index=layer_index,
+            in_channels=self.in_channels,
+            channel_list=channel_list,
             bn_momentum=bn_momentum,
         )
-        self.spe_gs = SpatialEmbedding(
-            in_channels=nbr_in_channels,
-            hidden_channels=nbr_hidden_channels,
-            embed_channels=nbr_out_channels,
-            out_channels=self.out_channels,
-            bn_momentum=bn_momentum,
-        )
-        self.alpha = nn.Parameter(torch.ones((1,), dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -74,7 +54,6 @@ class Stage(nn.Module):
         )
 
         mamba_config.n_layer = mamba_blocks[layer_index]
-        mamba_config.d_intermediate = 0
         self.pm = PointMambaLayer(
             layer_index=layer_index,
             channels=self.out_channels,
@@ -82,6 +61,9 @@ class Stage(nn.Module):
             hybrid_args=hybrid_args,
             bn_momentum=bn_momentum,
         )
+
+        self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
+
         if self.task_type == 'seg':
             self.post_proj = nn.Sequential(
                 nn.BatchNorm1d(self.out_channels, momentum=bn_momentum),
@@ -107,46 +89,34 @@ class Stage(nn.Module):
             )
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
-        assert len(f.shape) == 2
-        if not self.is_head:
-            idx = gs.gs_points.idx_ds[self.layer_index - 1]
-            p = p[idx]
-            p_gs = p_gs[idx]
-            pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
-            pre_gs_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0),
-                                                 pre_gs_group_idx.unsqueeze(0)).squeeze(0)[idx]
-
+        # 1. encode
+        # set abstraction: down sample, group and abstract the local points set
+        p, p_gs, f_local, gs = self.sa(p, p_gs, f, gs)
+        # invert residual connections: local feature aggregation and propagation
         group_idx = gs.gs_points.idx_group[self.layer_index]
-        gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-        p_group = p[group_idx]
-        p_group = p_group - p.unsqueeze(1)
-        if self.is_head:
-            f_group = f[group_idx]
-            f_gs_group = f[gs_group_idx]
-            p_gs_group = p_gs[gs_group_idx]
-            f_group = torch.cat([p_group, p_gs_group, f_group + f_gs_group], dim=-1).view(-1, 3 + 3 + self.in_channels)
-        else:
-            p_gs_group = p_gs[gs_group_idx]
-            f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 3 + 3)
-
-        f_group = self.spe(f_group, group_idx)
-        f = f_group if self.is_head else f_group + f
-
         pts = gs.gs_points.pts_list[self.layer_index]
-        f = self.res_mlp(f.unsqueeze(0), group_idx.unsqueeze(0), gs_group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
-        f = self.pm(p, f, gs)
+        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
+        # point mamba: extract the global feature from center points of local
+        f_global = self.pm(p, p_gs, f_local, gs)
+        # fuse local and global feature
+        alpha = self.alpha.sigmoid()
+        f = f_global * alpha + f_local * (1 - alpha)
+
+        # 2. netx stage
         if not self.is_tail:
             f_sub = self.sub_stage(p, p_gs, f, gs)
         else:
             f_sub = None
 
+        # 3. decode
+        # up sample
         if self.task_type == 'seg':
             f = self.post_proj(f)
             if not self.is_head:
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
                 f = f[us_idx]
             f = self.head_drop(f)
+        # residual connections
         f = f_sub + f if f_sub is not None else f
         return f
 
@@ -230,4 +200,3 @@ class ClsHead(nn.Module):
         f = self.proj(f)
         f = f.max(dim=0)[0].unsqueeze(0)
         return self.head(f)
-
