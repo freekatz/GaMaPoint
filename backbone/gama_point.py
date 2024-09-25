@@ -106,7 +106,7 @@ class Stage(nn.Module):
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
         if not self.is_head:
-            idx = gs.gs_points.idx_group[self.layer_index - 1]
+            idx = gs.gs_points.idx_ds[self.layer_index - 1]
             p = p[idx]
             p_gs = p_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
@@ -122,8 +122,8 @@ class Stage(nn.Module):
             f_group = p_group.view(-1, 3)
 
         N, K = group_idx.shape
-        nbr_embed_fn = lambda f: self.nbr_embed(f).view(N, K, -1).max(dim=1)[0]
-        f_group = nbr_embed_fn(f_group)
+        embed_fn = lambda f: self.nbr_embed(f).view(N, K, -1).max(dim=1)[0]
+        f_group = embed_fn(f_group)
         f_group = self.nbr_proj(f_group)
         f_group = self.nbr_bn(f_group)
         f = f_group if self.is_head else f_group + f
