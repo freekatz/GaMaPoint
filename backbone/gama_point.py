@@ -112,7 +112,8 @@ class Stage(nn.Module):
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
-        p_group, group_idx = gs.gs_points.grouping('p', self.layer_index, need_idx=True)
+        group_idx = gs.gs_points.idx_group[self.layer_index]
+        p_group = p[group_idx]
         p_group = p_group - p.unsqueeze(1)
         if self.is_head:
             f_group = f[group_idx]
