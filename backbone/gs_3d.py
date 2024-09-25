@@ -349,7 +349,7 @@ class NaiveGaussian3D:
         xyz_scaled = points_scaler(xyz.unsqueeze(0), scale=scale).squeeze(0)
         cameras = self.generate_cameras(xyz_scaled)
 
-        uv_all, depths_all, visible_all, camid_all = [], [], [], []
+        uv_all, depths_all, visible_all = [], [], []
         cam_intr_all, cam_extr_all = [], []
         camid = torch.zeros((n_cameras*2, xyz_scaled.shape[0], 1), device=self.device)
         for j in range(n_cameras * 2 // cam_batch):
@@ -376,14 +376,13 @@ class NaiveGaussian3D:
             uv_all.append(uv)
             depths_all.append(depths)
             visible_all.append(visible)
-            camid_all.append(camid)
             cam_intr_all.append(cam_intr)
             cam_extr_all.append(cam_extr)
 
         uv = torch.cat(uv_all, dim=0).permute(1, 2, 0)
         depths = torch.cat(depths_all, dim=0).permute(1, 2, 0)
         visible = torch.cat(visible_all, dim=0).permute(1, 2, 0)
-        camid = torch.cat(camid_all, dim=0).permute(1, 2, 0)
+        camid = camid.permute(1, 2, 0)
         cam_intr = torch.cat(cam_intr_all, dim=0).permute(1, 0)
         cam_extr = torch.cat(cam_extr_all, dim=0).permute(1, 2, 0)
 
