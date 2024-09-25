@@ -355,7 +355,7 @@ class NaiveGaussian3D:
         for j in range(n_cameras * 2 // cam_batch):
             cam_intr_batch = []
             cam_extr_batch = []
-            camid = torch.zeros((cam_batch, xyz_scaled.shape[0], 1), device=self.device)
+            camid = torch.zeros((cam_batch, xyz_scaled.shape[1], 1), device=self.device)
             for i in range(cam_batch):
                 cam_intr = cameras[j*cam_batch + i].intrinsics
                 cam_extr = cameras[j*cam_batch + i].pose
@@ -396,8 +396,8 @@ class NaiveGaussian3D:
         self.gs_points.__update_attr__('cam_extr', cam_extr)
 
         # positions in gs space
-        depths = points_scaler(self.gs_points.depths.unsqueeze(0), scale=1.0).squeeze(0)
-        uvc = torch.cat([uv.mul(depths), camid.mul(visible)], dim=1)
+        uv = points_scaler(uv.mul(depths).unsqueeze(0), scale=40.0).squeeze(0)
+        uvc = torch.cat([uv, camid.mul(visible)], dim=1)
         p_gs = uvc.mean(dim=-1).squeeze(-1)  # [N, 3]
         p_gs = points_scaler(p_gs.unsqueeze(0), scale=1.0).squeeze(0)
         self.gs_points.__update_attr__('p_gs', p_gs)
