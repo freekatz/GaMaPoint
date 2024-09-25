@@ -15,6 +15,7 @@ def points_scaler(xyz, scale=1.):
     :param scale: float, scale factor, by default 2.0, which means scale into [0, 1]
     :return: [B, N, 3]]
     """
+    assert len(xyz.shape) == 3
     mi, ma = xyz.min(dim=1, keepdim=True)[0], xyz.max(dim=1, keepdim=True)[0]
     xyz = (xyz - mi) / (ma - mi + 1e-12)
     return xyz * scale
