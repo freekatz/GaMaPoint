@@ -351,7 +351,6 @@ class NaiveGaussian3D:
 
         uv_all, depths_all, visible_all, camid_all = [], [], [], []
         cam_intr_all, cam_extr_all = [], []
-        xyz_scaled = repeat(xyz_scaled, 'n c -> b n c', b=cam_batch)
         for j in range(n_cameras * 2 // cam_batch):
             cam_intr_batch = []
             cam_extr_batch = []
