@@ -351,14 +351,14 @@ class NaiveGaussian3D:
 
         uv_all, depths_all, visible_all, camid_all = [], [], [], []
         cam_intr_all, cam_extr_all = [], []
+        camid = torch.zeros((n_cameras*2, xyz_scaled.shape[0], 1), device=self.device)
         for j in range(n_cameras * 2 // cam_batch):
             cam_intr_batch = []
             cam_extr_batch = []
-            camid = torch.zeros((cam_batch, xyz_scaled.shape[0], 1), device=self.device)
             for i in range(cam_batch):
                 cam_intr = cameras[j*cam_batch + i].intrinsics
                 cam_extr = cameras[j*cam_batch + i].pose
-                camid[j, ...] = cameras[j*cam_batch + i].camid + cam_seed * n_cameras * 2
+                camid[j*cam_batch + i, ...] = cameras[j*cam_batch + i].camid + cam_seed * n_cameras * 2
                 cam_intr_batch.append(cam_intr)
                 cam_extr_batch.append(cam_extr)
             cam_intr = torch.stack(cam_intr_batch, dim=0)

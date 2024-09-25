@@ -212,15 +212,16 @@ def make_hybrid_idx(n_layer, hybrid_type, ratio) -> list:
 
 
 def self_adapt_heads(d_model: int) -> int:
-    target_headdim = 64
-    num_heads = math.ceil(d_model / target_headdim)
+    min_heads = 8
+    min_head_dims = 64
+    num_heads = math.ceil(d_model / min_head_dims)
     num_heads |= num_heads >> 1
     num_heads |= num_heads >> 2
     num_heads |= num_heads >> 4
     num_heads |= num_heads >> 8
     num_heads |= num_heads >> 16
     num_heads += 1
-    return max(4, num_heads)
+    return max(min_heads, num_heads)
 
 
 def create_mixer(
