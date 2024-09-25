@@ -130,9 +130,9 @@ class Stage(nn.Module):
 
         pts = gs.gs_points.pts_list[self.layer_index]
         f = self.res_mlp(f.unsqueeze(0), group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
-        f = self.pm(p, f, gs)
+        f = self.pm(p, p_gs, f, gs)
         if not self.is_tail:
-            f_sub = self.sub_stage(p, f, gs)
+            f_sub = self.sub_stage(p, p_gs, f, gs)
         else:
             f_sub = None
 
