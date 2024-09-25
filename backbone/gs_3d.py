@@ -395,8 +395,8 @@ class NaiveGaussian3D:
         self.gs_points.__update_attr__('cam_extr', cam_extr)
 
         # positions in gs space
-        uv = points_scaler(uv.mul(depths).unsqueeze(0), scale=40.0).squeeze(0)
-        uvc = torch.cat([uv, camid.mul(visible)], dim=1)
+        depths = points_scaler(depths.unsqueeze(0), scale=1.).squeeze(0)
+        uvc = torch.cat([uv.mul(depths), camid.mul(visible)], dim=1)
         p_gs = uvc.mean(dim=-1).squeeze(-1)  # [N, 3]
         p_gs = points_scaler(p_gs.unsqueeze(0), scale=1.0).squeeze(0)
         self.gs_points.__update_attr__('p_gs', p_gs)
