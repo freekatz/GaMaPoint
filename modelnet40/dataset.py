@@ -53,7 +53,7 @@ class ModelNet40(Dataset):
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('y', label)
-        gs.projects(xyz, cam_seed=idx)
+        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.strides, up_sample=False)
         return gs
 

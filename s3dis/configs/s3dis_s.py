@@ -13,6 +13,8 @@ class S3disConfig(BaseConfig):
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
+    gs_opts.n_cameras = 16
+    gs_opts.cam_fovy = 150
 
 
 class S3disWarmupConfig(BaseConfig):
@@ -21,6 +23,8 @@ class S3disWarmupConfig(BaseConfig):
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
+    gs_opts.n_cameras = 16
+    gs_opts.cam_fovy = 150
 
 
 class GaMaConfig(BaseConfig):

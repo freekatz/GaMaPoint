@@ -24,7 +24,7 @@ def project_points(
         extent (float, optional): extent threshold for frustum culling, by default 1.3
 
     Returns
-        uv (torch.Tensor): 2D positions for each point in the image, [B, N, 3]
+        uv (torch.Tensor): 2D positions for each point in the image, [B, N, 2]
         depth (torch.Tensor): depth for each point, [B, N, 1]
     """
     B = xyz.shape[0]

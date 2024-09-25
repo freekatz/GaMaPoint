@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+from einops import repeat
 from pytorch3d.ops import sample_farthest_points
 import torch
 from torch_kdtree import build_kd_tree
@@ -332,38 +333,45 @@ class NaiveGaussian3D:
         return cameras_all
 
     @torch.no_grad()
-    def projects(self, xyz, cam_seed=0, scale=1.):
+    def projects(self, xyz, cam_seed=0, scale=1., cam_batch=1):
         """
         :param xyz: [N, 3]
         :param cam_seed: seed to generate camera id
         :param scale: xyz scale factor
+        :param cam_batch: batch size of cameras to project
         :return: [N, 3]
         """
         cam_seed = cam_seed % self.batch_size
+        n_cameras = self.opt.n_cameras
+        assert n_cameras * 2 % cam_batch == 0
+        cam_width, cam_height = self.opt.cam_field_size
         xyz_scaled = points_scaler(xyz.unsqueeze(0), scale=scale).squeeze(0)
         cameras = self.generate_cameras(xyz_scaled)
-        n_cameras = self.opt.n_cameras
-        cam_width, cam_height = self.opt.cam_field_size
 
         uv_all, depths_all, visible_all, camid_all = [], [], [], []
         cam_intr_all, cam_extr_all = [], []
-        for j in range(n_cameras * 2):
-            cam_intr = cameras[j].intrinsics
-            cam_extr = cameras[j].pose
+        for j in range(n_cameras * 2 // cam_batch):
+            cam_intr_batch = []
+            cam_extr_batch = []
+            camid = torch.zeros((cam_batch, xyz_scaled.shape[0], 1), device=self.device)
+            for i in range(cam_batch):
+                cam_intr = cameras[j*cam_batch + i].intrinsics
+                cam_extr = cameras[j*cam_batch + i].pose
+                camid[j, ...] = cameras[j*cam_batch + i].camid + cam_seed * n_cameras * 2
+                cam_intr_batch.append(cam_intr)
+                cam_extr_batch.append(cam_extr)
+            xyz_scaled = repeat(xyz_scaled, 'n c -> b n c', b=cam_batch)
+            cam_intr = torch.stack(cam_intr_batch, dim=0)
+            cam_extr = torch.stack(cam_extr_batch, dim=0)
             uv, depths = project_points(
-                # the batch size is 1
-                xyz_scaled.unsqueeze(0),
-                cam_intr.unsqueeze(0),
-                cam_extr.unsqueeze(0),
+                # the batch size is cam_batch
+                xyz_scaled,
+                cam_intr,
+                cam_extr,
                 cam_width,
                 cam_height,
             )
-            uv = uv.squeeze(0)
-            depths = depths.squeeze(0)
-
-            visible = depths != 0
-            camid = torch.zeros_like(depths, device=self.device)
-            camid[...] = cameras[j].camid + cam_seed * n_cameras * 2
+            visible = (depths != 0).int()
 
             uv_all.append(uv)
             depths_all.append(depths)
@@ -371,12 +379,14 @@ class NaiveGaussian3D:
             camid_all.append(camid)
             cam_intr_all.append(cam_intr)
             cam_extr_all.append(cam_extr)
-        uv = torch.stack(uv_all, dim=-1)
-        depths = torch.stack(depths_all, dim=-1)
-        visible = torch.stack(visible_all, dim=-1)
-        camid = torch.stack(camid_all, dim=-1)
-        cam_intr = torch.stack(cam_intr_all, dim=-1)
-        cam_extr = torch.stack(cam_extr_all, dim=-1)
+
+        uv = torch.cat(uv_all, dim=0).permute(1, 2, 0)
+        depths = torch.cat(depths_all, dim=0).permute(1, 2, 0)
+        visible = torch.cat(visible_all, dim=0).permute(1, 2, 0)
+        camid = torch.cat(camid_all, dim=0).permute(1, 2, 0)
+        cam_intr = torch.cat(cam_intr_all, dim=0).permute(1, 0)
+        cam_extr = torch.cat(cam_extr_all, dim=0).permute(1, 2, 0)
+
         self.gs_points.__update_attr__('uv', uv)
         self.gs_points.__update_attr__('depths', depths)
         self.gs_points.__update_attr__('visible', visible)
