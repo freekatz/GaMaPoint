@@ -12,6 +12,37 @@ from backbone.mamba_ssm.models import MambaConfig, MixerModel
 from utils.cutils import knn_edge_maxpooling
 
 
+class SpatialEmbedding(nn.Module):
+    def __init__(self,
+                 in_channels,
+                 hidden_channels,
+                 embed_channels,
+                 out_channels,
+                 bn_momentum,
+                 ):
+        super().__init__()
+        self.embed = nn.Sequential(
+            nn.Linear(in_channels, hidden_channels // 2, bias=False),
+            nn.BatchNorm1d(hidden_channels // 2, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(hidden_channels // 2, hidden_channels, bias=False),
+            nn.BatchNorm1d(hidden_channels, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(hidden_channels, embed_channels, bias=False),
+        )
+        self.proj = nn.Identity() if embed_channels == out_channels else nn.Linear(embed_channels, out_channels, bias=False)
+        self.bn = nn.BatchNorm1d(out_channels, momentum=bn_momentum)
+        nn.init.constant_(self.bn.weight, 0.8 if embed_channels==out_channels else 0.2)
+
+    def forward(self, f, group_idx):
+        N, K = group_idx.shape
+        embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
+        f = embed_fn(f)
+        f = self.proj(f)
+        f = self.bn(f)
+        return f
+
+
 class LocalAggregation(nn.Module):
     def __init__(self,
                  in_channels: int,
@@ -214,7 +245,7 @@ class PointMambaLayer(nn.Module):
         self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
         self.bn = nn.BatchNorm1d(channels, momentum=bn_momentum)
 
-    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
+    def forward(self, p, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
         f = f.unsqueeze(0)
         B, N, C = f.shape

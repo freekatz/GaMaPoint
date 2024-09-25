@@ -5,7 +5,7 @@ from timm.models.layers import DropPath
 
 from backbone.ops import points_scaler
 from backbone.gs_3d import NaiveGaussian3D
-from backbone.layers import LocalAggregation, InvResMLP, PointMambaLayer
+from backbone.layers import LocalAggregation, InvResMLP, PointMambaLayer, SpatialEmbedding
 from backbone.mamba_ssm.models import MambaConfig
 
 
@@ -46,21 +46,24 @@ class Stage(nn.Module):
             self.la = LocalAggregation(self.in_channels, self.out_channels, bn_momentum, 0.3)
             nn.init.constant_(self.skip_proj[1].weight, 0.3)
 
-        nbr_in_channels = 3 + self.in_channels if is_head else 3
+        nbr_in_channels = 3 + 3 + self.in_channels if is_head else 3 + 3
         nbr_hidden_channels = channel_list[0] if is_head else channel_list[0]//2
         nbr_out_channels = self.out_channels if is_head else channel_list[0]
-        self.nbr_embed = nn.Sequential(
-            nn.Linear(nbr_in_channels, nbr_hidden_channels // 2, bias=False),
-            nn.BatchNorm1d(nbr_hidden_channels // 2, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(nbr_hidden_channels // 2, nbr_hidden_channels, bias=False),
-            nn.BatchNorm1d(nbr_hidden_channels, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(nbr_hidden_channels, nbr_out_channels, bias=False),
+        self.spe = SpatialEmbedding(
+            in_channels=nbr_in_channels,
+            hidden_channels=nbr_hidden_channels,
+            embed_channels=nbr_out_channels,
+            out_channels=self.out_channels,
+            bn_momentum=bn_momentum,
         )
-        self.nbr_proj = nn.Identity() if is_head else nn.Linear(nbr_out_channels, self.out_channels, bias=False)
-        self.nbr_bn = nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
-        nn.init.constant_(self.nbr_bn.weight, 0.8 if is_head else 0.2)
+        self.spe_gs = SpatialEmbedding(
+            in_channels=nbr_in_channels,
+            hidden_channels=nbr_hidden_channels,
+            embed_channels=nbr_out_channels,
+            out_channels=self.out_channels,
+            bn_momentum=bn_momentum,
+        )
+        self.alpha = nn.Parameter(torch.ones((1,), dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -116,21 +119,22 @@ class Stage(nn.Module):
         p_group = p[group_idx]
         p_group = p_group - p.unsqueeze(1)
         if self.is_head:
+            gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
             f_group = f[group_idx]
-            f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
+            f_gs_group = f[gs_group_idx]
+            p_gs_group = p_gs[gs_group_idx]
+            f_group = torch.cat([p_group, p_gs_group, f_group + f_gs_group], dim=-1).view(-1, 3 + 3 + self.in_channels)
         else:
-            f_group = p_group.view(-1, 3)
+            gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
+            p_gs_group = p_gs[gs_group_idx]
+            f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 3 + 3)
 
-        N, K = group_idx.shape
-        embed_fn = lambda f: self.nbr_embed(f).view(N, K, -1).max(dim=1)[0]
-        f_group = embed_fn(f_group)
-        f_group = self.nbr_proj(f_group)
-        f_group = self.nbr_bn(f_group)
+        f_group = self.spe(f_group, group_idx)
         f = f_group if self.is_head else f_group + f
 
         pts = gs.gs_points.pts_list[self.layer_index]
         f = self.res_mlp(f.unsqueeze(0), group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
-        f = self.pm(p, p_gs, f, gs)
+        f = self.pm(p, f, gs)
         if not self.is_tail:
             f_sub = self.sub_stage(p, p_gs, f, gs)
         else:
@@ -176,7 +180,6 @@ class SegHead(nn.Module):
         f = gs.gs_points.f
 
         p = p.mul_(40)  # make diff from p and f
-        p_gs = p_gs.mul_(40)  # make diff from p_gs and f_gs
         f = self.stage(p, p_gs, f, gs)
         return self.head(f)
 
@@ -222,7 +225,6 @@ class ClsHead(nn.Module):
         f = gs.gs_points.f
 
         p = p.mul_(40)  # make diff from p and f
-        p_gs = p_gs.mul_(40)  # make diff from p_gs and f_gs
         f = self.stage(p, p_gs, f, gs)
         f = self.proj(f)
         f = f.max(dim=0)[0].unsqueeze(0)
