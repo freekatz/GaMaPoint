@@ -38,7 +38,7 @@ class GaMaConfig(BaseConfig):
     stage_cfg.in_channels = 4
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 256
-    stage_cfg.mamba_blocks = [1, 1, 2, 1]
+    stage_cfg.mamba_blocks = [1, 1, 1, 1]
     stage_cfg.res_blocks = [4, 4, 8, 4]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum

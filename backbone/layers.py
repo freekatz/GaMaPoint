@@ -82,7 +82,6 @@ class SetAbstraction(nn.Module):
         embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
         f_group = embed_fn(f_group) if not self.use_cp \
             else checkpoint(embed_fn, f_group)
-        f_group = f_group.view(N, K, -1).max(dim=1)[0]
         f_group = self.proj(f_group)
         f_group = self.bn(f_group)
         f = f_group if self.is_head else f_group + f
