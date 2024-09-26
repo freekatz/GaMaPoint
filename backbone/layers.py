@@ -79,8 +79,9 @@ class SetAbstraction(nn.Module):
             f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 3 + 3)
 
         N, K = group_idx.shape
-        f_group = self.embed(f_group) if not self.use_cp \
-            else checkpoint(self.embed.forward, f_group)
+        embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
+        f_group = embed_fn(f_group) if not self.use_cp \
+            else checkpoint(embed_fn, f_group)
         f_group = f_group.view(N, K, -1).max(dim=1)[0]
         f_group = self.proj(f_group)
         f_group = self.bn(f_group)

@@ -13,6 +13,8 @@ class ScanNetV2Config(BaseConfig):
     grid_size = [0.02, 0.04, 0.08, 0.16, 0.32]
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
+    gs_opts.n_cameras = 24
+    gs_opts.cam_fovy = 150
 
 
 class ScanNetV2WarmupConfig(BaseConfig):
@@ -21,6 +23,8 @@ class ScanNetV2WarmupConfig(BaseConfig):
     grid_size = [0.02, 0.04, 0.08, 0.16, 0.32]
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
+    gs_opts.n_cameras = 24
+    gs_opts.cam_fovy = 150
 
 
 class GaMaConfig(BaseConfig):
@@ -34,7 +38,7 @@ class GaMaConfig(BaseConfig):
     stage_cfg.in_channels = 7
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 288
-    stage_cfg.mamba_blocks = [1, 1, 1, 1, 1]
+    stage_cfg.mamba_blocks = [1, 1, 1, 2, 1]
     stage_cfg.res_blocks = [4, 4, 4, 8, 4]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum
