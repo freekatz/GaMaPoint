@@ -308,7 +308,7 @@ if __name__ == '__main__':
     cfg.gama_cfg = gama_cfg
     cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
-        cfg.gama_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
+        cfg.gama_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''
