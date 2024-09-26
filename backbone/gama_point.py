@@ -44,6 +44,7 @@ class Stage(nn.Module):
             in_channels=in_channels,
             channel_list=channel_list,
             bn_momentum=bn_momentum,
+            use_cp=use_cp,
         )
 
         self.res_mlp = InvResMLP(
