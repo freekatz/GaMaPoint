@@ -10,7 +10,6 @@ from scannetv2.configs.config import BaseConfig
 class ScanNetV2Config(BaseConfig):
     name = 'ScanNetV2Config'
     k = [24, 24, 24, 24, 24]
-    grid_size = [0.08, 0.16, 0.32]
     grid_size = [0.04, 0.08, 0.16, 0.32]
     visible_sample_stride = 0.
     voxel_max = 80000
