@@ -42,7 +42,7 @@ def prepare_exp(cfg):
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
-def warmup(model: nn.Module, warmup_loader):
+def warmup(cfg, model: nn.Module, warmup_loader):
     model.train()
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
     for idx, gs in pbar:
@@ -50,7 +50,7 @@ def warmup(model: nn.Module, warmup_loader):
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
-            loss = F.cross_entropy(pred, target, ignore_index=20)
+            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index)
         loss.backward()
 
 
@@ -67,7 +67,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         mask = target != 20
         with autocast():
             pred = model(gs)
-            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=20)
+            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
             scaler.scale(loss).backward()
@@ -212,7 +212,7 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
 
-    warmup(model, warmup_loader)
+    warmup(cfg, model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
         train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
@@ -303,6 +303,8 @@ if __name__ == '__main__':
     cfg.scannetv2_warmup_cfg = scannetv2_warmup_cfg
     cfg.gama_cfg = gama_cfg
     cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
+    if cfg.use_cp:
+        cfg.gama_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''
@@ -310,7 +312,7 @@ if __name__ == '__main__':
 
     # scannetv2
     cfg.num_classes = 20
-    cfg.ignore_index = None
+    cfg.ignore_index = 20
 
     prepare_exp(cfg)
     main(cfg)
