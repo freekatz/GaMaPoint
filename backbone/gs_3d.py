@@ -46,6 +46,21 @@ def random_sample(xyz, n_samples, **kwargs):
     return xyz_sampled, xyz_idx
 
 
+def visible_sample(xyz, visible, n_samples, **kwargs):
+    """
+    :param xyz: [B, N, 3]
+    :param visible: [B, N, 1, n_cameras*2]
+    :return: [B, n_samples, 3], [B, n_samples]
+    """
+    B, N, _ = xyz.shape
+    n_cameras = visible.shape[-1]
+    visible = visible.sum(dim=-1, keepdim=False).squeeze(-1)
+    visible = visible / n_cameras
+    xyz_idx = torch.multinomial(visible.float().softmax(dim=1), n_samples, replacement=False)
+    xyz_sampled = torch.gather(xyz, 1, xyz_idx.unsqueeze(-1).expand((-1, -1, 3)))
+    return xyz_sampled, xyz_idx
+
+
 @dataclass
 class GaussianOptions(dict):
     # camera numbers outside in points
@@ -112,6 +127,17 @@ class GaussianPoints(object):
                 for i in range(len(item)):
                     if isinstance(item[i], torch.Tensor):
                         item[i] = item[i].cuda(non_blocking=non_blocking)
+            self.__update_attr__(key, item)
+
+    def apply_index(self, index):
+        assert len(index.shape) == 1
+        N = index.shape[0]
+        keys = self.keys()
+        for key in keys:
+            item = self.__get_attr__(key)
+            if isinstance(self.__get_attr__(key), torch.Tensor):
+                if item.shape[0] >= N:
+                    item = item[index]
             self.__update_attr__(key, item)
 
     def down_sampling(self, key, layer_idx, need_idx=False):
@@ -445,12 +471,15 @@ class NaiveGaussian3D:
         return cov2d
 
 
-def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True) -> GaussianPoints:
+def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, visible_sample_stride=0.) -> GaussianPoints:
     assert (grid_size is not None and strides is not None) is False
     assert (grid_size is None and strides is None) is False
     n_layers = len(ks)
     p = gs_points.p
     p_gs = gs_points.p_gs
+
+
+    # gs_points.apply_index(idx)
 
     idx_ds = []
     idx_us = []
@@ -461,14 +490,23 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True) 
         # down sample
         if i > 0:
             if grid_size is not None:
-                gsize = grid_size[i]
-                if p.is_cuda:
-                    ds_idx = grid_subsampling(p.detach().cpu(), gsize)
+                if visible_sample_stride > 0 and i == 1:
+                    _, ds_idx = visible_sample(p.unsqueeze(0), gs_points.visible.unsqueeze(0), int(p.shape[0] // visible_sample_stride))
+                    ds_idx = ds_idx.squeeze(0)
                 else:
-                    ds_idx = grid_subsampling(p, gsize)
+                    gsize = grid_size[i-1]
+                    if p.is_cuda:
+                        ds_idx = grid_subsampling(p.detach().cpu(), gsize)
+                    else:
+                        ds_idx = grid_subsampling(p, gsize)
             else:
-                stride = strides[i]
-                _, ds_idx = fps_sample(p, p.shape[0]//stride)
+                if visible_sample_stride > 0 and i == 1:
+                    _, ds_idx = visible_sample(p.unsqueeze(0), gs_points.visible.unsqueeze(0), int(p.shape[0] // visible_sample_stride))
+                    ds_idx = ds_idx.squeeze(0)
+                else:
+                    stride = strides[i-1]
+                    _, ds_idx = fps_sample(p.unsqueeze(0), p.shape[0]//stride)
+                    ds_idx = ds_idx.squeeze(0)
             p = p[ds_idx]
             p_gs = p_gs[ds_idx]
             idx_ds.append(ds_idx)

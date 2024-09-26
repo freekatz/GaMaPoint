@@ -10,20 +10,23 @@ from scannetv2.configs.config import BaseConfig
 class ScanNetV2Config(BaseConfig):
     name = 'ScanNetV2Config'
     k = [24, 24, 24, 24, 24]
-    grid_size = [0.02, 0.04, 0.08, 0.16, 0.32]
+    grid_size = [0.08, 0.16, 0.32]
+    grid_size = [0.04, 0.08, 0.16, 0.32]
+    visible_sample_stride = 0.
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
-    gs_opts.n_cameras = 24
+    gs_opts.n_cameras = 16
     gs_opts.cam_fovy = 150
 
 
 class ScanNetV2WarmupConfig(BaseConfig):
     name = 'ScanNetV2WarmupConfig'
     k = [24, 24, 24, 24, 24]
-    grid_size = [0.02, 0.04, 0.08, 0.16, 0.32]
+    grid_size = [0.04, 0.08, 0.16, 0.32]
+    visible_sample_stride = 0.
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
-    gs_opts.n_cameras = 24
+    gs_opts.n_cameras = 16
     gs_opts.cam_fovy = 150
 
 

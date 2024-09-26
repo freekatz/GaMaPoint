@@ -116,6 +116,7 @@ def main(cfg):
             voxel_max=cfg.s3dis_warmup_cfg.voxel_max,
             k=cfg.s3dis_warmup_cfg.k,
             grid_size=cfg.s3dis_warmup_cfg.grid_size,
+            visible_sample_stride=cfg.s3dis_warmup_cfg.visible_sample_stride,
             batch_size=1,
             gs_opts=cfg.s3dis_warmup_cfg.gs_opts
         ),
@@ -134,6 +135,7 @@ def main(cfg):
             voxel_max=cfg.s3dis_cfg.voxel_max,
             k=cfg.s3dis_cfg.k,
             grid_size=cfg.s3dis_cfg.grid_size,
+            visible_sample_stride=cfg.s3dis_cfg.visible_sample_stride,
             batch_size=cfg.batch_size,
             gs_opts=cfg.s3dis_cfg.gs_opts
         ),
@@ -155,6 +157,7 @@ def main(cfg):
             voxel_max=cfg.s3dis_cfg.voxel_max,
             k=cfg.s3dis_cfg.k,
             grid_size=cfg.s3dis_cfg.grid_size,
+            visible_sample_stride=cfg.s3dis_cfg.visible_sample_stride,
             batch_size=1,
             gs_opts=cfg.s3dis_cfg.gs_opts
         ),
