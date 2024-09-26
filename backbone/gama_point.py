@@ -114,8 +114,10 @@ class Stage(nn.Module):
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
                 f = f[us_idx]
             f = self.head_drop(f)
-        # residual connections
-        f = f_sub + f if f_sub is not None else f
+            # residual connections
+            f = f_sub + f if f_sub is not None else f
+        else:
+            f = f_sub
         return f
 
 
