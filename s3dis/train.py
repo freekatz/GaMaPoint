@@ -290,6 +290,9 @@ if __name__ == '__main__':
     # for validate
     parser.add_argument('--val_freq', type=int, required=False, default=1)
 
+    # for model
+    parser.add_argument("--use_cp", action='store_true')
+
     args, opts = parser.parse_known_args()
     cfg = EasyConfig()
     cfg.load_args(args)
@@ -298,6 +301,7 @@ if __name__ == '__main__':
     cfg.s3dis_cfg = s3dis_cfg
     cfg.s3dis_warmup_cfg = s3dis_warmup_cfg
     cfg.gama_cfg = gama_cfg
+    cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''

@@ -19,8 +19,10 @@ class SetAbstraction(nn.Module):
                  in_channels=4,
                  channel_list=[64, 128, 256, 512],
                  bn_momentum=0.02,
+                 use_cp=False,
                  ):
         super().__init__()
+        self.use_cp = use_cp
         self.layer_index = layer_index
         is_head = self.layer_index == 0
         self.is_head = is_head
@@ -77,7 +79,9 @@ class SetAbstraction(nn.Module):
             f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 3 + 3)
 
         N, K = group_idx.shape
-        f_group = checkpoint(self.embed.forward, f_group).view(N, K, -1).max(dim=1)[0]
+        f_group = self.embed(f_group) if not self.use_cp \
+            else checkpoint(self.embed.forward, f_group)
+        f_group = f_group.view(N, K, -1).max(dim=1)[0]
         f_group = self.proj(f_group)
         f_group = self.bn(f_group)
         f = f_group if self.is_head else f_group + f

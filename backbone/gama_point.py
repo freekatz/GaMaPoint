@@ -24,11 +24,13 @@ class Stage(nn.Module):
                  mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False},
                  task_type='seg',
+                 use_cp=False,
                  **kwargs
                  ):
         super().__init__()
         assert task_type.lower() in ['seg', 'cls']
         self.task_type = task_type.lower()
+        self.use_cp = use_cp
         self.layer_index = layer_index
         is_head = self.layer_index == 0
         self.is_head = is_head
@@ -92,10 +94,11 @@ class Stage(nn.Module):
         # set abstraction: down sample, group and abstract the local points set
         p, p_gs, f_local, gs = self.sa(p, p_gs, f, gs)
         # invert residual connections: local feature aggregation and propagation
-        group_idx = gs.gs_points.idx_group[self.layer_index]
-        pts = gs.gs_points.pts_list[self.layer_index]
-        f_local = checkpoint(self.res_mlp.forward, f_local.unsqueeze(0),
-                             group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
+        group_idx = gs.gs_points.idx_group[self.layer_index].unsqueeze(0)
+        pts = gs.gs_points.pts_list[self.layer_index].tolist()
+        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx, pts) if not self.use_cp \
+            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx, pts)
+        f_local = f_local.squeeze(0)
         # point mamba: extract the global feature from center points of local
         f_global = self.pm(p, p_gs, f_local, gs)
         # fuse local and global feature
