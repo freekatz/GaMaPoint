@@ -28,7 +28,7 @@ class GaMaConfig(BaseConfig):
     num_classes = 20
     bn_momentum = 0.02
     drop_path = 0.1
-    channel_list = [64, 128, 256, 512]
+    channel_list = [64, 96, 160, 288, 512]
     stage_cfg = BaseConfig()
     stage_cfg.name = 'StageConfig'
     stage_cfg.in_channels = 7
