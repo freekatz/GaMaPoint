@@ -6,6 +6,7 @@ from timm.models.layers import DropPath
 from backbone.gs_3d import NaiveGaussian3D
 from backbone.layers import InvResMLP, PointMambaLayer, SetAbstraction
 from backbone.mamba_ssm.models import MambaConfig
+from utils.model_utils import checkpoint
 
 
 class Stage(nn.Module):
@@ -93,7 +94,8 @@ class Stage(nn.Module):
         # invert residual connections: local feature aggregation and propagation
         group_idx = gs.gs_points.idx_group[self.layer_index]
         pts = gs.gs_points.pts_list[self.layer_index]
-        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
+        f_local = checkpoint(self.res_mlp.forward, f_local.unsqueeze(0),
+                             group_idx.unsqueeze(0), pts.tolist()).squeeze(0)
         # point mamba: extract the global feature from center points of local
         f_global = self.pm(p, p_gs, f_local, gs)
         # fuse local and global feature

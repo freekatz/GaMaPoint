@@ -10,6 +10,7 @@ from backbone.mamba_ssm.custom import StructuredMask
 from backbone.mamba_ssm.custom.order import Order
 from backbone.mamba_ssm.models import MambaConfig, MixerModel
 from utils.cutils import knn_edge_maxpooling
+from utils.model_utils import checkpoint
 
 
 class SetAbstraction(nn.Module):
@@ -76,8 +77,7 @@ class SetAbstraction(nn.Module):
             f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 3 + 3)
 
         N, K = group_idx.shape
-        embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
-        f_group = embed_fn(f_group)
+        f_group = checkpoint(self.embed.forward, f_group).view(N, K, -1).max(dim=1)[0]
         f_group = self.proj(f_group)
         f_group = self.bn(f_group)
         f = f_group if self.is_head else f_group + f
