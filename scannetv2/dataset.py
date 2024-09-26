@@ -246,7 +246,7 @@ class ScanNetV2(Dataset):
         norm = norm @ rotmat
         rotmat *= random.uniform(0.8, 1.2)
         xyz = xyz @ rotmat
-        xyz += self.els(xyz)
+        xyz = self.els(xyz)
         xyz -= xyz.min(dim=0)[0]
         return xyz, norm
 
