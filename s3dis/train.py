@@ -316,7 +316,7 @@ if __name__ == '__main__':
 
     # s3dis
     cfg.num_classes = 13
-    cfg.ignore_index = None
+    cfg.ignore_index = -100
 
     prepare_exp(cfg)
     main(cfg)

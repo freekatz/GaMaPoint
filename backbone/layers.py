@@ -65,27 +65,22 @@ class SetAbstraction(nn.Module):
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
-        # random select neighbors
         group_idx = gs.gs_points.idx_group[self.layer_index]
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-        N, K = group_idx.shape
-        K_sample = K // 3 * 2
-        rand_group = torch.randint(0, K, (N, K_sample), device=group_idx.device)
-        gs_rand_group = torch.randint(0, K, (N, K_sample), device=group_idx.device)
-        group_idx = torch.gather(group_idx, 1, rand_group)
-        gs_group_idx = torch.gather(gs_group_idx, 1, gs_rand_group)
-
         group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
-        p_group = p[group_idx_all]
+
+        p_group = p[group_idx]
         p_group = p_group - p.unsqueeze(1)
+        p_gs_group = p_gs[gs_group_idx]
+        p_group_all = torch.cat([p_group, p_gs_group], dim=1)
         if self.is_head:
             f_group = f[group_idx_all]
-            f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
+            f_group = torch.cat([p_group_all, f_group], dim=-1).view(-1, 3 + self.in_channels)
         else:
-            f_group = p_group.view(-1, 3)
+            f_group = p_group_all.view(-1, 3)
 
-        N, K_all = group_idx_all.shape
-        embed_fn = lambda x: self.embed(x).view(N, K_all, -1).max(dim=1)[0]
+        N, K = group_idx_all.shape
+        embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
         f_group = embed_fn(f_group) if not self.use_cp \
             else checkpoint(embed_fn, f_group)
         f_group = self.proj(f_group)
