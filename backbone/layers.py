@@ -39,7 +39,7 @@ class SetAbstraction(nn.Module):
             self.la = LocalAggregation(self.in_channels, self.out_channels, bn_momentum, 0.3)
             nn.init.constant_(self.skip_proj[1].weight, 0.3)
 
-        embed_in_channels = 3 + 3 + self.in_channels if is_head else 3 + 3
+        embed_in_channels = 3 + self.in_channels if is_head else 3
         embed_hidden_channels = channel_list[0] if is_head else channel_list[0] // 2
         embed_out_channels = self.out_channels if is_head else channel_list[0]
 
@@ -65,21 +65,27 @@ class SetAbstraction(nn.Module):
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
+        # random select neighbors
         group_idx = gs.gs_points.idx_group[self.layer_index]
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-        p_group = p[group_idx]
+        N, K = group_idx.shape
+        K_sample = K // 3 * 2
+        rand_group = torch.randint(0, K, (N, K_sample), device=group_idx.device)
+        gs_rand_group = torch.randint(0, K, (N, K_sample), device=group_idx.device)
+        group_idx = torch.gather(group_idx, 1, rand_group)
+        gs_group_idx = torch.gather(gs_group_idx, 1, gs_rand_group)
+
+        group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
+        p_group = p[group_idx_all]
         p_group = p_group - p.unsqueeze(1)
         if self.is_head:
-            f_group = f[group_idx]
-            f_gs_group = f[gs_group_idx]
-            p_gs_group = p_gs[gs_group_idx]
-            f_group = torch.cat([p_group, p_gs_group, f_group + f_gs_group], dim=-1).view(-1, 3 + 3 + self.in_channels)
+            f_group = f[group_idx_all]
+            f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
         else:
-            p_gs_group = p_gs[gs_group_idx]
-            f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 3 + 3)
+            f_group = p_group.view(-1, 3)
 
-        N, K = group_idx.shape
-        embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
+        N, K_all = group_idx_all.shape
+        embed_fn = lambda x: self.embed(x).view(N, K_all, -1).max(dim=1)[0]
         f_group = embed_fn(f_group) if not self.use_cp \
             else checkpoint(embed_fn, f_group)
         f_group = self.proj(f_group)
