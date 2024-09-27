@@ -80,7 +80,7 @@ class SetAbstraction(nn.Module):
             f_group = p_group_all.view(-1, 3)
 
         N, K = group_idx_all.shape
-        embed_fn = lambda x: self.embed(x).view(N, K, -1)
+        embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
         f_group = embed_fn(f_group) if not self.use_cp \
             else checkpoint(embed_fn, f_group)
         f_group = self.proj(f_group)
