@@ -52,15 +52,6 @@ class SetAbstraction(nn.Module):
             nn.GELU(),
             nn.Linear(embed_hidden_channels, embed_out_channels, bias=False),
         )
-        self.embed_gs = nn.Sequential(
-            nn.Linear(embed_in_channels, embed_hidden_channels // 2, bias=False),
-            nn.BatchNorm1d(embed_hidden_channels // 2, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(embed_hidden_channels // 2, embed_hidden_channels, bias=False),
-            nn.BatchNorm1d(embed_hidden_channels, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(embed_hidden_channels, embed_out_channels, bias=False),
-        )
         self.proj = nn.Identity() if is_head else nn.Linear(embed_out_channels, self.out_channels, bias=False)
         self.bn = nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
         nn.init.constant_(self.bn.weight, 0.8 if is_head else 0.2)
@@ -76,38 +67,26 @@ class SetAbstraction(nn.Module):
 
         group_idx = gs.gs_points.idx_group[self.layer_index]
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
+        group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
 
         p_group = p[group_idx]
         p_group = p_group - p.unsqueeze(1)
-        if self.is_head:
-            f_group = f[group_idx]
-            f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
-        else:
-            f_group = p_group.view(-1, 3)
-
         p_gs_group = p_gs[gs_group_idx]
+        p_group_all = torch.cat([p_group, p_gs_group], dim=1)
         if self.is_head:
-            f_gs_group = f[gs_group_idx]
-            f_gs_group = torch.cat([p_gs_group, f_gs_group], dim=-1).view(-1, 3 + self.in_channels)
+            f_group = f[group_idx_all]
+            f_group = torch.cat([p_group_all, f_group], dim=-1).view(-1, 3 + self.in_channels)
         else:
-            f_gs_group = p_gs_group.view(-1, 3)
+            f_group = p_group_all.view(-1, 3)
 
-        N, K = group_idx.shape
+        N, K = group_idx_all.shape
         embed_fn = lambda x: self.embed(x).view(N, K, -1)
         f_group = embed_fn(f_group) if not self.use_cp \
             else checkpoint(embed_fn, f_group)
+        f_group = self.proj(f_group)
+        f_group = self.bn(f_group)
 
-        N, K_gs = gs_group_idx.shape
-        embed_fn_gs = lambda x: self.embed_gs(x).view(N, K_gs, -1)
-        f_gs_group = embed_fn_gs(f_gs_group) if not self.use_cp \
-            else checkpoint(embed_fn_gs, f_gs_group)
-
-        f_group_all = torch.cat([f_group, f_gs_group], dim=1).max(dim=1)[0]
-        f_group_all = self.proj(f_group_all)
-        f_group_all = self.bn(f_group_all)
-
-        f = f_group_all if self.is_head else f_group_all + f
-        group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
+        f = f_group if self.is_head else f_group + f
         return f, group_idx_all
 
 
