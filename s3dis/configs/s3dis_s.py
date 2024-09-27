@@ -9,7 +9,8 @@ from s3dis.configs.config import BaseConfig
 
 class S3disConfig(BaseConfig):
     name = 'S3disConfig'
-    k = [12, 12, 12, 12]
+    k = [24, 20, 20, 20]
+    k_gs = [_k // 4 for _k in k]
     grid_size = [0.08, 0.16, 0.32]
     visible_sample_stride = 0.
     voxel_max = 30000
@@ -20,7 +21,8 @@ class S3disConfig(BaseConfig):
 
 class S3disWarmupConfig(BaseConfig):
     name = 'S3disWarmupConfig'
-    k = [12, 12, 12, 12]
+    k = [24, 20, 20, 20]
+    k_gs = [_k // 4 for _k in k]
     grid_size = [0.08, 0.16, 0.32]
     visible_sample_stride = 0.
     voxel_max = 30000

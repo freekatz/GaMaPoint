@@ -471,7 +471,7 @@ class NaiveGaussian3D:
         return cov2d
 
 
-def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, visible_sample_stride=0.) -> GaussianPoints:
+def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample=True, visible_sample_stride=0.) -> GaussianPoints:
     assert (grid_size is not None and strides is not None) is False
     assert (grid_size is None and strides is None) is False
     n_layers = len(ks)
@@ -513,10 +513,11 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
 
         # group
         k = ks[i]
+        k_gs = ks_gs[i]
         kdt = build_kd_tree(p)
         kdt_gs = build_kd_tree(p_gs)
         idx_group.append(kdt.query(p, nr_nns_searches=k)[1].long())
-        idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k)[1].long())
+        idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k_gs)[1].long())
 
         # up sample
         if i > 0 and up_sample:

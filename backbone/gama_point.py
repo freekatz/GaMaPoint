@@ -93,12 +93,11 @@ class Stage(nn.Module):
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         # 1. encode
         # set abstraction: down sample, group and abstract the local points set
-        p, p_gs, f_local, gs = self.sa(p, p_gs, f, gs)
+        f_local, group_idx = self.sa(p, p_gs, f, gs)
         # invert residual connections: local feature aggregation and propagation
-        group_idx = gs.gs_points.idx_group[self.layer_index].unsqueeze(0)
         pts = gs.gs_points.pts_list[self.layer_index].tolist()
-        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx, pts) if not self.use_cp \
-            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx, pts)
+        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
+            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx.unsqueeze(0), pts)
         f_local = f_local.squeeze(0)
         # point mamba: extract the global feature from center points of local
         f_global = self.pm(p, p_gs, f_local, gs)

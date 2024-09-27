@@ -86,7 +86,7 @@ class SetAbstraction(nn.Module):
         f_group = self.proj(f_group)
         f_group = self.bn(f_group)
         f = f_group if self.is_head else f_group + f
-        return p, p_gs, f, gs
+        return f, group_idx_all
 
 
 class LocalAggregation(nn.Module):
