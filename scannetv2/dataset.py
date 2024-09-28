@@ -20,50 +20,44 @@ with open(train_file, 'r') as file:
 with open(val_file, 'r') as file:
     scan_val_list = [line.strip() for line in file.readlines()]
 
-# adapted from https://github.com/Gofinge/PointTransformerV2/blob/main/pcr/datasets/transform.py
 class ElasticDistortion(object):
-    def __init__(self, distortion_params=None):
-        self.distortion_params = [[0.2, 0.4], [0.8, 1.6]] if distortion_params is None else distortion_params
+    def __init__(self, granularity=0.2, magnitude=0.4, **kwargs):
+        self.granularity = granularity
+        self.magnitude = magnitude
 
-    @staticmethod
-    def elastic_distortion(coords, granularity, magnitude):
+    def __call__(self, coords):
+        """Apply elastic distortion on sparse coordinate space.
+
+          pointcloud: numpy array of (number of points, at least 3 spatial dims)
+          granularity: size of the noise grid (in same scale[m/cm] as the voxel grid)
+          magnitude: noise multiplier
         """
-        Apply elastic distortion on sparse coordinate space.
-        pointcloud: numpy array of (number of points, at least 3 spatial dims)
-        granularity: size of the noise grid (in same scale[m/cm] as the voxel grid)
-        magnitude: noise multiplier
-        """
-        blurx = np.ones((3, 1, 1, 1)).astype('float32') / 3
-        blury = np.ones((1, 3, 1, 1)).astype('float32') / 3
-        blurz = np.ones((1, 1, 3, 1)).astype('float32') / 3
-        coords_min = coords.min(0)
-
-        # Create Gaussian noise tensor of the size given by granularity.
-        noise_dim = ((coords - coords_min).max(0) // granularity).astype(int) + 3
-        noise = np.random.randn(*noise_dim, 3).astype(np.float32)
-
-        # Smoothing.
-        for _ in range(2):
-            noise = scipy.ndimage.filters.convolve(noise, blurx, mode='constant', cval=0)
-            noise = scipy.ndimage.filters.convolve(noise, blury, mode='constant', cval=0)
-            noise = scipy.ndimage.filters.convolve(noise, blurz, mode='constant', cval=0)
-
-        # Trilinear interpolate noise filters for each spatial dimensions.
-        ax = [
-            np.linspace(d_min, d_max, d)
-            for d_min, d_max, d in zip(coords_min - granularity, coords_min + granularity *
-                                       (noise_dim - 2), noise_dim)
-        ]
-        interp = scipy.interpolate.RegularGridInterpolator(ax, noise, bounds_error=False, fill_value=0)
-        coords += interp(coords) * magnitude
-        return coords
-
-    def __call__(self, coord):
-        coord = coord.numpy()
         if random.random() < 0.95:
-            for granularity, magnitude in self.distortion_params:
-                coord = self.elastic_distortion(coord, granularity, magnitude)
-        return torch.from_numpy(coord)
+            blurx = torch.ones((3, 1, 1, 1), dtype=torch.float32) / 3
+            blury = torch.ones((1, 3, 1, 1), dtype=torch.float32) / 3
+            blurz = torch.ones((1, 1, 3, 1), dtype=torch.float32) / 3
+            coords_min = coords.min(0)[0]
+
+            # Create Gaussian noise tensor of the size given by granularity.
+            noise_dim = ((coords - coords_min).max(0)[0] // self.granularity).int() + 3
+            noise = torch.randn(*noise_dim, 3, dtype=torch.float32)
+
+            # Smoothing.
+            for _ in range(2):
+                noise = scipy.ndimage.filters.convolve(noise, blurx, mode='constant', cval=0)
+                noise = scipy.ndimage.filters.convolve(noise, blury, mode='constant', cval=0)
+                noise = scipy.ndimage.filters.convolve(noise, blurz, mode='constant', cval=0)
+
+            # Trilinear interpolate noise filters for each spatial dimensions.
+            ax = [
+                torch.linspace(d_min, d_max, d)
+                for d_min, d_max, d in zip(coords_min - self.granularity, coords_min + self.granularity *
+                                           (noise_dim - 2), noise_dim)
+            ]
+            interp = scipy.interpolate.RegularGridInterpolator(ax, noise, bounds_error=0, fill_value=0)
+            coords = coords + interp(coords) * self.magnitude
+        return coords.float()
+
 
 
 class ScanNetV2(Dataset):
@@ -248,7 +242,7 @@ class ScanNetV2(Dataset):
         norm = norm @ rotmat
         rotmat *= random.uniform(0.8, 1.2)
         xyz = xyz @ rotmat
-        xyz = self.els(xyz)
+        # xyz = self.els(xyz)
         xyz -= xyz.min(dim=0)[0]
         return xyz, norm
 
