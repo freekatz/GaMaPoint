@@ -4,7 +4,7 @@ from torch.nn.init import trunc_normal_
 from timm.models.layers import DropPath
 
 from backbone.gs_3d import NaiveGaussian3D
-from backbone.layers import InvResMLP, PointMambaLayer, SetAbstraction
+from backbone.layers import InvResMLP, PointMambaLayer, SetAbstraction, LocalAggregation
 from backbone.mamba_ssm.models import MambaConfig
 from utils.model_utils import checkpoint
 
@@ -36,8 +36,17 @@ class Stage(nn.Module):
         self.is_head = is_head
         is_tail = self.layer_index == len(channel_list) - 1
         self.is_tail = is_tail
+        self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
+
+        if not is_head:
+            self.skip_proj = nn.Sequential(
+                nn.Linear(self.in_channels, self.out_channels, bias=False),
+                nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
+            )
+            self.la = LocalAggregation(self.in_channels, self.out_channels, bn_momentum, 0.3)
+            nn.init.constant_(self.skip_proj[1].weight, 0.3)
 
         self.sa = SetAbstraction(
             layer_index=layer_index,
@@ -92,7 +101,16 @@ class Stage(nn.Module):
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         # 1. encode
-        # set abstraction: down sample, group and abstract the local points set
+        # down sample
+        if not self.is_head:
+            idx = gs.gs_points.idx_ds[self.layer_index - 1]
+            p = p[idx]
+            p_gs = p_gs[idx]
+            pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
+            pre_gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index-1]
+            pre_group_idx_all = torch.cat([pre_group_idx, pre_gs_group_idx], dim=1)
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx_all.unsqueeze(0)).squeeze(0)[idx]
+        # set abstraction: group and abstract the local points set
         f_local, group_idx = self.sa(p, p_gs, f, gs)
         # invert residual connections: local feature aggregation and propagation
         pts = gs.gs_points.pts_list[self.layer_index].tolist()

@@ -26,18 +26,8 @@ class SetAbstraction(nn.Module):
         self.layer_index = layer_index
         is_head = self.layer_index == 0
         self.is_head = is_head
-        is_tail = self.layer_index == len(channel_list) - 1
-        self.is_tail = is_tail
         self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
-
-        if not is_head:
-            self.skip_proj = nn.Sequential(
-                nn.Linear(self.in_channels, self.out_channels, bias=False),
-                nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
-            )
-            self.la = LocalAggregation(self.in_channels, self.out_channels, bn_momentum, 0.3)
-            nn.init.constant_(self.skip_proj[1].weight, 0.3)
 
         embed_in_channels = 3 + self.in_channels if is_head else 3
         embed_hidden_channels = channel_list[0] if is_head else channel_list[0] // 2
@@ -58,12 +48,6 @@ class SetAbstraction(nn.Module):
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
-        if not self.is_head:
-            idx = gs.gs_points.idx_ds[self.layer_index - 1]
-            p = p[idx]
-            p_gs = p_gs[idx]
-            pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
         group_idx = gs.gs_points.idx_group[self.layer_index]
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
@@ -71,7 +55,7 @@ class SetAbstraction(nn.Module):
 
         p_group = p[group_idx]
         p_group = p_group - p.unsqueeze(1)
-        p_gs_group = p_gs[gs_group_idx]
+        p_gs_group = p_gs[gs_group_idx] - p_gs.unsqueeze(1)
         p_group_all = torch.cat([p_group, p_gs_group], dim=1)
         if self.is_head:
             f_group = f[group_idx_all]
@@ -294,9 +278,14 @@ class PointMambaLayer(nn.Module):
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
+
+        # get order
+        cam_order = p_gs[:, 2]
+        idx = torch.argsort(cam_order, dim=0, descending=True)
+        order = Order(idx.unsqueeze(0))
         f = f.unsqueeze(0)
         B, N, C = f.shape
         mask = None
-        f = f + self.mixer(input_ids=f, mask=mask, gs=gs, order=None)
+        f = f + self.mixer(input_ids=f, mask=mask, gs=gs, order=order)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
         return f.squeeze(0)

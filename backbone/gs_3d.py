@@ -490,15 +490,11 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
         # down sample
         if i > 0:
             if grid_size is not None:
-                if visible_sample_stride > 0 and i == 1:
-                    _, ds_idx = visible_sample(p.unsqueeze(0), gs_points.visible.unsqueeze(0), int(p.shape[0] // visible_sample_stride))
-                    ds_idx = ds_idx.squeeze(0)
+                gsize = grid_size[i-1]
+                if p.is_cuda:
+                    ds_idx = grid_subsampling(p.detach().cpu(), gsize)
                 else:
-                    gsize = grid_size[i-1]
-                    if p.is_cuda:
-                        ds_idx = grid_subsampling(p.detach().cpu(), gsize)
-                    else:
-                        ds_idx = grid_subsampling(p, gsize)
+                    ds_idx = grid_subsampling(p, gsize)
             else:
                 if visible_sample_stride > 0 and i == 1:
                     _, ds_idx = visible_sample(p.unsqueeze(0), gs_points.visible.unsqueeze(0), int(p.shape[0] // visible_sample_stride))
