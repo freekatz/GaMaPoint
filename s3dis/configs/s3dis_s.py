@@ -12,7 +12,6 @@ class S3disConfig(BaseConfig):
     k = [16, 16, 16, 16]
     k_gs = [8, 8, 8, 8]
     grid_size = [0.08, 0.16, 0.32]
-    visible_sample_stride = 0.
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16
@@ -24,7 +23,6 @@ class S3disWarmupConfig(BaseConfig):
     k = [16, 16, 16, 16]
     k_gs = [8, 8, 8, 8]
     grid_size = [0.08, 0.16, 0.32]
-    visible_sample_stride = 0.
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16

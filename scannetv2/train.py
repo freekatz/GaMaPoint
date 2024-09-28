@@ -118,7 +118,6 @@ def main(cfg):
             k=cfg.scannetv2_warmup_cfg.k,
             k_gs=cfg.scannetv2_warmup_cfg.k_gs,
             grid_size=cfg.scannetv2_warmup_cfg.grid_size,
-            visible_sample_stride=cfg.scannetv2_warmup_cfg.visible_sample_stride,
             batch_size=1,
             gs_opts=cfg.scannetv2_warmup_cfg.gs_opts
         ),
@@ -137,7 +136,6 @@ def main(cfg):
             k=cfg.scannetv2_cfg.k,
             k_gs=cfg.scannetv2_warmup_cfg.k_gs,
             grid_size=cfg.scannetv2_cfg.grid_size,
-            visible_sample_stride=cfg.scannetv2_cfg.visible_sample_stride,
             batch_size=cfg.batch_size,
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
@@ -159,7 +157,6 @@ def main(cfg):
             k=cfg.scannetv2_cfg.k,
             k_gs=cfg.scannetv2_warmup_cfg.k_gs,
             grid_size=cfg.scannetv2_cfg.grid_size,
-            visible_sample_stride=cfg.scannetv2_cfg.visible_sample_stride,
             batch_size=1,
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
