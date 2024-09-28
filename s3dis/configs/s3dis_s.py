@@ -10,7 +10,7 @@ from s3dis.configs.config import BaseConfig
 class S3disConfig(BaseConfig):
     name = 'S3disConfig'
     k = [16, 16, 16, 16]
-    k_gs = [8, 8, 8, 8]
+    k_gs = [4, 4, 4, 4]
     grid_size = [0.08, 0.16, 0.32]
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
@@ -21,7 +21,7 @@ class S3disConfig(BaseConfig):
 class S3disWarmupConfig(BaseConfig):
     name = 'S3disWarmupConfig'
     k = [16, 16, 16, 16]
-    k_gs = [8, 8, 8, 8]
+    k_gs = [4, 4, 4, 4]
     grid_size = [0.08, 0.16, 0.32]
     voxel_max = 30000
     gs_opts = GaussianOptions.default()
