@@ -307,7 +307,7 @@ class NaiveGaussian3D:
             cx, cy, cz = centroid
             x, y, z = xyz_sampled[j]
             outside_cameras.append(OrbitCamera(
-                camid=2 * j,
+                camid=2 * j + 1,
                 width=cam_width,
                 height=cam_height,
                 campos=(x, y, z),
@@ -316,7 +316,7 @@ class NaiveGaussian3D:
                 device=self.device,
             ))
             inside_cameras.append(OrbitCamera(
-                camid=2 * j + 1,
+                camid=2 * j + 2,
                 width=cam_width,
                 height=cam_height,
                 campos=(cx, cy, cz),
@@ -347,7 +347,7 @@ class NaiveGaussian3D:
             cx, cy, cz = xyz_sampled[j - 1]
             x, y, z = xyz_sampled[j]
             cameras_all.append(OrbitCamera(
-                camid=2 * j,
+                camid=j,
                 width=cam_width,
                 height=cam_height,
                 campos=(x, y, z),
@@ -421,7 +421,9 @@ class NaiveGaussian3D:
 
         # positions in gs space
         depths = points_scaler(depths.unsqueeze(0), scale=1.).squeeze(0)
-        uvc = torch.cat([uv.mul(depths), camid.mul(visible)], dim=1)
+        i = torch.arange(1, n_cameras*2+1)
+        i = repeat(i, 'c -> n d c', n=camid.shape[0], d=1)
+        uvc = torch.cat([uv.mul(depths), camid * i], dim=1).squeeze(-1)  # [N, 3]
         p_gs = uvc.mean(dim=-1).squeeze(-1)  # [N, 3]
         p_gs = points_scaler(p_gs.unsqueeze(0), scale=1.0).squeeze(0)
         self.gs_points.__update_attr__('p_gs', p_gs)

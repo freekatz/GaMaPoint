@@ -41,7 +41,7 @@ class GaMaConfig(BaseConfig):
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 288
     stage_cfg.mamba_blocks = [1, 1, 1, 1, 1]
-    stage_cfg.res_blocks = [6, 6, 6, 10, 6]
+    stage_cfg.res_blocks = [4, 4, 4, 8, 4]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum
     drop_rates = torch.linspace(0., drop_path, sum(stage_cfg.res_blocks)).split(stage_cfg.res_blocks)
