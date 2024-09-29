@@ -275,10 +275,7 @@ class PointMambaLayer(nn.Module):
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
 
-        # get order
-        cam_order = p_gs[:, 2]
-        idx = torch.argsort(cam_order, dim=0, descending=True)
-        order = Order(idx.unsqueeze(0))
+        order = None
         f = f.unsqueeze(0)
         B, N, C = f.shape
         mask = None
