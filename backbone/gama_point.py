@@ -55,6 +55,14 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
             use_cp=use_cp,
         )
+        self.sa_gs = SetAbstraction(
+            layer_index=layer_index,
+            in_channels=in_channels,
+            channel_list=channel_list,
+            bn_momentum=bn_momentum,
+            use_cp=use_cp,
+        )
+        self.alpha = nn.Parameter(torch.tensor([0.8], dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -72,8 +80,7 @@ class Stage(nn.Module):
             hybrid_args=hybrid_args,
             bn_momentum=bn_momentum,
         )
-
-        self.alpha = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
+        self.beta = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
 
         if self.task_type == 'seg':
             self.post_proj = nn.Sequential(

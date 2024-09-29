@@ -29,7 +29,7 @@ class SetAbstraction(nn.Module):
         self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
 
-        embed_in_channels = 3 + self.in_channels if is_head else 3
+        embed_in_channels = 6 + self.in_channels if is_head else 6
         embed_hidden_channels = channel_list[0] if is_head else channel_list[0] // 2
         embed_out_channels = self.out_channels if is_head else channel_list[0]
 
@@ -53,15 +53,13 @@ class SetAbstraction(nn.Module):
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
         group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
 
-        p_group = p[group_idx]
-        p_group = p_group - p.unsqueeze(1)
-        p_gs_group = p_gs[gs_group_idx] - p_gs.unsqueeze(1)
-        p_group_all = torch.cat([p_group, p_gs_group], dim=1)
+        p_group = p[group_idx_all] - p.unsqueeze(1)
+        p_gs_group = p_gs[group_idx_all] - p_gs.unsqueeze(1)
         if self.is_head:
             f_group = f[group_idx_all]
-            f_group = torch.cat([p_group_all, f_group], dim=-1).view(-1, 3 + self.in_channels)
+            f_group = torch.cat([p_group, p_gs_group, f_group], dim=-1).view(-1, 6 + self.in_channels)
         else:
-            f_group = p_group_all.view(-1, 3)
+            f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 6)
 
         N, K = group_idx_all.shape
         embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
