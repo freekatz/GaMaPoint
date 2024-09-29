@@ -8,7 +8,7 @@ from torch_kdtree import build_kd_tree
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
-from utils.cutils import grid_subsampling
+from utils.cutils import grid_subsampling, KDTree
 
 
 def create_sampler(sampler='random', **kwargs):
@@ -510,14 +510,14 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
         # group
         k = ks[i]
         k_gs = ks_gs[i]
-        kdt = build_kd_tree(p)
-        kdt_gs = build_kd_tree(p_gs)
-        idx_group.append(kdt.query(p, nr_nns_searches=k)[1].long())
-        idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k_gs)[1].long())
+        kdt = KDTree(p)
+        kdt_gs = KDTree(p_gs)
+        idx_group.append(kdt.knn(p, k, False)[0].long())
+        idx_gs_group.append(kdt_gs.knn(p_gs, k_gs, False)[0].long())
 
         # up sample
         if i > 0 and up_sample:
-            us_idx = kdt.query(gs_points.p, 1)[1].squeeze(-1)
+            us_idx = kdt.knn(gs_points.p, 1, False)[0].squeeze(-1)
             idx_us.append(us_idx)
 
     gs_points.__update_attr__('idx_ds', idx_ds)
