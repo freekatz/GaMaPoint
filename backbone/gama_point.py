@@ -62,7 +62,7 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
             use_cp=use_cp,
         )
-        self.alpha = nn.Parameter(torch.ones([0.8], dtype=torch.float32) * 100)
+        self.alpha = nn.Parameter(torch.tensor([0.8], dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
