@@ -50,20 +50,16 @@ class SetAbstraction(nn.Module):
         assert len(f.shape) == 2
 
         group_idx = gs.gs_points.idx_group[self.layer_index]
-        gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-        group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
 
         p_group = p[group_idx]
         p_group = p_group - p.unsqueeze(1)
-        p_gs_group = p_gs[gs_group_idx] - p_gs.unsqueeze(1)
-        p_group_all = torch.cat([p_group, p_gs_group], dim=1)
         if self.is_head:
-            f_group = f[group_idx_all]
-            f_group = torch.cat([p_group_all, f_group], dim=-1).view(-1, 3 + self.in_channels)
+            f_group = f[group_idx]
+            f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
         else:
-            f_group = p_group_all.view(-1, 3)
+            f_group = p_group.view(-1, 3)
 
-        N, K = group_idx_all.shape
+        N, K = group_idx.shape
         embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
         f_group = embed_fn(f_group) if not self.use_cp \
             else checkpoint(embed_fn, f_group)
@@ -71,7 +67,7 @@ class SetAbstraction(nn.Module):
         f_group = self.bn(f_group)
 
         f = f_group if self.is_head else f_group + f
-        return f, group_idx_all
+        return f, group_idx
 
 
 class LocalAggregation(nn.Module):

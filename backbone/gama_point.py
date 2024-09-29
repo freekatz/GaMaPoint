@@ -107,9 +107,7 @@ class Stage(nn.Module):
             p = p[idx]
             p_gs = p_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
-            pre_gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index-1]
-            pre_group_idx_all = torch.cat([pre_group_idx, pre_gs_group_idx], dim=1)
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx_all.unsqueeze(0)).squeeze(0)[idx]
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
         # set abstraction: group and abstract the local points set
         f_local, group_idx = self.sa(p, p_gs, f, gs)
         # invert residual connections: local feature aggregation and propagation
