@@ -29,7 +29,7 @@ class SetAbstraction(nn.Module):
         self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
 
-        embed_in_channels = 6 + self.in_channels if is_head else 6
+        embed_in_channels = 3 + self.in_channels if is_head else 3
         embed_hidden_channels = channel_list[0] if is_head else channel_list[0] // 2
         embed_out_channels = self.out_channels if is_head else channel_list[0]
 
@@ -46,22 +46,17 @@ class SetAbstraction(nn.Module):
         self.bn = nn.BatchNorm1d(self.out_channels, momentum=bn_momentum)
         nn.init.constant_(self.bn.weight, 0.8 if is_head else 0.2)
 
-    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
+    def forward(self, p, f, group_idx):
         assert len(f.shape) == 2
 
-        group_idx = gs.gs_points.idx_group[self.layer_index]
-        gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-        group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
-
-        p_group = p[group_idx_all] - p.unsqueeze(1)
-        p_gs_group = p_gs[group_idx_all] - p_gs.unsqueeze(1)
+        p_group = p[group_idx] - p.unsqueeze(1)
         if self.is_head:
-            f_group = f[group_idx_all]
-            f_group = torch.cat([p_group, p_gs_group, f_group], dim=-1).view(-1, 6 + self.in_channels)
+            f_group = f[group_idx]
+            f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
         else:
-            f_group = torch.cat([p_group, p_gs_group], dim=-1).view(-1, 6)
+            f_group = p_group.view(-1, 3)
 
-        N, K = group_idx_all.shape
+        N, K = group_idx.shape
         embed_fn = lambda x: self.embed(x).view(N, K, -1).max(dim=1)[0]
         f_group = embed_fn(f_group) if not self.use_cp \
             else checkpoint(embed_fn, f_group)
@@ -69,7 +64,7 @@ class SetAbstraction(nn.Module):
         f_group = self.bn(f_group)
 
         f = f_group if self.is_head else f_group + f
-        return f, group_idx_all
+        return f
 
 
 class LocalAggregation(nn.Module):
@@ -277,10 +272,11 @@ class PointMambaLayer(nn.Module):
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
 
-        # get order
-        cam_order = p_gs[:, 2]
-        idx = torch.argsort(cam_order, dim=0, descending=True)
-        order = Order(idx.unsqueeze(0))
+        # # get order
+        # cam_order = p_gs[:, 2]
+        # idx = torch.argsort(cam_order, dim=0, descending=True)
+        # order = Order(idx.unsqueeze(0))
+        order = None
         f = f.unsqueeze(0)
         B, N, C = f.shape
         mask = None
