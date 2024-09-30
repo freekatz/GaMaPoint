@@ -118,8 +118,7 @@ class Stage(nn.Module):
         # point mamba: extract the global feature from center points of local
         f_global = self.pm(p, p_gs, f_local, gs)
         # fuse local and global feature
-        alpha = self.alpha.sigmoid()
-        f = f_global * alpha + f_local * (1 - alpha)
+        f = f_global + f_local
 
         # 2. netx stage
         if not self.is_tail:
