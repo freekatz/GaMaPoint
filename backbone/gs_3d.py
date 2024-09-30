@@ -423,7 +423,7 @@ class NaiveGaussian3D:
         depths = points_scaler(depths.unsqueeze(0), scale=1.).squeeze(0)
         i = torch.arange(1, n_cameras*2+1)
         i = repeat(i, 'c -> n d c', n=camid.shape[0], d=1)
-        uvc = torch.cat([uv.mul(depths), camid * i], dim=1).squeeze(-1)  # [N, 3]
+        uvc = torch.cat([uv.mul(depths), camid * visible * i], dim=1).squeeze(-1)  # [N, 3]
         p_gs = uvc.mean(dim=-1).squeeze(-1)  # [N, 3]
         p_gs = points_scaler(p_gs.unsqueeze(0), scale=1.0).squeeze(0)
         self.gs_points.__update_attr__('p_gs', p_gs)
