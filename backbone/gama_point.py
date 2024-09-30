@@ -80,7 +80,6 @@ class Stage(nn.Module):
             hybrid_args=hybrid_args,
             bn_momentum=bn_momentum,
         )
-        self.beta = nn.Parameter(torch.tensor([0.5], dtype=torch.float32) * 100)
 
         if self.task_type == 'seg':
             self.post_proj = nn.Sequential(
@@ -130,8 +129,7 @@ class Stage(nn.Module):
         # point mamba: extract the global feature from center points of local
         f_global = self.pm(p, p_gs, f_local, gs)
         # fuse local and global feature
-        beta = self.beta.sigmoid()
-        f = f_global * beta + f_local * (1 - beta)
+        f = f_global + f_local
 
         # 2. netx stage
         if not self.is_tail:
