@@ -6,6 +6,7 @@ from torch.nn.init import trunc_normal_
 import sys
 from pathlib import Path
 
+from backbone import MambaConfig, PointMambaLayer
 from backbone.gs_3d import NaiveGaussian3D
 
 sys.path.append(str(Path(__file__).absolute().parent.parent))
@@ -142,6 +143,15 @@ class Stage(nn.Module):
         )
         nn.init.constant_(self.postproj[0].weight, (args.dims[0] / dim) ** 0.5)
 
+        mamba_config = MambaConfig.default()
+        mamba_config.n_layer = args.mamba_blocks[depth]
+        self.pm = PointMambaLayer(
+            layer_index=depth,
+            channels=dim,
+            config=mamba_config,
+            hybrid_args={'hybrid': False},
+            bn_momentum=cp_bn_momentum,
+        )
         self.cor_std = 1 / args.cor_std[depth]
         self.cor_head = nn.Sequential(
             nn.Linear(dim, 32, bias=False),
@@ -188,7 +198,7 @@ class Stage(nn.Module):
         x = checkpoint(self.local_aggregation, x, knn, pts) if self.training and self.cp else self.local_aggregation(x,
                                                                                                                      knn,
                                                                                                                      pts)
-
+        x = x + self.pm(xyz, xyz, x, None)
         # get subsequent feature maps
         if not self.last:
             sub_x, sub_c = self.sub_stage(x, xyz, knn, indices, pts_list)

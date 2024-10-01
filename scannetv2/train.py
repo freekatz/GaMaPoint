@@ -318,6 +318,7 @@ if __name__ == '__main__':
     dela_args.ks = [24, 24, 24, 24, 24]
     dela_args.depths = [4, 4, 4, 8, 4]
     dela_args.dims = [64, 96, 160, 288, 512]
+    dela_args.mamba_blocks = [1, 1, 1, 2, 1]
     dela_args.nbr_dims = [32, 32]
     dela_args.head_dim = 288
     dela_args.num_classes = 20
