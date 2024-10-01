@@ -274,6 +274,8 @@ class DelaSemSeg(nn.Module):
 
     def forward(self, gs: NaiveGaussian3D):
         xyz = gs.gs_points.p
+        xyz = xyz.mul_(40)  # make diff from p and f
+
         x = gs.gs_points.f
         pts_list = gs.gs_points.pts_list.tolist()[::-1]
         indices = []
