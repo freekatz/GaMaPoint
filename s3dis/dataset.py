@@ -47,8 +47,8 @@ class S3DIS(Dataset):
                  train=True,
                  warmup=False,
                  voxel_max=24000,
-                 k=[24, 24, 24, 24],
-                 k_gs=[6, 6, 6, 6],
+                 k=[16, 16, 16, 16],
+                 k_gs=[8, 8, 8, 8],
                  grid_size=[0.08, 0.16, 0.32],
                  visible_sample_stride=0.,
                  batch_size=8,
@@ -87,92 +87,89 @@ class S3DIS(Dataset):
 
     def __getitem__(self, idx):
         if not self.train:
-            return self.__getitem_test__(idx)
+            return self.get_test_item(idx)
 
-        idx = idx // self.loop
-        xyz, colors, label = self.datas[idx]
+        idx //= self.loop
+        xyz, col, lbl = self.datas[idx]
 
-        # xyz transforms
         if self.train:
-            xyz = self.xyz_transform(xyz)
+            angle = random.random() * 2 * math.pi
+            cos, sin = math.cos(angle), math.sin(angle)
+            rotmat = torch.tensor([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
+            rotmat *= random.uniform(0.8, 1.2)
+            xyz = xyz @ rotmat
+            xyz += torch.empty_like(xyz).normal_(std=0.005)
+            xyz -= xyz.min(dim=0)[0]
 
-        # pre sample xyz
+        # here grid size is assumed 0.04, so estimated downsampling ratio is ~14
         if self.train:
-            ds_idx = grid_subsampling(xyz, 0.04, 2.5 / 14)
+            indices = grid_subsampling(xyz, self.grid_size[0], 2.5 / 14)
         else:
-            ds_idx = grid_subsampling_test(xyz, 0.04, 2.5 / 14, pick=0)
-        xyz = xyz[ds_idx]
+            indices = grid_subsampling_test(xyz, self.grid_size[0], 2.5 / 14, pick=0)
+
+        xyz = xyz[indices]
+
         if not self.train:
             xyz -= xyz.min(dim=0)[0]
 
-        # select max voxel by random
         if xyz.shape[0] > self.voxel_max and self.train:
             pt = random.choice(xyz)
             condition = (xyz - pt).square().sum(dim=1).argsort()[:self.voxel_max].sort()[0]  # sort to preserve locality
             xyz = xyz[condition]
-            ds_idx = ds_idx[condition]
-        colors = colors[ds_idx].float()
-        label = label[ds_idx]
-        # random to fill color with zero
-        colors = self.color_transform(colors)
-        # mix z into feature
-        height = xyz[:, 2:]
-        feature = torch.cat([colors, height], dim=1)
+            indices = indices[condition]
 
-        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
-        gs.gs_points.__update_attr__('p', xyz)
-        gs.gs_points.__update_attr__('f', feature)
-        gs.gs_points.__update_attr__('y', label)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None, up_sample=True, visible_sample_stride=self.visible_sample_stride)
-        return gs
+        col = col[indices]
+        lbl = lbl[indices]
+        col = col.float()
 
-    def __getitem_test__(self, idx):
-        idx_pick = idx % self.loop * 5
-        idx = idx // self.loop
-        xyz, colors, label = self.datas[idx]
-
-        # pre sample xyz
-        idx_sampled = grid_subsampling_test(xyz, 0.04, 2.5 / 14, pick=idx_pick)
-        xyz = xyz[idx_sampled]
-        colors = colors[idx_sampled].float()
-        label = label[idx_sampled]
-
-        xyz -= xyz.min(dim=0)[0]
-        colors.mul_(1 / 250.)
-        feature = torch.cat([colors, xyz[:, 2:]], dim=1)
-
-        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
-        gs.gs_points.__update_attr__('p', xyz)
-        gs.gs_points.__update_attr__('f', feature)
-        gs.gs_points.__update_attr__('y', label)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None, up_sample=True, visible_sample_stride=self.visible_sample_stride)
-        return gs
-
-    def xyz_transform(self, xyz):
-        angle = random.random() * 2 * math.pi
-        cos, sin = math.cos(angle), math.sin(angle)
-        rotmat = torch.tensor([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
-        rotmat *= random.uniform(0.8, 1.2)
-        xyz = xyz @ rotmat
-        xyz += torch.empty_like(xyz).normal_(std=0.005)
-        xyz -= xyz.min(dim=0)[0]
-        return xyz
-
-    def color_transform(self, colors):
         if self.train and random.random() < 0.2:
-            colors.fill_(0.)
+            col.fill_(0.)
         else:
-            # color transforms
             if self.train and random.random() < 0.2:
-                colmin = colors.min(dim=0, keepdim=True)[0]
-                colmax = colors.max(dim=0, keepdim=True)[0]
+                colmin = col.min(dim=0, keepdim=True)[0]
+                colmax = col.max(dim=0, keepdim=True)[0]
                 scale = 255 / (colmax - colmin)
                 alpha = random.random()
-                colors = (1 - alpha + alpha * scale) * colors - alpha * colmin * scale
-            colors.mul_(1 / 250.)
-        return colors
+                col = (1 - alpha + alpha * scale) * col - alpha * colmin * scale
+            col.mul_(1 / 250.)
+
+        height = xyz[:, 2:]
+        feature = torch.cat([col, height], dim=1)
+        xyz.mul_(40)
+
+        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
+        gs.gs_points.__update_attr__('p', xyz)
+        gs.gs_points.__update_attr__('f', feature)
+        gs.gs_points.__update_attr__('y', lbl)
+        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride)
+        return gs
+
+    def get_test_item(self, idx):
+        pick = idx % self.loop * 5
+
+        idx //= self.loop
+        xyz, col, lbl = self.datas[idx]
+
+        indices = grid_subsampling_test(xyz, self.grid_size[0], 2.5 / 14, pick=pick)
+        xyz = xyz[indices]
+        col = col[indices].float()
+        col.mul_(1 / 250.)
+
+        xyz -= xyz.min(dim=0)[0]
+        feature = torch.cat([col, xyz[:, 2:]], dim=1)
+        xyz.mul_(40)
+
+        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
+        gs.gs_points.__update_attr__('p', xyz)
+        gs.gs_points.__update_attr__('f', feature)
+        gs.gs_points.__update_attr__('y', lbl)
+        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride)
+        return gs
+
 
 
 def s3dis_collate_fn(batch):
