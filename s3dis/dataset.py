@@ -48,7 +48,7 @@ class S3DIS(Dataset):
                  warmup=False,
                  voxel_max=24000,
                  k=[16, 16, 16, 16],
-                 k_gs=[8, 8, 8, 8],
+                 k_gs=[4, 4, 4, 4],
                  grid_size=[0.08, 0.16, 0.32],
                  visible_sample_stride=0.,
                  batch_size=8,
