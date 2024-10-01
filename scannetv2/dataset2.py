@@ -10,7 +10,6 @@ from backbone import merge_gs_list, NaiveGaussian3D, make_gs_points, GaussianOpt
 
 sys.path.append(str(Path(__file__).absolute().parent.parent))
 from utils.cutils import grid_subsampling, KDTree, grid_subsampling_test
-from config import processed_data_path, scan_train, scan_val
 
 
 # adapted from https://github.com/Gofinge/PointTransformerV2/blob/main/pcr/datasets/transform.py
