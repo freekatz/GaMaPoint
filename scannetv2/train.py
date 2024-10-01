@@ -16,9 +16,10 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from backbone import SegHead, Stage
+from backbone.dela import DelaSemSeg
 from scannetv2.configs import model_configs
-# from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
-from scannetv2.dataset2 import ScanNetV22, scannetv2_collate_fn2
+from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
+# from scannetv2.dataset2 import ScanNetV22, scannetv2_collate_fn2
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist
@@ -110,7 +111,7 @@ def main(cfg):
     logging.info(f'Config:\n{cfg.__str__()}')
 
     warmup_loader = DataLoader(
-        ScanNetV22(
+        ScanNetV2(
             dataset_dir=cfg.dataset,
             loop=cfg.batch_size,
             train=True,
@@ -123,12 +124,12 @@ def main(cfg):
             gs_opts=cfg.scannetv2_warmup_cfg.gs_opts
         ),
         batch_size=1,
-        collate_fn=scannetv2_collate_fn2,
+        collate_fn=scannetv2_collate_fn,
         pin_memory=True,
         num_workers=cfg.num_workers,
     )
     train_loader = DataLoader(
-        ScanNetV22(
+        ScanNetV2(
             dataset_dir=cfg.dataset,
             loop=cfg.train_loop,
             train=True,
@@ -141,7 +142,7 @@ def main(cfg):
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
-        collate_fn=scannetv2_collate_fn2,
+        collate_fn=scannetv2_collate_fn,
         shuffle=True,
         pin_memory=True,
         persistent_workers=True,
@@ -149,7 +150,7 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     val_loader = DataLoader(
-        ScanNetV22(
+        ScanNetV2(
             dataset_dir=cfg.dataset,
             loop=cfg.val_loop,
             train=False,
@@ -162,19 +163,22 @@ def main(cfg):
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
         batch_size=1,
-        collate_fn=scannetv2_collate_fn2,
+        collate_fn=scannetv2_collate_fn,
         pin_memory=True,
         persistent_workers=True,
         num_workers=cfg.num_workers,
     )
 
-    stage = Stage(
-        **cfg.gama_cfg.stage_cfg,
-    ).to('cuda')
-    model = SegHead(
-        stage=stage,
-        num_classes=cfg.gama_cfg.num_classes,
-        bn_momentum=cfg.gama_cfg.bn_momentum,
+    # stage = Stage(
+    #     **cfg.gama_cfg.stage_cfg,
+    # ).to('cuda')
+    # model = SegHead(
+    #     stage=stage,
+    #     num_classes=cfg.gama_cfg.num_classes,
+    #     bn_momentum=cfg.gama_cfg.bn_momentum,
+    # ).to('cuda')
+    model = DelaSemSeg(
+        cfg.dela_args
     ).to('cuda')
     model_size, trainable_model_size = cal_model_params(model)
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
@@ -306,6 +310,30 @@ if __name__ == '__main__':
     cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
         cfg.gama_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
+
+    ## tmp code
+    from types import SimpleNamespace
+
+    dela_args = SimpleNamespace()
+    dela_args.ks = [24, 24, 24, 24, 24]
+    dela_args.depths = [4, 4, 4, 8, 4]
+    dela_args.dims = [64, 96, 160, 288, 512]
+    dela_args.nbr_dims = [32, 32]
+    dela_args.head_dim = 288
+    dela_args.num_classes = 20
+    drop_path = 0.1
+    drop_rates = torch.linspace(0., drop_path, sum(dela_args.depths)).split(dela_args.depths)
+    dela_args.drop_paths = [dpr.tolist() for dpr in drop_rates]
+    dela_args.head_drops = torch.linspace(0., 0.2, len(dela_args.depths)).tolist()
+    dela_args.bn_momentum = 0.02
+    dela_args.act = nn.GELU
+    dela_args.mlp_ratio = 2
+    # gradient checkpoint
+    dela_args.use_cp = False
+
+    dela_args.cor_std = [1.6, 2.5, 5, 10, 20]
+    cfg.dela_args = dela_args
+    ## tmp code
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''
