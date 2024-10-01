@@ -154,6 +154,7 @@ class S3DIS(Dataset):
 
         indices = grid_subsampling_test(xyz, self.grid_size[0], 2.5 / 14, pick=pick)
         xyz = xyz[indices]
+        lbl = lbl[indices]
         col = col[indices].float()
         col.mul_(1 / 250.)
 
