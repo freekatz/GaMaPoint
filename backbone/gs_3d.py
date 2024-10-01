@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from einops import repeat
 from pytorch3d.ops import sample_farthest_points
 import torch
-from torch_kdtree import build_kd_tree
+# from torch_kdtree import build_kd_tree
 
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from backbone.ops import points_centroid, points_scaler
