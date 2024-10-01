@@ -212,7 +212,7 @@ class ScanNetV22(Dataset):
 
         indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=pick)
         xyz = xyz[indices]
-        # lbl = lbl[indices]
+        lbl = lbl[indices]
         col = col[indices].float()
         norm = norm[indices]
 
