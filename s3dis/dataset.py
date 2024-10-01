@@ -135,7 +135,6 @@ class S3DIS(Dataset):
 
         height = xyz[:, 2:]
         feature = torch.cat([col, height], dim=1)
-        xyz.mul_(40)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
@@ -160,7 +159,6 @@ class S3DIS(Dataset):
 
         xyz -= xyz.min(dim=0)[0]
         feature = torch.cat([col, xyz[:, 2:]], dim=1)
-        xyz.mul_(40)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
