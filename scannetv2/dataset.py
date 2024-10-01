@@ -1,8 +1,7 @@
-import numpy as np
-import scipy
-
 import __init__
 
+import numpy as np
+import scipy
 import torch
 import random
 import math
@@ -127,7 +126,7 @@ class ScanNetV2(Dataset):
                  warmup=False,
                  voxel_max=64000,
                  k=[24, 24, 24, 24, 24],
-                 k_gs=[6, 6, 6, 6, 6],
+                 k_gs=[8, 8, 8, 8, 8],
                  grid_size=[0.04, 0.08, 0.16, 0.32],
                  visible_sample_stride=0.,
                  batch_size=8,
@@ -168,92 +167,77 @@ class ScanNetV2(Dataset):
 
     def __getitem__(self, idx):
         if not self.train:
-            return self.__getitem_test__(idx)
+            return self.get_test_item(idx)
 
-        idx = idx // self.loop
-        xyz, colors, norm, label = self.datas[idx]
+        idx //= self.loop
+        xyz, col, norm, lbl = self.datas[idx]
 
-        # xyz transforms
         if self.train:
-            xyz, norm = self.xyz_transform(xyz, norm)
-
-        # pre sample xyz
-        if self.train:
-            ds_idx = grid_subsampling(xyz, 0.02, 2.5 / 1.5)
-        else:
-            ds_idx = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=0)
-        xyz = xyz[ds_idx]
-        if not self.train:
+            angle = random.random() * 2 * math.pi
+            cos, sin = math.cos(angle), math.sin(angle)
+            rotmat = torch.tensor([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
+            norm = norm @ rotmat
+            rotmat *= random.uniform(0.8, 1.2)
+            xyz = xyz @ rotmat
+            xyz = self.els(xyz)
             xyz -= xyz.min(dim=0)[0]
 
-        # select max voxel by random
+        # here grid size is assumed 0.02, so estimated downsampling ratio is ~1.5
+        if self.train:
+            indices = grid_subsampling(xyz, 0.02, 2.5 / 1.5)
+        else:
+            indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=0)
+
+        xyz = xyz[indices]
+        if not self.train:
+            xyz -= xyz.min(dim=0)[0]
         if xyz.shape[0] > self.voxel_max and self.train:
             pt = random.choice(xyz)
             condition = (xyz - pt).square().sum(dim=1).argsort()[:self.voxel_max].sort()[0]  # sort to preserve locality
             xyz = xyz[condition]
-            ds_idx = ds_idx[condition]
-        colors = colors[ds_idx].float()
-        norm = norm[ds_idx]
-        label = label[ds_idx]
-        # random to fill norm with zero
-        norm = self.norm_transform(norm)
-        # random to fill color with zero
-        colors = self.color_transform(colors)
-        # mix z into feature
+            indices = indices[condition]
+
+        col = col[indices]
+        lbl = lbl[indices]
+        norm = norm[indices]
+        col = col.float()
+
+        if self.train and random.random() < 0.2:
+            col.fill_(0.)
+        else:
+            if self.train and random.random() < 0.2:
+                colmin = col.min(dim=0, keepdim=True)[0]
+                colmax = col.max(dim=0, keepdim=True)[0]
+                scale = 255 / (colmax - colmin)
+                alpha = random.random()
+                col = (1 - alpha + alpha * scale) * col - alpha * colmin * scale
+            col.mul_(1 / 250.)
+        if self.train and random.random() < 0.2:
+            norm.fill_(0.)
+
         height = xyz[:, 2:]
-        feature = torch.cat([colors, height, norm], dim=1)
+        feature = torch.cat([col, height, norm], dim=1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
-        gs.gs_points.__update_attr__('y', label)
+        gs.gs_points.__update_attr__('y', lbl)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None, up_sample=True, visible_sample_stride=self.visible_sample_stride)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride)
         return gs
 
-    def __getitem_test__(self, idx):
+    def get_test_item(self, idx):
         rotations = [0, 0.5, 1, 1.5]
         scales = [0.95, 1, 1.05]
         augs = len(rotations) * len(scales)
         aug = idx % self.loop
-        idx_pick = aug // augs
+        pick = aug // augs
         aug %= augs
 
-        idx = idx // self.loop
-        xyz, colors, norm, label = self.datas[idx]
-        xyz, norm = self.xyz_transform_test(xyz, norm, aug, rotations, scales)
+        idx //= self.loop
+        xyz, col, norm, lbl = self.datas[idx]
 
-        # pre sample xyz
-        idx_sampled = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=idx_pick)
-        xyz = xyz[idx_sampled]
-        colors = colors[idx_sampled].float()
-        norm = norm[idx_sampled]
-        label = label[idx_sampled]
-
-        xyz -= xyz.min(dim=0)[0]
-        colors.mul_(1 / 250.)
-        feature = torch.cat([colors, xyz[:, 2:], norm], dim=1)
-
-        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
-        gs.gs_points.__update_attr__('p', xyz)
-        gs.gs_points.__update_attr__('f', feature)
-        gs.gs_points.__update_attr__('y', label)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None, up_sample=True, visible_sample_stride=self.visible_sample_stride)
-        return gs
-
-    def xyz_transform(self, xyz, norm):
-        angle = random.random() * 2 * math.pi
-        cos, sin = math.cos(angle), math.sin(angle)
-        rotmat = torch.tensor([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
-        norm = norm @ rotmat
-        rotmat *= random.uniform(0.8, 1.2)
-        xyz = xyz @ rotmat
-        xyz = self.els(xyz)
-        xyz -= xyz.min(dim=0)[0]
-        return xyz, norm
-
-    def xyz_transform_test(self, xyz, norm, aug, rotations, scales):
         angle = math.pi * rotations[aug // len(scales)]
         cos, sin = math.cos(angle), math.sin(angle)
         rotmat = torch.tensor([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
@@ -261,29 +245,30 @@ class ScanNetV2(Dataset):
         rotmat *= scales[aug % len(scales)]
         xyz = xyz @ rotmat
         xyz -= xyz.min(dim=0)[0]
-        return xyz, norm
 
-    def color_transform(self, colors):
-        if self.train and random.random() < 0.2:
-            colors.fill_(0.)
-        else:
-            # color transforms
-            if self.train and random.random() < 0.2:
-                colmin = colors.min(dim=0, keepdim=True)[0]
-                colmax = colors.max(dim=0, keepdim=True)[0]
-                scale = 255 / (colmax - colmin)
-                alpha = random.random()
-                colors = (1 - alpha + alpha * scale) * colors - alpha * colmin * scale
-            colors.mul_(1 / 250.)
-        return colors
+        indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=pick)
+        xyz = xyz[indices]
+        lbl = lbl[indices]
+        col = col[indices].float()
+        norm = norm[indices]
 
-    def norm_transform(self, norm):
-        if self.train and random.random() < 0.2:
-            norm.fill_(0.)
-        return norm
+        col.mul_(1 / 250.)
+
+        xyz -= xyz.min(dim=0)[0]
+        feature = torch.cat([col, xyz[:, 2:], norm], dim=1)
+
+        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
+        gs.gs_points.__update_attr__('p', xyz)
+        gs.gs_points.__update_attr__('f', feature)
+        gs.gs_points.__update_attr__('y', lbl)
+        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride)
+        return gs
 
 
-def scannetv2_collate_fn(batch):
+def scannetv2_collate_fn2(batch):
     gs_list = list(batch)
     new_gs = merge_gs_list(gs_list)
     return new_gs
+
