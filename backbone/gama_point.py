@@ -181,7 +181,8 @@ class SegHead(nn.Module):
         p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
 
-        p = p.mul_(40)  # make diff from p and f
+        p = p.mul_(60)
+        p_gs = p_gs.mul_(60)
         f = self.stage(p, p_gs, f, gs)
         return self.head(f)
 
@@ -226,7 +227,8 @@ class ClsHead(nn.Module):
         p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
 
-        p = p.mul_(40)  # make diff from p and f
+        p = p.mul_(60)
+        p_gs = p_gs.mul_(60)
         f = self.stage(p, p_gs, f, gs)
         f = self.proj(f)
         f = f.max(dim=0)[0].unsqueeze(0)
