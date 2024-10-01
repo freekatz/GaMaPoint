@@ -267,7 +267,7 @@ class ScanNetV2(Dataset):
         return gs
 
 
-def scannetv2_collate_fn2(batch):
+def scannetv2_collate_fn(batch):
     gs_list = list(batch)
     new_gs = merge_gs_list(gs_list)
     return new_gs
