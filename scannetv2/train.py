@@ -17,7 +17,8 @@ from tqdm import tqdm
 
 from backbone import SegHead, Stage
 from scannetv2.configs import model_configs
-from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
+# from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
+from scannetv2.dataset2 import ScanNetV22, scannetv2_collate_fn2
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist
@@ -109,7 +110,7 @@ def main(cfg):
     logging.info(f'Config:\n{cfg.__str__()}')
 
     warmup_loader = DataLoader(
-        ScanNetV2(
+        ScanNetV22(
             dataset_dir=cfg.dataset,
             loop=cfg.batch_size,
             train=True,
@@ -122,12 +123,12 @@ def main(cfg):
             gs_opts=cfg.scannetv2_warmup_cfg.gs_opts
         ),
         batch_size=1,
-        collate_fn=scannetv2_collate_fn,
+        collate_fn=scannetv2_collate_fn2,
         pin_memory=True,
         num_workers=cfg.num_workers,
     )
     train_loader = DataLoader(
-        ScanNetV2(
+        ScanNetV22(
             dataset_dir=cfg.dataset,
             loop=cfg.train_loop,
             train=True,
@@ -140,7 +141,7 @@ def main(cfg):
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
-        collate_fn=scannetv2_collate_fn,
+        collate_fn=scannetv2_collate_fn2,
         shuffle=True,
         pin_memory=True,
         persistent_workers=True,
@@ -148,7 +149,7 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     val_loader = DataLoader(
-        ScanNetV2(
+        ScanNetV22(
             dataset_dir=cfg.dataset,
             loop=cfg.val_loop,
             train=False,
@@ -161,7 +162,7 @@ def main(cfg):
             gs_opts=cfg.scannetv2_cfg.gs_opts
         ),
         batch_size=1,
-        collate_fn=scannetv2_collate_fn,
+        collate_fn=scannetv2_collate_fn2,
         pin_memory=True,
         persistent_workers=True,
         num_workers=cfg.num_workers,
@@ -224,7 +225,7 @@ def main(cfg):
         logging.info(f'@E{epoch} train results: '
                      + f'lr={lr:.6f} train_loss={train_loss:.4f} '
                      + f'train_macc={train_macc:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
-                     + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
+                     + f'time_cost={time_cost:.2f}s avg_time_cost={timer_meter.avg:.2f}s')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
