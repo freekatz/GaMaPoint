@@ -103,9 +103,9 @@ class S3DIS(Dataset):
 
         # here grid size is assumed 0.04, so estimated downsampling ratio is ~14
         if self.train:
-            indices = grid_subsampling(xyz, self.grid_size[0], 2.5 / 14)
+            indices = grid_subsampling(xyz, 0.04, 2.5 / 14)
         else:
-            indices = grid_subsampling_test(xyz, self.grid_size[0], 2.5 / 14, pick=0)
+            indices = grid_subsampling_test(xyz, 0.04, 2.5 / 14, pick=0)
 
         xyz = xyz[indices]
 
@@ -152,7 +152,7 @@ class S3DIS(Dataset):
         idx //= self.loop
         xyz, col, lbl = self.datas[idx]
 
-        indices = grid_subsampling_test(xyz, self.grid_size[0], 2.5 / 14, pick=pick)
+        indices = grid_subsampling_test(xyz, 0.04, 2.5 / 14, pick=pick)
         xyz = xyz[indices]
         lbl = lbl[indices]
         col = col[indices].float()
