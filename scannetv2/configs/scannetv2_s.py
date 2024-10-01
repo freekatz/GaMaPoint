@@ -14,8 +14,8 @@ class ScanNetV2Config(BaseConfig):
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
-    gs_opts.n_cameras = 16
-    gs_opts.cam_fovy = 150
+    gs_opts.n_cameras = 32
+    gs_opts.cam_fovy = 120
 
 
 class ScanNetV2WarmupConfig(BaseConfig):
@@ -25,23 +25,23 @@ class ScanNetV2WarmupConfig(BaseConfig):
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
-    gs_opts.n_cameras = 16
-    gs_opts.cam_fovy = 150
+    gs_opts.n_cameras = 32
+    gs_opts.cam_fovy = 120
 
 
 class GaMaConfig(BaseConfig):
     name = 'GaMaConfig'
     num_classes = 20
     bn_momentum = 0.02
-    drop_path = 0.1
+    drop_path = 0.2
     channel_list = [64, 96, 160, 288, 512]
     stage_cfg = BaseConfig()
     stage_cfg.name = 'StageConfig'
-    stage_cfg.in_channels = 7
+    stage_cfg.in_channels = 6
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 288
     stage_cfg.mamba_blocks = [1, 1, 1, 1, 1]
-    stage_cfg.res_blocks = [4, 4, 4, 8, 4]
+    stage_cfg.res_blocks = [2, 2, 2, 3, 2]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum
     drop_rates = torch.linspace(0., drop_path, sum(stage_cfg.res_blocks)).split(stage_cfg.res_blocks)

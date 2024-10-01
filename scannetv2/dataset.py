@@ -215,8 +215,7 @@ class ScanNetV2(Dataset):
         if self.train and random.random() < 0.2:
             norm.fill_(0.)
 
-        height = xyz[:, 2:]
-        feature = torch.cat([col, height, norm], dim=1)
+        feature = torch.cat([norm, col], dim=1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
@@ -255,7 +254,7 @@ class ScanNetV2(Dataset):
         col.mul_(1 / 250.)
 
         xyz -= xyz.min(dim=0)[0]
-        feature = torch.cat([col, xyz[:, 2:], norm], dim=1)
+        feature = torch.cat([norm, col], dim=1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)

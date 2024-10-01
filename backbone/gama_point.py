@@ -126,22 +126,20 @@ class Stage(nn.Module):
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx] \
                  + self.la_gs(f.unsqueeze(0), pre_gs_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
-        pts = gs.gs_points.pts_list[self.layer_index].tolist()
         # set abstraction: group and abstract the local points set
-        # invert residual connections: local feature aggregation and propagation
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
-        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
-            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx.unsqueeze(0), pts)
-
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
         f_local_gs = self.sa_gs(p_gs, f, gs_group_idx)
-        f_local_gs = self.res_mlp_gs(f_local_gs.unsqueeze(0), gs_group_idx.unsqueeze(0), pts) if not self.use_cp \
-            else checkpoint(self.res_mlp.forward, f_local_gs.unsqueeze(0), gs_group_idx.unsqueeze(0), pts)
-
         alpha = self.alpha.sigmoid()
         f_local = f_local * alpha + f_local_gs * (1 - alpha)
+
+        # invert residual connections: local feature aggregation and propagation
+        pts = gs.gs_points.pts_list[self.layer_index].tolist()
+        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
+            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx.unsqueeze(0), pts)
         f_local = f_local.squeeze(0)
+
         # point mamba: extract the global feature from center points of local
         f_global = self.pm(p, p_gs, f_local, gs)
         # fuse local and global feature
