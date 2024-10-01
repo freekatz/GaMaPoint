@@ -145,9 +145,9 @@ class ScanNetV22(Dataset):
 
         # here grid size is assumed 0.02, so estimated downsampling ratio is ~1.5
         if self.train:
-            indices = grid_subsampling(xyz, self.grid_size[0], 2.5 / 1.5)
+            indices = grid_subsampling(xyz, 0.02, 2.5 / 1.5)
         else:
-            indices = grid_subsampling_test(xyz, self.grid_size[0], 2.5 / 1.5, pick=0)
+            indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=0)
 
         xyz = xyz[indices]
 
@@ -210,8 +210,9 @@ class ScanNetV22(Dataset):
         xyz = xyz @ rotmat
         xyz -= xyz.min(dim=0)[0]
 
-        indices = grid_subsampling_test(xyz, self.grid_size[0], 2.5 / 1.5, pick=pick)
+        indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=pick)
         xyz = xyz[indices]
+        # lbl = lbl[indices]
         col = col[indices].float()
         norm = norm[indices]
 
