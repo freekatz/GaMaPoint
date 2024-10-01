@@ -10,7 +10,7 @@ from scannetv2.configs.config import BaseConfig
 class ScanNetV2Config(BaseConfig):
     name = 'ScanNetV2Config'
     k = [24, 24, 24, 24, 24]
-    k_gs = [8, 8, 8, 8, 8]
+    k_gs = [6, 6, 6, 6, 6]
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
@@ -21,7 +21,7 @@ class ScanNetV2Config(BaseConfig):
 class ScanNetV2WarmupConfig(BaseConfig):
     name = 'ScanNetV2WarmupConfig'
     k = [24, 24, 24, 24, 24]
-    k_gs = [8, 8, 8, 8, 8]
+    k_gs = [6, 6, 6, 6, 6]
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
@@ -40,7 +40,7 @@ class GaMaConfig(BaseConfig):
     stage_cfg.in_channels = 7
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 288
-    stage_cfg.mamba_blocks = [1, 1, 1, 2, 1]
+    stage_cfg.mamba_blocks = [1, 1, 1, 1, 1]
     stage_cfg.res_blocks = [4, 4, 4, 8, 4]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum
