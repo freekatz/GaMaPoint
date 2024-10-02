@@ -99,12 +99,6 @@ class Stage(nn.Module):
             nn.GELU(),
             nn.Linear(32, 3, bias=False),
         )
-        self.diff_head_gs = nn.Sequential(
-            nn.Linear(self.out_channels, 32, bias=False),
-            nn.BatchNorm1d(32, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(32, 3, bias=False),
-        )
 
         if not is_tail:
             self.sub_stage = Stage(
@@ -164,24 +158,15 @@ class Stage(nn.Module):
 
         # regularization
         if self.training:
-            N, K1 = group_idx.shape
-            rand_group = torch.randint(0, K1, (N, 1), device=p.device)
+            N, K = group_idx.shape
+            rand_group = torch.randint(0, K, (N, 1), device=p.device)
             rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
             rand_p_group = p[rand_group_idx] - p
             rand_p_group.mul_(self.diff_std)
             rand_f_group = f[rand_group_idx] - f
             rand_f_group = self.diff_head(rand_f_group)
             diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
-
-            N, K2 = gs_group_idx.shape
-            rand_gs_group = torch.randint(0, K2, (N, 1), device=p.device)
-            rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
-            rand_p_gs_group = p_gs[rand_gs_group_idx] - p_gs
-            rand_p_gs_group.mul_(self.diff_std)
-            rand_f_gs_group = f[rand_gs_group_idx] - f
-            rand_f_gs_group = self.diff_head_gs(rand_f_gs_group)
-            diff_gs = nn.functional.mse_loss(rand_f_gs_group, rand_p_gs_group)
-            d_sub = d_sub + diff * 0.8 + diff_gs * 0.2 if d_sub is not None else diff * 0.8 + diff_gs * 0.2
+            d_sub = d_sub + diff if d_sub is not None else diff
 
 
         # 3. decode
