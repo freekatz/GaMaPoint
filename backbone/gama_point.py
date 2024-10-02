@@ -116,6 +116,7 @@ class Stage(nn.Module):
                 hybrid_args=hybrid_args,
                 task_type='seg',
                 use_cp=use_cp,
+                diff_factor=diff_factor,
                 diff_std=diff_std,
             )
 
