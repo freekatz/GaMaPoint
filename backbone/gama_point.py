@@ -89,6 +89,18 @@ class Stage(nn.Module):
             nn.init.constant_(self.post_proj[0].weight, (channel_list[0] / self.out_channels) ** 0.5)
             self.head_drop = DropPath(head_drops[layer_index])
 
+        self.diff_head = nn.Sequential(
+            nn.Linear(self.out_channels, 32, bias=False),
+            nn.BatchNorm1d(32, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(32, 16, bias=False),
+        )
+        self.diff_head_gs = nn.Sequential(
+            nn.Linear(self.out_channels, 32, bias=False),
+            nn.BatchNorm1d(32, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(32, 16, bias=False),
+        )
         if not is_tail:
             self.sub_stage = Stage(
                 layer_index=layer_index + 1,
@@ -136,9 +148,25 @@ class Stage(nn.Module):
 
         # 2. netx stage
         if not self.is_tail:
-            f_sub = self.sub_stage(p, p_gs, f, gs)
+            f_sub, d_sub = self.sub_stage(p, p_gs, f, gs)
         else:
-            f_sub = None
+            f_sub = d_sub = None
+
+        # regularization
+        if self.training:
+            N, K1 = group_idx.shape
+            rand_group = torch.randint(0, K1, (N, 1))
+            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
+            N, K2 = group_idx.shape
+            rand_gs_group = torch.randint(0, K2, (N, 1))
+            rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
+
+            rand_f = f[rand_group_idx] - f
+            rand_f = self.diff_head(rand_f)
+            rand_f_gs = f[rand_gs_group_idx] - f
+            rand_f_gs = self.diff_head_gs(rand_f_gs)
+            diff = nn.functional.mse_loss(rand_f, rand_f_gs)
+            d_sub = d_sub + diff if d_sub is not None else diff
 
         # 3. decode
         # up sample
@@ -152,7 +180,7 @@ class Stage(nn.Module):
             f = f_sub + f if f_sub is not None else f
         else:
             f = f_sub
-        return f
+        return f, d_sub
 
 
 class SegHead(nn.Module):
@@ -186,7 +214,9 @@ class SegHead(nn.Module):
 
         p = p.mul_(60)
         p_gs = p_gs.mul_(60)
-        f = self.stage(p, p_gs, f, gs)
+        f, diff = self.stage(p, p_gs, f, gs)
+        if self.training:
+            return self.head(f), diff
         return self.head(f)
 
 

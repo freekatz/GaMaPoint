@@ -49,8 +49,8 @@ def warmup(cfg, model: nn.Module, warmup_loader):
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred = model(gs)
-            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index)
+            pred, diff = model(gs)
+            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
         loss.backward()
 
 
@@ -59,28 +59,34 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
+    diff_meter = AverageMeter()
+    steps_per_epoch = len(train_loader)
     for idx, gs in pbar:
+        lam = scheduler_steps/(epoch*steps_per_epoch)
+        lam = 3e-3 ** lam * 0.2
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
-        mask = target != 20
         with autocast():
-            pred = model(gs)
+            pred, diff = model(gs)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss).backward()
+            scaler.scale(loss + diff*lam).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
+            loss = loss + diff*lam
             loss.backward()
             optimizer.step()
 
-        m.update(pred[mask], target[mask])
+        m.update(pred, target)
         loss_meter.update(loss.item())
+        diff_meter.update(diff.item())
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
+                             + f"Diff {diff_meter.avg:.4f} "
                              + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
     return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
@@ -93,10 +99,9 @@ def validate(cfg, model, val_loader, epoch):
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
-        mask = target != 20
         with autocast():
             pred = model(gs)
-        m.update(pred[mask], target[mask])
+        m.update(pred, target)
     acc, macc, miou, iou = m.calc()
     return miou, macc, iou, acc
 

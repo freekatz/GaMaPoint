@@ -27,7 +27,6 @@ class StructuredMask:
         return fn(x, is_post_mask=is_post_mask)
 
 
-
 def todo_fn():
     def fn(x, is_post_mask=False):
         return x
@@ -42,11 +41,12 @@ def cov3d_fn(cov3d, d_model):
     """
     L, _ = torch.linalg.eigh(cov3d)
     L, _ = L.max(dim=-1, keepdim=False)  # [B, N]
-    L = repeat(L, 'b n -> b n c', c=d_model)  # [B, d_model, N]
+    L = L.unsqueeze(-1)
+    print(L)
 
     def fn(x, is_post_mask=False):
         if not is_post_mask:
-            return torch.mul(L, x)
+            return x * L
         else:
             return x
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     print(x.shape)
     print(x)
 
-    x_old = mask.apply(x_old, is_post_mask=False)
+    x_old = mask.apply(x_old, is_post_mask=True)
     print(x_old.shape)
     print(x_old)
 
