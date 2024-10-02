@@ -117,6 +117,9 @@ class Stage(nn.Module):
                 head_drops=head_drops,
                 mamba_config=mamba_config,
                 hybrid_args=hybrid_args,
+                task_type='seg',
+                use_cp=use_cp,
+                diff_std=diff_std,
             )
 
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
