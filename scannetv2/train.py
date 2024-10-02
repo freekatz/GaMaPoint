@@ -103,7 +103,7 @@ def validate(cfg, model, val_loader, epoch):
         target = gs.gs_points.y
         mask = target != cfg.ignore_index
         with autocast():
-            pred, diff = model(gs)
+            pred = model(gs)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         m.update(pred[mask], target[mask])
         loss_meter.update(loss.item())

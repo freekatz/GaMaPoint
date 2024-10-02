@@ -101,7 +101,7 @@ def validate(cfg, model, val_loader, epoch):
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred, diff = model(gs)
+            pred = model(gs)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         m.update(pred, target)
         loss_meter.update(loss.item())
