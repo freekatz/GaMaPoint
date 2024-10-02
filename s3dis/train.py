@@ -86,24 +86,33 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         diff_meter.update(diff.item())
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
-                             + f"Diff {diff_meter.avg*100:.4f} "
+                             + f"Diff {diff_meter.avg:.4f} "
                              + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
-    return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
+    return loss_meter.avg, diff_meter.avg, miou, macc, iou, acc, scheduler_steps
 
 
 def validate(cfg, model, val_loader, epoch):
     model.eval()
-    m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
+    m = Metric(cfg.num_classes)
+    loss_meter = AverageMeter()
+    diff_meter = AverageMeter()
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred = model(gs)
+            pred, diff = model(gs, need_diff=True)
+            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         m.update(pred, target)
+        loss_meter.update(loss.item())
+        diff_meter.update(diff.item())
+        pbar.set_description(f"Val Epoch [{epoch}/{cfg.epochs}] "
+                             + f"Loss {loss_meter.avg:.4f} "
+                             + f"Diff {diff_meter.avg:.4f} "
+                             + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
-    return miou, macc, iou, acc
+    return loss_meter.avg, diff_meter.avg, miou, macc, iou, acc
 
 
 def main(cfg):
@@ -223,7 +232,7 @@ def main(cfg):
     warmup(cfg, model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
+        train_loss, train_diff, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
@@ -237,7 +246,7 @@ def main(cfg):
         is_best = False
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
-                val_miou, val_macc, val_ious, val_accs = validate(
+                val_loss, val_diff, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
             if val_miou > best_miou:
@@ -262,7 +271,10 @@ def main(cfg):
             writer.add_scalar('val_miou', val_miou, epoch)
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
             writer.add_scalar('val_macc', val_macc, epoch)
+            writer.add_scalar('val_loss', val_loss, epoch)
+            writer.add_scalar('val_diff', val_diff, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
+            writer.add_scalar('train_diff', train_diff, epoch)
             writer.add_scalar('train_miou', train_miou, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)

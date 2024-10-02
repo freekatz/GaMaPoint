@@ -25,6 +25,7 @@ class Stage(nn.Module):
                  hybrid_args={'hybrid': False},
                  task_type='seg',
                  use_cp=False,
+                 diff_std=[1.6, 3.2, 6.4, 12.8],
                  **kwargs
                  ):
         super().__init__()
@@ -89,17 +90,18 @@ class Stage(nn.Module):
             nn.init.constant_(self.post_proj[0].weight, (channel_list[0] / self.out_channels) ** 0.5)
             self.head_drop = DropPath(head_drops[layer_index])
 
+        self.diff_std = 1 / diff_std[layer_index]
         self.diff_head = nn.Sequential(
             nn.Linear(self.out_channels, 32, bias=False),
             nn.BatchNorm1d(32, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(32, 16, bias=False),
+            nn.Linear(32, 3, bias=False),
         )
         self.diff_head_gs = nn.Sequential(
             nn.Linear(self.out_channels, 32, bias=False),
             nn.BatchNorm1d(32, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(32, 16, bias=False),
+            nn.Linear(32, 3, bias=False),
         )
         if not is_tail:
             self.sub_stage = Stage(
@@ -154,18 +156,14 @@ class Stage(nn.Module):
 
         # regularization
         if self.training:
-            N, K1 = group_idx.shape
-            rand_group = torch.randint(0, K1, (N, 1), device=p.device)
-            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
-            N, K2 = gs_group_idx.shape
-            rand_gs_group = torch.randint(0, K2, (N, 1), device=p.device)
-            rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
-
-            rand_f = f[rand_group_idx] - f
-            rand_f = self.diff_head(rand_f)
-            rand_f_gs = f[rand_gs_group_idx] - f
-            rand_f_gs = self.diff_head_gs(rand_f_gs)
-            diff = nn.functional.mse_loss(rand_f, rand_f_gs)
+            N, K = group_idx_all.shape
+            rand_group = torch.randint(0, K, (N, 1), device=p.device)
+            rand_group_idx = torch.gather(group_idx_all, 1, rand_group).squeeze(1)
+            rand_p_group = p[rand_group_idx] - p
+            rand_p_group.mul_(self.diff_std)
+            rand_f_group = f[rand_group_idx] - f
+            rand_f_group = self.diff_head(rand_f_group)
+            diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
             d_sub = d_sub + diff if d_sub is not None else diff
 
         # 3. decode
@@ -207,7 +205,7 @@ class SegHead(nn.Module):
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, gs: NaiveGaussian3D):
+    def forward(self, gs: NaiveGaussian3D, need_diff=False):
         p = gs.gs_points.p
         p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
@@ -215,7 +213,7 @@ class SegHead(nn.Module):
         p = p.mul_(60)
         p_gs = p_gs.mul_(60)
         f, diff = self.stage(p, p_gs, f, gs)
-        if self.training:
+        if self.training or need_diff:
             return self.head(f), diff
         return self.head(f)
 
