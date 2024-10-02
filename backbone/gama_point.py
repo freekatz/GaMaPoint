@@ -25,6 +25,7 @@ class Stage(nn.Module):
                  hybrid_args={'hybrid': False},
                  task_type='seg',
                  use_cp=False,
+                 diff_factor=40.,
                  diff_std=[1.6, 3.2, 6.4, 12.8],
                  **kwargs
                  ):
@@ -40,6 +41,7 @@ class Stage(nn.Module):
         self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
+        self.diff_factor = diff_factor
 
         if not is_head:
             self.skip_proj = nn.Sequential(
@@ -126,6 +128,8 @@ class Stage(nn.Module):
     def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
         # 1. encode
         # down sample
+        if self.is_head:
+            p = p.mul_(self.diff_factor)
         if not self.is_head:
             idx = gs.gs_points.idx_ds[self.layer_index - 1]
             p = p[idx]
@@ -224,8 +228,6 @@ class SegHead(nn.Module):
         p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
 
-        p = p.mul_(60)
-        p_gs = p_gs.mul_(60)
         f, diff = self.stage(p, p_gs, f, gs)
         if self.training:
             return self.head(f), diff
