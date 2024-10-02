@@ -97,6 +97,12 @@ class Stage(nn.Module):
             nn.GELU(),
             nn.Linear(32, 3, bias=False),
         )
+        self.diff_head_gs = nn.Sequential(
+            nn.Linear(self.out_channels, 32, bias=False),
+            nn.BatchNorm1d(32, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(32, 3, bias=False),
+        )
 
         if not is_tail:
             self.sub_stage = Stage(
