@@ -159,21 +159,20 @@ class Stage(nn.Module):
             N, K1 = group_idx.shape
             rand_group = torch.randint(0, K1, (N, 1), device=p.device)
             rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
+            rand_p_group = p[rand_group_idx] - p
+            rand_p_group.mul_(self.diff_std)
+            rand_f_group = f[rand_group_idx] - f
+            rand_f_group = self.diff_head(rand_f_group)
+            diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
+            d_sub = d_sub + diff if d_sub is not None else diff
+
             N, K2 = gs_group_idx.shape
             rand_gs_group = torch.randint(0, K2, (N, 1), device=p.device)
             rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
-
-            rand_p_group = p[rand_group_idx] - p
-            rand_p_group.mul_(self.diff_std)
-            rand_p_gs_group = p_gs[rand_gs_group_idx] - p_gs
-            rand_p_group_all = torch.cat([rand_p_group, rand_p_gs_group], dim=1)
-            rand_f_group = f[rand_group_idx] - f
-            rand_f_group = self.diff_head(rand_f_group)
             rand_f_group_gs = f[rand_gs_group_idx] - f
             rand_f_group_gs = self.diff_head_gs(rand_f_group_gs)
-            rand_f_group_all = torch.cat([rand_f_group, rand_f_group_gs], dim=1)
-            diff = nn.functional.mse_loss(rand_f_group_all, rand_p_group_all)
-            d_sub = d_sub + diff if d_sub is not None else diff
+            diff_gs = nn.functional.mse_loss(rand_f_group_gs, rand_f_group)
+            d_sub = d_sub + diff_gs
 
         # 3. decode
         # up sample
