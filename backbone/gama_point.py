@@ -129,9 +129,7 @@ class Stage(nn.Module):
             p = p[idx]
             p_gs = p_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
-            pre_gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index - 1]
-            pre_group_idx_all = torch.cat([pre_group_idx, pre_gs_group_idx], dim=1)
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx_all.unsqueeze(0)).squeeze(0)[idx]
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
         # set abstraction: group and abstract the local points set
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
@@ -140,10 +138,9 @@ class Stage(nn.Module):
         alpha = self.alpha.sigmoid()
         f_local = f_local * alpha + f_local_gs * (1 - alpha)
         # invert residual connections: local feature aggregation and propagation
-        group_idx_all = torch.cat([group_idx, gs_group_idx], dim=1)
         pts = gs.gs_points.pts_list[self.layer_index].tolist()
-        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx_all.unsqueeze(0), pts) if not self.use_cp \
-            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx_all.unsqueeze(0), pts)
+        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
+            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx.unsqueeze(0), pts)
         f_local = f_local.squeeze(0)
         # point mamba: extract the global feature from center points of local
         f_global = self.pm(p, p_gs, f_local, gs)
@@ -167,7 +164,6 @@ class Stage(nn.Module):
             rand_f_group = self.diff_head(rand_f_group)
             diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
             d_sub = d_sub + diff if d_sub is not None else diff
-
 
         # 3. decode
         # up sample
