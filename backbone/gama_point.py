@@ -97,12 +97,7 @@ class Stage(nn.Module):
             nn.GELU(),
             nn.Linear(32, 3, bias=False),
         )
-        self.diff_head_gs = nn.Sequential(
-            nn.Linear(self.out_channels, 32, bias=False),
-            nn.BatchNorm1d(32, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(32, 3, bias=False),
-        )
+
         if not is_tail:
             self.sub_stage = Stage(
                 layer_index=layer_index + 1,
@@ -172,9 +167,11 @@ class Stage(nn.Module):
             N, K2 = gs_group_idx.shape
             rand_gs_group = torch.randint(0, K2, (N, 1), device=p.device)
             rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
-            rand_f_group_gs = f[rand_gs_group_idx] - f
-            rand_f_group_gs = self.diff_head_gs(rand_f_group_gs)
-            diff_gs = nn.functional.mse_loss(rand_f_group_gs, rand_f_group)
+            rand_p_gs_group = p_gs[rand_group_idx] - p_gs
+            rand_p_gs_group.mul_(self.diff_std)
+            rand_f_gs_group = f[rand_gs_group_idx] - f
+            rand_f_gs_group = self.diff_head_gs(rand_f_gs_group)
+            diff_gs = nn.functional.mse_loss(rand_f_gs_group, rand_p_gs_group)
             d_sub = d_sub + diff_gs
 
         # 3. decode
