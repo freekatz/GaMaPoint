@@ -155,10 +155,10 @@ class Stage(nn.Module):
         # regularization
         if self.training:
             N, K1 = group_idx.shape
-            rand_group = torch.randint(0, K1, (N, 1))
+            rand_group = torch.randint(0, K1, (N, 1), device=p.device)
             rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
-            N, K2 = group_idx.shape
-            rand_gs_group = torch.randint(0, K2, (N, 1))
+            N, K2 = gs_group_idx.shape
+            rand_gs_group = torch.randint(0, K2, (N, 1), device=p.device)
             rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
 
             rand_f = f[rand_group_idx] - f
