@@ -252,7 +252,7 @@ def main(cfg):
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
                 logging.info(f'@E{epoch} val results: '
-                             + f'loss={train_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
+                             + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
                              + f'miou={val_miou:.4f} best_miou={best_miou:.4f}'
                              + f'\nious={val_ious.detach().cpu().numpy()}')
         if is_best:

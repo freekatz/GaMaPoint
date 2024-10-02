@@ -251,7 +251,7 @@ def main(cfg):
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
                 logging.info(f'@E{epoch} val results: '
-                             + f'loss={train_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
+                             + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
                              + f'miou={val_miou:.4f} best_miou={best_miou:.4f}'
                              + f'\nious={val_ious.detach().cpu().numpy()}')
         if is_best:
@@ -297,8 +297,8 @@ if __name__ == '__main__':
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=200)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
-    parser.add_argument("--lr", type=float, required=False, default=5e-3)
-    parser.add_argument("--lr_decay", type=float, required=False, default=1.)
+    parser.add_argument("--lr", type=float, required=False, default=1e-3)
+    parser.add_argument("--lr_decay", type=float, required=False, default=1.-1e-3)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')
