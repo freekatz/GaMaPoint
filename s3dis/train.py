@@ -63,7 +63,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     steps_per_epoch = len(train_loader)
     for idx, gs in pbar:
         lam = scheduler_steps/(epoch*steps_per_epoch)
-        lam = 3e-3 ** lam * 0.2
+        lam = 3e-3 ** lam * 0.25
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
         gs.gs_points.to_cuda(non_blocking=True)

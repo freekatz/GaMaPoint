@@ -63,7 +63,7 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
             use_cp=use_cp,
         )
-        self.alpha = nn.Parameter(torch.tensor([0.75], dtype=torch.float32) * 100)
+        self.alpha = nn.Parameter(torch.tensor([0.8], dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -173,12 +173,12 @@ class Stage(nn.Module):
             N, K2 = gs_group_idx.shape
             rand_gs_group = torch.randint(0, K2, (N, 1), device=p.device)
             rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
-            rand_p_gs_group = p_gs[rand_group_idx] - p_gs
+            rand_p_gs_group = p_gs[rand_gs_group_idx] - p_gs
             rand_p_gs_group.mul_(self.diff_std)
             rand_f_gs_group = f[rand_gs_group_idx] - f
             rand_f_gs_group = self.diff_head_gs(rand_f_gs_group)
             diff_gs = nn.functional.mse_loss(rand_f_gs_group, rand_p_gs_group)
-            d_sub = d_sub + diff_gs
+            d_sub = d_sub * 0.8 + diff_gs * 0.2
 
         # 3. decode
         # up sample
