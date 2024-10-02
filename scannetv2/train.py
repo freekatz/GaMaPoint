@@ -98,23 +98,20 @@ def validate(cfg, model, val_loader, epoch):
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
-    diff_meter = AverageMeter()
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
-        mask = target != 20
+        mask = target != cfg.ignore_index
         with autocast():
-            pred, diff = model(gs, need_diff=True)
+            pred, diff = model(gs)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         m.update(pred[mask], target[mask])
         loss_meter.update(loss.item())
-        diff_meter.update(diff.item())
         pbar.set_description(f"Val Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
-                             + f"Diff {diff_meter.avg:.4f} "
                              + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
-    return loss_meter.avg, diff_meter.avg, miou, macc, iou, acc
+    return loss_meter.avg, miou, macc, iou, acc
 
 
 def main(cfg):
@@ -238,14 +235,14 @@ def main(cfg):
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
-                     + f'lr={lr:.6f} train_loss={train_loss:.4f} '
-                     + f'train_macc={train_macc:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
+                     + f'lr={lr:.6f} loss={train_loss:.4f} diff={train_diff:.4f} '
+                     + f'macc={train_macc:.4f} accs={train_accs:.4f} miou={train_miou:.4f} '
                      + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
-                val_loss, val_diff, val_miou, val_macc, val_ious, val_accs = validate(
+                val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
             if val_miou > best_miou:
@@ -254,11 +251,11 @@ def main(cfg):
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
                 logging.info(f'@E{epoch} val results: '
-                             + f'val_macc={val_macc:.4f} val_accs={val_accs.detach().cpu().numpy():.4f} '
-                             + f'val_miou={val_miou:.4f}  best_val_miou={best_miou:.4f}'
-                             + f'\nval_ious={val_ious.detach().cpu().numpy()}')
+                             + f'loss={train_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
+                             + f'miou={val_miou:.4f} best_miou={best_miou:.4f}'
+                             + f'\nious={val_ious.detach().cpu().numpy()}')
         if is_best:
-            logging.info(f'@E{epoch} new best: best_val_miou={best_miou:.4f}')
+            logging.info(f'@E{epoch} new best: best_miou={best_miou:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
@@ -271,7 +268,6 @@ def main(cfg):
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
             writer.add_scalar('val_macc', val_macc, epoch)
             writer.add_scalar('val_loss', val_loss, epoch)
-            writer.add_scalar('val_diff', val_diff, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
             writer.add_scalar('train_diff', train_diff, epoch)
             writer.add_scalar('train_miou', train_miou, epoch)

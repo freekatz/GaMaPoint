@@ -9,8 +9,8 @@ from scannetv2.configs.config import BaseConfig
 
 class ScanNetV2Config(BaseConfig):
     name = 'ScanNetV2Config'
-    k = [20, 20, 20, 20, 20]
-    k_gs = [5, 5, 5, 5, 5]
+    k = [24, 24, 24, 24, 24]
+    k_gs = [6, 6, 6, 6, 6]
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 64000
     gs_opts = GaussianOptions.default()
@@ -20,8 +20,8 @@ class ScanNetV2Config(BaseConfig):
 
 class ScanNetV2WarmupConfig(BaseConfig):
     name = 'ScanNetV2WarmupConfig'
-    k = [20, 20, 20, 20, 20]
-    k_gs = [5, 5, 5, 5, 5]
+    k = [24, 24, 24, 24, 24]
+    k_gs = [6, 6, 6, 6, 6]
     grid_size = [0.04, 0.08, 0.16, 0.32]
     voxel_max = 64000
     gs_opts = GaussianOptions.default()
@@ -41,7 +41,7 @@ class GaMaConfig(BaseConfig):
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 288
     stage_cfg.mamba_blocks = [1, 1, 1, 1, 1]
-    stage_cfg.res_blocks = [6, 6, 6, 10, 6]
+    stage_cfg.res_blocks = [4, 4, 4, 8, 4]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum
     drop_rates = torch.linspace(0., drop_path, sum(stage_cfg.res_blocks)).split(stage_cfg.res_blocks)
@@ -49,4 +49,4 @@ class GaMaConfig(BaseConfig):
     stage_cfg.head_drops = torch.linspace(0., 0.2, len(stage_cfg.res_blocks)).tolist()
     stage_cfg.mamba_cfg = MambaConfig.default()
     stage_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
-    stage_cfg.diff_std=[1.6, 2.5, 5, 10, 20]
+    stage_cfg.diff_std = [1.6, 2.5, 5, 10, 20]

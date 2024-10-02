@@ -49,4 +49,4 @@ class GaMaConfig(BaseConfig):
     stage_cfg.head_drops = torch.linspace(0., 0.15, len(stage_cfg.res_blocks)).tolist()
     stage_cfg.mamba_cfg = MambaConfig.default()
     stage_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
-    stage_cfg.diff_std=[1.6, 3.2, 6.4, 12.8]
+    stage_cfg.diff_std = [1.6, 3.2, 6.4, 12.8]

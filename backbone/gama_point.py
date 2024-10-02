@@ -156,14 +156,23 @@ class Stage(nn.Module):
 
         # regularization
         if self.training:
-            N, K = group_idx_all.shape
-            rand_group = torch.randint(0, K, (N, 1), device=p.device)
-            rand_group_idx = torch.gather(group_idx_all, 1, rand_group).squeeze(1)
+            N, K1 = group_idx.shape
+            rand_group = torch.randint(0, K1, (N, 1), device=p.device)
+            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
+            N, K2 = gs_group_idx.shape
+            rand_gs_group = torch.randint(0, K2, (N, 1), device=p.device)
+            rand_gs_group_idx = torch.gather(gs_group_idx, 1, rand_gs_group).squeeze(1)
+
             rand_p_group = p[rand_group_idx] - p
             rand_p_group.mul_(self.diff_std)
+            rand_p_gs_group = p_gs[rand_gs_group_idx] - p_gs
+            rand_p_group_all = torch.cat([rand_p_group, rand_p_gs_group], dim=1)
             rand_f_group = f[rand_group_idx] - f
             rand_f_group = self.diff_head(rand_f_group)
-            diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
+            rand_f_group_gs = f[rand_gs_group_idx] - f
+            rand_f_group_gs = self.diff_head_gs(rand_f_group_gs)
+            rand_f_group_all = torch.cat([rand_f_group, rand_f_group_gs], dim=1)
+            diff = nn.functional.mse_loss(rand_f_group_all, rand_p_group_all)
             d_sub = d_sub + diff if d_sub is not None else diff
 
         # 3. decode
@@ -205,7 +214,7 @@ class SegHead(nn.Module):
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, gs: NaiveGaussian3D, need_diff=False):
+    def forward(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
         p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
@@ -213,7 +222,7 @@ class SegHead(nn.Module):
         p = p.mul_(60)
         p_gs = p_gs.mul_(60)
         f, diff = self.stage(p, p_gs, f, gs)
-        if self.training or need_diff:
+        if self.training:
             return self.head(f), diff
         return self.head(f)
 
