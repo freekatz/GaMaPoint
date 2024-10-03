@@ -180,6 +180,7 @@ def main(cfg):
 
     stage = Stage(
         **cfg.gama_cfg.stage_cfg,
+        task_type='cls',
     ).to('cuda')
     model = ClsHead(
         stage=stage,
