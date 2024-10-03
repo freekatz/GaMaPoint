@@ -60,7 +60,7 @@ class ModelNet40(Dataset):
         height = xyz[:, 2:] * 4
         height -= height.min(dim=0, keepdim=True)[0]
         if self.train:
-            height += torch.empty((1, 1, 1)).uniform_(-0.2, 0.2) * 4
+            height += torch.empty((1, 1)).uniform_(-0.2, 0.2) * 4
         feature = height
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
