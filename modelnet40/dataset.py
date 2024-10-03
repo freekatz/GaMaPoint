@@ -57,7 +57,7 @@ class ModelNet40(Dataset):
 
         xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
         xyz = xyz.squeeze(0)
-        height = xyz[2:] * 4
+        height = xyz[:, 2:] * 4
         height -= height.min(dim=0, keepdim=True)[0]
         if self.train:
             height += torch.empty((1, 1, 1)).uniform_(-0.2, 0.2) * 4

@@ -30,8 +30,8 @@ class SetAbstraction(nn.Module):
         self.out_channels = channel_list[layer_index]
 
         embed_in_channels = 3 + self.in_channels if is_head else 3
-        embed_hidden_channels = channel_list[0] if is_head else channel_list[0] // 2
-        embed_out_channels = self.out_channels if is_head else channel_list[0]
+        embed_hidden_channels = channel_list[0] // 2 if is_head else channel_list[0] // 4
+        embed_out_channels = self.out_channels if is_head else channel_list[0] // 2
 
         self.embed = nn.Sequential(
             nn.Linear(embed_in_channels, embed_hidden_channels // 2, bias=False),
