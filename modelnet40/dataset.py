@@ -45,14 +45,16 @@ class ModelNet40(Dataset):
             label.append(torch.from_numpy(f['label'][:]).long())
             f.close()
         self.datas = torch.cat(datas)
-        self.label = torch.cat(label).squeeze()
+        self.label = torch.cat(label)
 
     def __len__(self):
         return self.datas.shape[0]
 
     def __getitem__(self, idx):
-        xyz, ds_idx = fps_sample(self.datas[idx], self.voxel_max)
-        label = self.label[idx][ds_idx]
+        xyz = self.datas[idx]
+        xyz, ds_idx = fps_sample(xyz.unsqueeze(0), self.voxel_max)
+        xyz = xyz.squeeze(0)
+        label = self.label[idx]
         if self.train:
             scale = torch.rand((3,)) * (3/2 - 2/3) + 2/3
             xyz = xyz * scale
@@ -69,5 +71,5 @@ class ModelNet40(Dataset):
 
 def modelnet40_collate_fn(batch):
     gs_list = list(batch)
-    new_gs = merge_gs_list(gs_list)
+    new_gs = merge_gs_list(gs_list, up_sample=False)
     return new_gs

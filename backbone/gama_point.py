@@ -23,10 +23,10 @@ class Stage(nn.Module):
                  head_drops=None,
                  mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False},
-                 task_type='seg',
                  use_cp=False,
                  diff_factor=40.,
                  diff_std=[1.6, 3.2, 6.4, 12.8],
+                 task_type='seg',
                  **kwargs
                  ):
         super().__init__()
@@ -39,6 +39,7 @@ class Stage(nn.Module):
         is_tail = self.layer_index == len(channel_list) - 1
         self.is_tail = is_tail
         self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
+        self.channel_list = channel_list
         self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
         self.diff_factor = diff_factor
@@ -57,6 +58,7 @@ class Stage(nn.Module):
             channel_list=channel_list,
             bn_momentum=bn_momentum,
             use_cp=use_cp,
+            task_type=task_type,
         )
         self.sa_gs = SetAbstraction(
             layer_index=layer_index,
@@ -64,6 +66,7 @@ class Stage(nn.Module):
             channel_list=channel_list,
             bn_momentum=bn_momentum,
             use_cp=use_cp,
+            task_type=task_type,
         )
         self.alpha = nn.Parameter(torch.tensor([0.8], dtype=torch.float32) * 100)
 
@@ -114,7 +117,7 @@ class Stage(nn.Module):
                 head_drops=head_drops,
                 mamba_config=mamba_config,
                 hybrid_args=hybrid_args,
-                task_type='seg',
+                task_type=task_type,
                 use_cp=use_cp,
                 diff_factor=diff_factor,
                 diff_std=diff_std,
@@ -177,7 +180,7 @@ class Stage(nn.Module):
             # residual connections
             f = f_sub + f if f_sub is not None else f
         else:
-            f = f_sub
+            f = f_sub if f_sub is not None else f
         return f, d_sub
 
 
@@ -225,10 +228,11 @@ class ClsHead(nn.Module):
                  ):
         super().__init__()
         self.stage = stage
+        self.num_classes = num_classes
 
         self.proj = nn.Sequential(
-            nn.BatchNorm1d(stage.out_channels, momentum=bn_momentum),
-            nn.Linear(stage.out_channels, stage.head_channels),
+            nn.BatchNorm1d(stage.channel_list[-1], momentum=bn_momentum),
+            nn.Linear(stage.channel_list[-1], stage.head_channels),
             nn.GELU(),
         )
 
@@ -258,8 +262,11 @@ class ClsHead(nn.Module):
 
         f, diff = self.stage(p, p_gs, f, gs)
         f = self.proj(f)
-        f = f.max(dim=0)[0].unsqueeze(0)
+        f = f.reshape(gs.batch_size, -1, self.stage.head_channels)
+        f = f.max(dim=1)[0]
+        f = self.head(f)
+        f = f.reshape(-1, self.num_classes)
         if self.training:
-            return self.head(f), diff
-        return self.head(f)
+            return f, diff
+        return f
 

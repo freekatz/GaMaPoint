@@ -42,18 +42,6 @@ def prepare_exp(cfg):
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
-def warmup(cfg, model: nn.Module, warmup_loader):
-    model.train()
-    pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
-    for idx, gs in pbar:
-        gs.gs_points.to_cuda(non_blocking=True)
-        target = gs.gs_points.y
-        with autocast():
-            pred, diff = model(gs)
-            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
-        loss.backward()
-
-
 def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps):
     model.train()
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
@@ -119,24 +107,6 @@ def main(cfg):
 
     logging.info(f'Config:\n{cfg.__str__()}')
 
-    warmup_loader = DataLoader(
-        ModelNet40(
-            dataset_dir=cfg.dataset,
-            train=True,
-            warmup=True,
-            voxel_max=cfg.modelnet40_warmup_cfg.voxel_max,
-            k=cfg.modelnet40_warmup_cfg.k,
-            k_gs=cfg.modelnet40_warmup_cfg.k_gs,
-            strides=cfg.modelnet40_warmup_cfg.strides,
-            visible_sample_stride=cfg.modelnet40_warmup_cfg.visible_sample_stride,
-            batch_size=1,
-            gs_opts=cfg.modelnet40_warmup_cfg.gs_opts
-        ),
-        batch_size=1,
-        collate_fn=modelnet40_collate_fn,
-        pin_memory=True,
-        num_workers=cfg.num_workers,
-    )
     train_loader = DataLoader(
         ModelNet40(
             dataset_dir=cfg.dataset,
@@ -171,10 +141,11 @@ def main(cfg):
             batch_size=cfg.batch_size,
             gs_opts=cfg.modelnet40_cfg.gs_opts
         ),
-        batch_size=1,
+        batch_size=cfg.batch_size,
         collate_fn=modelnet40_collate_fn,
         pin_memory=True,
         persistent_workers=True,
+        drop_last=True,
         num_workers=cfg.num_workers,
     )
 
@@ -195,19 +166,19 @@ def main(cfg):
     scaler = GradScaler()
     start_epoch = 1
     best_epoch = 0
-    best_miou = 0
+    best_accs = 0
     if cfg.mode == 'resume':
         cfg.ckpt = cfg.last_ckpt_path
         model_dict = resume_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
-        best_miou = model_dict['best_miou']
-        logging.info(f"Resume model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        best_accs = model_dict['best_accs']
+        logging.info(f"Resume model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     if cfg.mode == 'finetune':
         model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         best_epoch = model_dict['best_epoch']
-        best_miou = model_dict['best_miou']
-        logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        best_accs = model_dict['best_accs']
+        logging.info(f"Finetune model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
 
     steps_per_epoch = len(train_loader)
     scheduler_steps = steps_per_epoch * (start_epoch - 1)
@@ -224,7 +195,6 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
 
-    warmup(cfg, model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
         train_loss, train_diff, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
@@ -244,32 +214,32 @@ def main(cfg):
                 val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
-            if val_miou > best_miou:
+            if val_accs > best_accs:
                 is_best = True
-                best_miou = val_miou
+                best_accs = val_accs
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
                 logging.info(f'@E{epoch} val results: '
                              + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
-                             + f'miou={val_miou:.4f} best_miou={best_miou:.4f}'
+                             + f'miou={val_miou:.4f} best_accs={best_accs:.4f}'
                              + f'\nious={val_ious.detach().cpu().numpy()}')
         if is_best:
-            logging.info(f'@E{epoch} new best: best_miou={best_miou:.4f}')
+            logging.info(f'@E{epoch} new best: best_accs={best_accs:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                       best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
+                       best_epoch=best_epoch, last_epoch=epoch, best_accs=best_accs)
         save_state(cfg.last_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                   best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
+                   best_epoch=best_epoch, last_epoch=epoch, best_accs=best_accs)
         if writer is not None:
-            writer.add_scalar('best_miou', best_miou, epoch)
-            writer.add_scalar('val_miou', val_miou, epoch)
+            writer.add_scalar('best_accs', best_accs, epoch)
+            writer.add_scalar('val_accs', val_accs, epoch)
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
             writer.add_scalar('val_macc', val_macc, epoch)
             writer.add_scalar('val_loss', val_loss, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
             writer.add_scalar('train_diff', train_diff, epoch)
-            writer.add_scalar('train_miou', train_miou, epoch)
+            writer.add_scalar('train_accs', train_accs, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
             writer.add_scalar('time_cost_avg', timer_meter.avg, epoch)
@@ -327,7 +297,7 @@ if __name__ == '__main__':
 
     # modelnet40
     cfg.num_classes = 40
-    cfg.ignore_index = None
+    cfg.ignore_index = -100
 
     prepare_exp(cfg)
     main(cfg)
