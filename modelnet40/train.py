@@ -257,15 +257,12 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
-    parser.add_argument('--train_loop', type=int, required=False, default=30)
-    parser.add_argument('--val_loop', type=int, required=False, default=1)
-    parser.add_argument('--val_area', type=str, required=False, default='5')
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
-    parser.add_argument('--epochs', type=int, required=False, default=100)
-    parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
+    parser.add_argument('--epochs', type=int, required=False, default=300)
+    parser.add_argument("--warmup_epochs", type=int, required=False, default=30)
     parser.add_argument("--lr", type=float, required=False, default=6e-4)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
