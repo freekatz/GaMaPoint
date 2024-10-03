@@ -250,12 +250,13 @@ def main(cfg):
                 best_miou = val_miou
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
-                logging.info(f'@E{epoch} val results: '
+                logging.info(f'@E{epoch} val results:   '
                              + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
                              + f'miou={val_miou:.4f} best_miou={best_miou:.4f}'
                              + f'\nious={val_ious.detach().cpu().numpy()}')
         if is_best:
-            logging.info(f'@E{epoch} new best: best_miou={best_miou:.4f}')
+            logging.info(f'@E{epoch} new best:      '
+                         + f'best_miou={best_miou:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,

@@ -50,7 +50,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     diff_meter = AverageMeter()
     steps_per_epoch = len(train_loader)
     for idx, gs in pbar:
-        lam = scheduler_steps/(epoch*steps_per_epoch)
+        lam = scheduler_steps / (epoch * steps_per_epoch)
         lam = 3e-3 ** lam * 0.25
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
@@ -61,11 +61,11 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss + diff*lam).backward()
+            scaler.scale(loss + diff * lam).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = loss + diff*lam
+            loss = loss + diff * lam
             loss.backward()
             optimizer.step()
 
@@ -173,12 +173,14 @@ def main(cfg):
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
         best_accs = model_dict['best_accs']
-        logging.info(f"Resume model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        logging.info(
+            f"Resume model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     if cfg.mode == 'finetune':
         model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         best_epoch = model_dict['best_epoch']
         best_accs = model_dict['best_accs']
-        logging.info(f"Finetune model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        logging.info(
+            f"Finetune model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
 
     steps_per_epoch = len(train_loader)
     scheduler_steps = steps_per_epoch * (start_epoch - 1)
@@ -203,6 +205,8 @@ def main(cfg):
         lr = optimizer.param_groups[0]['lr']
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
+        #              @E{epoch} val results:   '
+        #              @E{epoch} new best:      '
         logging.info(f'@E{epoch} train results: '
                      + f'lr={lr:.6f} loss={train_loss:.4f} diff={train_diff:.4f} '
                      + f'macc={train_macc:.4f} accs={train_accs:.4f} '
@@ -219,11 +223,12 @@ def main(cfg):
                 best_accs = val_accs
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
-                logging.info(f'@E{epoch} val results: '
+                logging.info(f'@E{epoch} val results:   '
                              + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
                              + f'best_accs={best_accs:.4f}')
         if is_best:
-            logging.info(f'@E{epoch} new best: best_accs={best_accs:.4f}')
+            logging.info(f'@E{epoch} new best:      '
+                         + f'best_accs={best_accs:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
