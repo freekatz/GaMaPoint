@@ -261,8 +261,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
-    parser.add_argument('--epochs', type=int, required=False, default=200)
-    parser.add_argument("--warmup_epochs", type=int, required=False, default=20)
+    parser.add_argument('--epochs', type=int, required=False, default=300)
+    parser.add_argument("--warmup_epochs", type=int, required=False, default=30)
     parser.add_argument("--lr", type=float, required=False, default=2e-3)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
