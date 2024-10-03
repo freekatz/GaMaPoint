@@ -19,7 +19,9 @@ class ModelNet40(Dataset):
                  warmup=False,
                  voxel_max=1024,
                  k=[20, 20, 20],
+                 k_gs=[5, 5, 5],
                  strides=[1, 4, 4],
+                 visible_sample_stride=0.,
                  batch_size=32,
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
@@ -30,7 +32,9 @@ class ModelNet40(Dataset):
         self.warmup = warmup
         self.voxel_max = voxel_max
         self.k = k
+        self.k_gs = k_gs
         self.strides = strides
+        self.visible_sample_stride = visible_sample_stride
         self.batch_size = batch_size
         self.gs_opts = gs_opts
 
@@ -49,13 +53,19 @@ class ModelNet40(Dataset):
     def __getitem__(self, idx):
         xyz, ds_idx = fps_sample(self.datas[idx], self.voxel_max)
         label = self.label[idx][ds_idx]
+        if self.train:
+            scale = torch.rand((3,)) * (3/2 - 2/3) + 2/3
+            xyz = xyz * scale
+            xyz = xyz[torch.randperm(xyz.shape[0])]
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('y', label)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.strides, up_sample=False)
+        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, None, self.strides,
+                                      up_sample=False, visible_sample_stride=self.visible_sample_stride)
         return gs
+
 
 def modelnet40_collate_fn(batch):
     gs_list = list(batch)

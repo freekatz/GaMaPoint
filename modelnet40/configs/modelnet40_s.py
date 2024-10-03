@@ -10,7 +10,9 @@ from modelnet40.configs.config import BaseConfig
 class ModelNet40Config(BaseConfig):
     name = 'ModelNet40Config'
     k = [20, 20, 20]
+    k_gs = [5, 5, 5]
     strides = [1, 4, 4]
+    visible_sample_stride = 4
     voxel_max=1024
     gs_opts = GaussianOptions.default()
 
@@ -18,8 +20,10 @@ class ModelNet40Config(BaseConfig):
 class ModelNet40WarmupConfig(BaseConfig):
     name = 'ModelNet40WarmupConfig'
     k = [20, 20, 20]
+    k_gs = [5, 5, 5]
     strides = [1, 4, 4]
-    voxel_max=1024
+    visible_sample_stride = 4
+    voxel_max = 1024
     gs_opts = GaussianOptions.default()
 
 
@@ -34,7 +38,7 @@ class GaMaConfig(BaseConfig):
     stage_cfg.in_channels = 4
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 2048
-    stage_cfg.mamba_blocks = [1, 1, 1, 1]
+    stage_cfg.mamba_blocks = [1, 1, 1]
     stage_cfg.res_blocks = [4, 4, 4]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum
@@ -42,4 +46,5 @@ class GaMaConfig(BaseConfig):
     stage_cfg.drop_paths = [d.tolist() for d in drop_rates]
     stage_cfg.mamba_cfg = MambaConfig.default()
     stage_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
-
+    stage_cfg.diff_factor = 40.
+    stage_cfg.diff_std = [2.8, 5.3, 10]

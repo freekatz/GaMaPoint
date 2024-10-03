@@ -147,7 +147,7 @@ def main(cfg):
             warmup=False,
             voxel_max=cfg.scannetv2_cfg.voxel_max,
             k=cfg.scannetv2_cfg.k,
-            k_gs=cfg.scannetv2_warmup_cfg.k_gs,
+            k_gs=cfg.scannetv2_cfg.k_gs,
             grid_size=cfg.scannetv2_cfg.grid_size,
             batch_size=cfg.batch_size,
             gs_opts=cfg.scannetv2_cfg.gs_opts

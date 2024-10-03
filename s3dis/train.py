@@ -128,7 +128,7 @@ def main(cfg):
             warmup=True,
             voxel_max=cfg.s3dis_warmup_cfg.voxel_max,
             k=cfg.s3dis_warmup_cfg.k,
-            k_gs=cfg.s3dis_cfg.k_gs,
+            k_gs=cfg.s3dis_warmup_cfg.k_gs,
             grid_size=cfg.s3dis_warmup_cfg.grid_size,
             batch_size=1,
             gs_opts=cfg.s3dis_warmup_cfg.gs_opts

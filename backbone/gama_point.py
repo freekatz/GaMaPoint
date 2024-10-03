@@ -256,9 +256,10 @@ class ClsHead(nn.Module):
         p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
 
-        p = p.mul_(60)
-        p_gs = p_gs.mul_(60)
-        f = self.stage(p, p_gs, f, gs)
+        f, diff = self.stage(p, p_gs, f, gs)
         f = self.proj(f)
         f = f.max(dim=0)[0].unsqueeze(0)
+        if self.training:
+            return self.head(f), diff
         return self.head(f)
+

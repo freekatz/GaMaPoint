@@ -42,15 +42,15 @@ def prepare_exp(cfg):
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
-def warmup(model: nn.Module, warmup_loader):
+def warmup(cfg, model: nn.Module, warmup_loader):
     model.train()
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred = model(gs)
-            loss = F.cross_entropy(pred, target)
+            pred, diff = model(gs)
+            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
         loss.backward()
 
 
@@ -59,44 +59,57 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
+    diff_meter = AverageMeter()
+    steps_per_epoch = len(train_loader)
     for idx, gs in pbar:
+        lam = scheduler_steps/(epoch*steps_per_epoch)
+        lam = 3e-3 ** lam * 0.25
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
-            pred = model(gs)
-            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls)
+            pred, diff = model(gs)
+            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss).backward()
+            scaler.scale(loss + diff*lam).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
+            loss = loss + diff*lam
             loss.backward()
             optimizer.step()
 
         m.update(pred, target)
         loss_meter.update(loss.item())
+        diff_meter.update(diff.item())
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
+                             + f"Diff {diff_meter.avg:.4f} "
                              + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
-    return loss_meter.avg, miou, macc, iou, acc, scheduler_steps
+    return loss_meter.avg, diff_meter.avg, miou, macc, iou, acc, scheduler_steps
 
 
 def validate(cfg, model, val_loader, epoch):
     model.eval()
-    m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
+    m = Metric(cfg.num_classes)
+    loss_meter = AverageMeter()
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
             pred = model(gs)
+            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         m.update(pred, target)
+        loss_meter.update(loss.item())
+        pbar.set_description(f"Val Epoch [{epoch}/{cfg.epochs}] "
+                             + f"Loss {loss_meter.avg:.4f} "
+                             + f"mACC {m.calc_macc():.4f}")
     acc, macc, miou, iou = m.calc()
-    return miou, macc, iou, acc
+    return loss_meter.avg, miou, macc, iou, acc
 
 
 def main(cfg):
@@ -113,7 +126,9 @@ def main(cfg):
             warmup=True,
             voxel_max=cfg.modelnet40_warmup_cfg.voxel_max,
             k=cfg.modelnet40_warmup_cfg.k,
+            k_gs=cfg.modelnet40_warmup_cfg.k_gs,
             strides=cfg.modelnet40_warmup_cfg.strides,
+            visible_sample_stride=cfg.modelnet40_warmup_cfg.visible_sample_stride,
             batch_size=1,
             gs_opts=cfg.modelnet40_warmup_cfg.gs_opts
         ),
@@ -129,7 +144,9 @@ def main(cfg):
             warmup=False,
             voxel_max=cfg.modelnet40_cfg.voxel_max,
             k=cfg.modelnet40_cfg.k,
+            k_gs=cfg.modelnet40_cfg.k_gs,
             strides=cfg.modelnet40_cfg.strides,
+            visible_sample_stride=cfg.modelnet40_cfg.visible_sample_stride,
             batch_size=cfg.batch_size,
             gs_opts=cfg.modelnet40_cfg.gs_opts
         ),
@@ -148,8 +165,10 @@ def main(cfg):
             warmup=False,
             voxel_max=cfg.modelnet40_cfg.voxel_max,
             k=cfg.modelnet40_cfg.k,
+            k_gs=cfg.modelnet40_cfg.k_gs,
             strides=cfg.modelnet40_cfg.strides,
-            batch_size=1,
+            visible_sample_stride=cfg.modelnet40_cfg.visible_sample_stride,
+            batch_size=cfg.batch_size,
             gs_opts=cfg.modelnet40_cfg.gs_opts
         ),
         batch_size=1,
@@ -204,24 +223,24 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
 
-    warmup(model, warmup_loader)
+    warmup(cfg, model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
+        train_loss, train_diff, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
-                     + f'lr={lr:.6f} train_loss={train_loss:.4f} '
-                     + f'train_macc={train_macc:.4f} train_accs={train_accs:.4f} train_miou={train_miou:.4f} '
+                     + f'lr={lr:.6f} loss={train_loss:.4f} diff={train_diff:.4f} '
+                     + f'macc={train_macc:.4f} accs={train_accs:.4f} miou={train_miou:.4f} '
                      + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
-                val_miou, val_macc, val_ious, val_accs = validate(
+                val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
             if val_miou > best_miou:
@@ -230,11 +249,11 @@ def main(cfg):
                 macc_when_best = val_macc
             with np.printoptions(precision=4, suppress=True):
                 logging.info(f'@E{epoch} val results: '
-                             + f'val_macc={val_macc:.4f} val_accs={val_accs.detach().cpu().numpy():.4f} '
-                             + f'val_miou={val_miou:.4f}  best_val_miou={best_miou:.4f}'
-                             + f'\nval_ious={val_ious.detach().cpu().numpy()}')
+                             + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
+                             + f'miou={val_miou:.4f} best_miou={best_miou:.4f}'
+                             + f'\nious={val_ious.detach().cpu().numpy()}')
         if is_best:
-            logging.info(f'@E{epoch} new best: best_val_miou={best_miou:.4f}')
+            logging.info(f'@E{epoch} new best: best_miou={best_miou:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
@@ -246,7 +265,9 @@ def main(cfg):
             writer.add_scalar('val_miou', val_miou, epoch)
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
             writer.add_scalar('val_macc', val_macc, epoch)
+            writer.add_scalar('val_loss', val_loss, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
+            writer.add_scalar('train_diff', train_diff, epoch)
             writer.add_scalar('train_miou', train_miou, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
@@ -275,7 +296,7 @@ if __name__ == '__main__':
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=100)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
-    parser.add_argument("--lr", type=float, required=False, default=3e-4)
+    parser.add_argument("--lr", type=float, required=False, default=6e-4)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
@@ -296,6 +317,8 @@ if __name__ == '__main__':
     cfg.modelnet40_warmup_cfg = modelnet40_warmup_cfg
     cfg.gama_cfg = gama_cfg
     cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
+    if cfg.use_cp:
+        cfg.gama_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''
