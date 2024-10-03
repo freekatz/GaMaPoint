@@ -12,9 +12,11 @@ class ModelNet40Config(BaseConfig):
     k = [20, 20, 20]
     k_gs = [5, 5, 5]
     strides = [1, 4, 4]
-    visible_sample_stride = 4
-    voxel_max=1024
+    visible_sample_stride = 0.
+    num_points=1024
     gs_opts = GaussianOptions.default()
+    gs_opts.n_cameras = 8
+    gs_opts.cam_fovy = 120
 
 
 class ModelNet40WarmupConfig(BaseConfig):
@@ -22,9 +24,11 @@ class ModelNet40WarmupConfig(BaseConfig):
     k = [20, 20, 20]
     k_gs = [5, 5, 5]
     strides = [1, 4, 4]
-    visible_sample_stride = 4
-    voxel_max = 1024
+    visible_sample_stride = 0.
+    num_points = 1024
     gs_opts = GaussianOptions.default()
+    gs_opts.n_cameras = 8
+    gs_opts.cam_fovy = 120
 
 
 class GaMaConfig(BaseConfig):

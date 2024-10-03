@@ -17,7 +17,7 @@ class ModelNet40(Dataset):
                  dataset_dir: Path,
                  train=True,
                  warmup=False,
-                 voxel_max=1024,
+                 num_points=1024,
                  k=[20, 20, 20],
                  k_gs=[5, 5, 5],
                  strides=[1, 4, 4],
@@ -30,7 +30,7 @@ class ModelNet40(Dataset):
         self.data_paths = dataset_dir.glob(f"ply_data_{'train' if train else 'test'}*.h5")
         self.train = train
         self.warmup = warmup
-        self.voxel_max = voxel_max
+        self.num_points = num_points
         self.k = k
         self.k_gs = k_gs
         self.strides = strides
@@ -51,9 +51,7 @@ class ModelNet40(Dataset):
         return self.datas.shape[0]
 
     def __getitem__(self, idx):
-        xyz = self.datas[idx]
-        xyz, ds_idx = fps_sample(xyz.unsqueeze(0), self.voxel_max)
-        xyz = xyz.squeeze(0)
+        xyz = self.datas[idx][:self.num_points]
         label = self.label[idx]
         if self.train:
             scale = torch.rand((3,)) * (3/2 - 2/3) + 2/3

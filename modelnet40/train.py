@@ -112,7 +112,7 @@ def main(cfg):
             dataset_dir=cfg.dataset,
             train=True,
             warmup=False,
-            voxel_max=cfg.modelnet40_cfg.voxel_max,
+            num_points=cfg.modelnet40_cfg.num_points,
             k=cfg.modelnet40_cfg.k,
             k_gs=cfg.modelnet40_cfg.k_gs,
             strides=cfg.modelnet40_cfg.strides,
@@ -133,7 +133,7 @@ def main(cfg):
             dataset_dir=cfg.dataset,
             train=False,
             warmup=False,
-            voxel_max=cfg.modelnet40_cfg.voxel_max,
+            num_points=cfg.modelnet40_cfg.num_points,
             k=cfg.modelnet40_cfg.k,
             k_gs=cfg.modelnet40_cfg.k_gs,
             strides=cfg.modelnet40_cfg.strides,
@@ -189,7 +189,7 @@ def main(cfg):
                                   warmup_t=cfg.warmup_epochs * steps_per_epoch,
                                   warmup_lr_init=cfg.lr / 20)
 
-    val_miou, val_macc, val_ious, val_accs = 0., 0., [], []
+    val_macc, val_accs = 0., 0., [], []
     macc_when_best = 0.
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
@@ -197,7 +197,7 @@ def main(cfg):
 
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_diff, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
+        train_loss, train_diff, _, train_macc, _, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
@@ -205,13 +205,13 @@ def main(cfg):
         timer_meter.update(time_cost)
         logging.info(f'@E{epoch} train results: '
                      + f'lr={lr:.6f} loss={train_loss:.4f} diff={train_diff:.4f} '
-                     + f'macc={train_macc:.4f} accs={train_accs:.4f} miou={train_miou:.4f} '
+                     + f'macc={train_macc:.4f} accs={train_accs:.4f} '
                      + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
-                val_loss, val_miou, val_macc, val_ious, val_accs = validate(
+                val_loss, _, val_macc, _, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
             if val_accs > best_accs:
@@ -221,8 +221,7 @@ def main(cfg):
             with np.printoptions(precision=4, suppress=True):
                 logging.info(f'@E{epoch} val results: '
                              + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
-                             + f'miou={val_miou:.4f} best_accs={best_accs:.4f}'
-                             + f'\nious={val_ious.detach().cpu().numpy()}')
+                             + f'best_accs={best_accs:.4f}')
         if is_best:
             logging.info(f'@E{epoch} new best: best_accs={best_accs:.4f}')
             best_epoch = epoch
