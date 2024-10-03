@@ -189,7 +189,7 @@ def main(cfg):
                                   warmup_t=cfg.warmup_epochs * steps_per_epoch,
                                   warmup_lr_init=cfg.lr / 20)
 
-    val_macc, val_accs = 0., 0., [], []
+    val_macc, val_accs = 0., 0.
     macc_when_best = 0.
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
