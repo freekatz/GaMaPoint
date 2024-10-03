@@ -61,13 +61,12 @@ class ScanObjectNN(Dataset):
         label = label.unsqueeze(0)
         if self.train:
             xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
-            xyz = xyz.squeeze(0)
         else:
             xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points+200)
             xyz = xyz[:, torch.randperm(self.num_points+200)[:self.num_points]]
-            xyz = xyz.squeeze(0)
-        height = xyz[:, 2:]
-        height -= height.min(dim=1, keepdim=True)[0]
+        xyz = xyz.squeeze(0)
+        height = xyz[2:]
+        height -= height.min(dim=0, keepdim=True)[0]
         feature = height
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
