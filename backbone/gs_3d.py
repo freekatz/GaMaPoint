@@ -573,7 +573,7 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
 
     p = torch.cat(p_all, dim=0)
     p_gs = torch.cat(p_gs_all, dim=0)
-    f = torch.cat(f_all, dim=0) if up_sample else None
+    f = torch.cat(f_all, dim=0)
     y = torch.cat(y_all, dim=0)
     idx_ds = [torch.cat(idx, dim=0) for idx in zip(*idx_ds_all)]
     idx_us = [torch.cat(idx, dim=0) for idx in zip(*idx_us_all)]

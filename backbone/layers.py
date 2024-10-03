@@ -20,7 +20,6 @@ class SetAbstraction(nn.Module):
                  channel_list=[64, 128, 256, 512],
                  bn_momentum=0.02,
                  use_cp=False,
-                 task_type='seg',
                  ):
         super().__init__()
         self.use_cp = use_cp
@@ -29,7 +28,6 @@ class SetAbstraction(nn.Module):
         self.is_head = is_head
         self.in_channels = in_channels if is_head else channel_list[layer_index - 1]
         self.out_channels = channel_list[layer_index]
-        self.task_type = task_type
 
         embed_in_channels = 3 + self.in_channels if is_head and self.task_type is 'seg' else 3
         embed_hidden_channels = channel_list[0] if is_head else channel_list[0] // 2
@@ -49,11 +47,10 @@ class SetAbstraction(nn.Module):
         nn.init.constant_(self.bn.weight, 0.8 if is_head else 0.2)
 
     def forward(self, p, f, group_idx):
-        if self.task_type == 'seg':
-            assert len(f.shape) == 2
+        assert len(f.shape) == 2
 
         p_group = p[group_idx] - p.unsqueeze(1)
-        if self.is_head and self.task_type == 'seg':
+        if self.is_head:
             f_group = f[group_idx]
             f_group = torch.cat([p_group, f_group], dim=-1).view(-1, 3 + self.in_channels)
         else:

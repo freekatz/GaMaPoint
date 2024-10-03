@@ -58,7 +58,6 @@ class Stage(nn.Module):
             channel_list=channel_list,
             bn_momentum=bn_momentum,
             use_cp=use_cp,
-            task_type=task_type,
         )
         self.sa_gs = SetAbstraction(
             layer_index=layer_index,
@@ -66,7 +65,6 @@ class Stage(nn.Module):
             channel_list=channel_list,
             bn_momentum=bn_momentum,
             use_cp=use_cp,
-            task_type=task_type,
         )
         self.alpha = nn.Parameter(torch.tensor([0.8], dtype=torch.float32) * 100)
 

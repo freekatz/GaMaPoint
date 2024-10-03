@@ -39,7 +39,7 @@ class GaMaConfig(BaseConfig):
     channel_list = [96, 192, 384]
     stage_cfg = BaseConfig()
     stage_cfg.name = 'StageConfig'
-    stage_cfg.in_channels = -1
+    stage_cfg.in_channels = 1
     stage_cfg.channel_list = channel_list
     stage_cfg.head_channels = 2048
     stage_cfg.mamba_blocks = [1, 1, 1]

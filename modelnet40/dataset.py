@@ -3,13 +3,10 @@ import h5py
 import __init__
 
 import torch
-import random
-import math
 from torch.utils.data import Dataset
 from pathlib import Path
 
 from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list, fps_sample
-from utils.cutils import grid_subsampling, grid_subsampling_test
 
 
 class ModelNet40(Dataset):
@@ -51,15 +48,20 @@ class ModelNet40(Dataset):
         return self.datas.shape[0]
 
     def __getitem__(self, idx):
-        xyz = self.datas[idx][:self.num_points]
+        xyz = self.datas[idx]
         label = self.label[idx]
         if self.train:
             scale = torch.rand((3,)) * (3/2 - 2/3) + 2/3
             xyz = xyz * scale
             xyz = xyz[torch.randperm(xyz.shape[0])]
 
+        xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
+        xyz = xyz.squeeze(0)
+        feature = xyz[:, 2:]
+
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
+        gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, None, self.strides,
