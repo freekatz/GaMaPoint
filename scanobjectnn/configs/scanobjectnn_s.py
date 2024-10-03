@@ -4,11 +4,11 @@ import torch
 
 from backbone.gs_3d import GaussianOptions
 from backbone.mamba_ssm.models import MambaConfig
-from modelnet40.configs.config import BaseConfig
+from scanobjectnn.configs.config import BaseConfig
 
 
-class ModelNet40Config(BaseConfig):
-    name = 'ModelNet40Config'
+class ScanObjectNNConfig(BaseConfig):
+    name = 'ScanObjectNNConfig'
     k = [24, 24, 24]
     k_gs = [6, 6, 6]
     strides = [1, 4, 4]
@@ -19,8 +19,8 @@ class ModelNet40Config(BaseConfig):
     gs_opts.cam_fovy = 120
 
 
-class ModelNet40WarmupConfig(BaseConfig):
-    name = 'ModelNet40WarmupConfig'
+class ScanObjectNNWarmupConfig(BaseConfig):
+    name = 'ScanObjectNNWarmupConfig'
     k = [24, 24, 24]
     k_gs = [6, 6, 6]
     strides = [1, 4, 4]
@@ -33,7 +33,7 @@ class ModelNet40WarmupConfig(BaseConfig):
 
 class GaMaConfig(BaseConfig):
     name = 'GaMaConfig'
-    num_classes = 40
+    num_classes = 15
     bn_momentum = 0.1
     drop_path = 0.15
     channel_list = [96, 192, 384]
@@ -51,4 +51,4 @@ class GaMaConfig(BaseConfig):
     stage_cfg.mamba_cfg = MambaConfig.default()
     stage_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
     stage_cfg.diff_factor = 40.
-    stage_cfg.diff_std = [2.8, 5.3, 10]
+    stage_cfg.diff_std = [2.2, 4.4, 8.8]
