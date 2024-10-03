@@ -12,7 +12,7 @@ class ScanObjectNNConfig(BaseConfig):
     k = [24, 24, 24]
     k_gs = [6, 6, 6]
     strides = [1, 4, 4]
-    visible_sample_stride = 4.
+    visible_sample_stride = 0.
     num_points = 1024
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
@@ -24,7 +24,7 @@ class ScanObjectNNWarmupConfig(BaseConfig):
     k = [24, 24, 24]
     k_gs = [6, 6, 6]
     strides = [1, 4, 4]
-    visible_sample_stride = 4.
+    visible_sample_stride = 0.
     num_points = 1024
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
