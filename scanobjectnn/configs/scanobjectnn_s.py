@@ -35,7 +35,7 @@ class GaMaConfig(BaseConfig):
     name = 'GaMaConfig'
     num_classes = 15
     bn_momentum = 0.1
-    drop_path = 0.15
+    drop_path = 0.1
     channel_list = [96, 192, 384]
     stage_cfg = BaseConfig()
     stage_cfg.name = 'StageConfig'

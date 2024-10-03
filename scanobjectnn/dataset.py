@@ -58,8 +58,14 @@ class ScanObjectNN(Dataset):
             xyz = xyz @ rotmat
             xyz = xyz[torch.randperm(xyz.shape[0])]
 
-        xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
-        xyz = xyz.squeeze(0)
+        label = label.unsqueeze(0)
+        if self.train:
+            xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
+            xyz = xyz.squeeze(0)
+        else:
+            xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points+200)
+            xyz = xyz[:, torch.randperm(self.num_points+200)[:self.num_points]]
+            xyz = xyz.squeeze(0)
         feature = xyz[:, 2:]
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
