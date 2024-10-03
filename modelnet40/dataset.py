@@ -57,7 +57,11 @@ class ModelNet40(Dataset):
 
         xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
         xyz = xyz.squeeze(0)
-        feature = xyz[:, 2:]
+        height = xyz[:, 2:] * 4
+        height -= height.min(dim=1, keepdim=True)[0]
+        if self.train:
+            height += torch.empty((1, 1, 1)).uniform_(-0.2, 0.2) * 4
+        feature = height
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)

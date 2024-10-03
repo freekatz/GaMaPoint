@@ -66,7 +66,9 @@ class ScanObjectNN(Dataset):
             xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points+200)
             xyz = xyz[:, torch.randperm(self.num_points+200)[:self.num_points]]
             xyz = xyz.squeeze(0)
-        feature = xyz[:, 2:]
+        height = xyz[:, 2:]
+        height -= height.min(dim=1, keepdim=True)[0]
+        feature = height
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
