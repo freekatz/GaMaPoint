@@ -318,7 +318,7 @@ class ClsHead(nn.Module):
         f, diff = self.stage(p, p_gs, f, gs)
         f = self.proj(f)
         f = f.view(gs.batch_size, -1, self.stage.head_channels)
-        f = f.mean(dim=1)
+        f = f.max(dim=1)[0]
         f = self.head(f)
         f = f.view(-1, self.num_classes)
         if self.training:
