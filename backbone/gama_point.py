@@ -86,6 +86,12 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
         )
 
+        if self.task_type == 'cls':
+            self.mid_proj = nn.Sequential(
+                nn.BatchNorm1d(self.out_channels, momentum=bn_momentum),
+                nn.Linear(self.out_channels, self.out_channels, bias=False),
+            )
+
         if self.task_type == 'segsem':
             self.post_proj = nn.Sequential(
                 nn.BatchNorm1d(self.out_channels, momentum=bn_momentum),
@@ -145,10 +151,14 @@ class Stage(nn.Module):
         f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
             else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx.unsqueeze(0), pts)
         f_local = f_local.squeeze(0)
-        # point mamba: extract the global feature from center points of local
-        f_global = self.pm(p, p_gs, f_local, gs)
-        # fuse local and global feature
-        f = f_global + f_local
+        if self.task_type != 'cls':
+            # point mamba: extract the global feature from center points of local
+            f_global = self.pm(p, p_gs, f_local, gs)
+            # fuse local and global feature
+            f = f_global + f_local
+        else:
+            f = f_local
+            f = self.mid_proj(f)
 
         # 2. netx stage
         if not self.is_tail:
@@ -170,7 +180,7 @@ class Stage(nn.Module):
 
         # 3. decode
         # up sample
-        if self.task_type == 'segsem':
+        if self.task_type != 'cls':
             f = self.post_proj(f)
             if not self.is_head:
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
