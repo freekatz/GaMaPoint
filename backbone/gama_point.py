@@ -292,7 +292,7 @@ class ClsHead(nn.Module):
         )
 
         self.head = nn.Sequential(
-            nn.Linear(stage.head_channels, 512, bias=False),
+            nn.Linear(stage.head_channels * 2, 512, bias=False),
             nn.BatchNorm1d(512, momentum=bn_momentum),
             nn.GELU(),
             nn.Linear(512, 256, bias=False),
@@ -318,7 +318,8 @@ class ClsHead(nn.Module):
         f, diff = self.stage(p, p_gs, f, gs)
         f = self.proj(f)
         f = f.view(gs.batch_size, -1, self.stage.head_channels)
-        f = f.max(dim=1)[0]
+        f = torch.cat([f[:, 0], f[:, 1:].max(1)[0] + f[:, 1:].mean(1)[0]], dim=-1)
+        f = f.squeeze(1)
         f = self.head(f)
         f = f.view(-1, self.num_classes)
         if self.training:
