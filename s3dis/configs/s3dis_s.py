@@ -9,24 +9,24 @@ from s3dis.configs.config import BaseConfig
 
 class S3disConfig(BaseConfig):
     name = 'S3disConfig'
-    k = [16, 16, 16, 16]
-    k_gs = [4, 4, 4, 4]
+    k = [24, 24, 24, 24]
+    k_gs = [6, 6, 6, 6]
     grid_size = [0.08, 0.16, 0.32]
     voxel_max = 24000
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16
-    gs_opts.cam_fovy = 150
+    gs_opts.cam_fovy = 120
 
 
 class S3disWarmupConfig(BaseConfig):
     name = 'S3disWarmupConfig'
-    k = [16, 16, 16, 16]
-    k_gs = [4, 4, 4, 4]
+    k = [24, 24, 24, 24]
+    k_gs = [6, 6, 6, 6]
     grid_size = [0.08, 0.16, 0.32]
     voxel_max = 24000
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16
-    gs_opts.cam_fovy = 150
+    gs_opts.cam_fovy = 120
 
 
 class GaMaConfig(BaseConfig):
