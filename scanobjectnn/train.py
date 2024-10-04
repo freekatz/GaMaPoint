@@ -234,8 +234,8 @@ def main(cfg):
             'loss': val_loss,
         }
         logging.info(f'@E{epoch} summary:'
-                     + f'train: \n{format_dict(train_info)}'
-                     + f'val: \n{format_dict(val_info)}')
+                     + f'\ntrain: \n{format_dict(train_info)}'
+                     + f'\nval: \n{format_dict(val_info)}')
         if is_best:
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
