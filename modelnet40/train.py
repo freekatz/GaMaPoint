@@ -216,7 +216,7 @@ def main(cfg):
                 )
             logging.info(f'@E{epoch} val:      macc={val_macc:.4f} oa={val_accs:.4f}')
             if val_accs > best_accs:
-                logging.info(f'@E{epoch} new best: oa {val_accs:.4f} => {best_accs:.4f}')
+                logging.info(f'@E{epoch} new best: oa {best_accs:.4f} => {val_accs:.4f}')
                 is_best = True
                 best_accs = val_accs
                 macc_when_best = val_macc

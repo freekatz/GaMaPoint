@@ -245,7 +245,7 @@ def main(cfg):
                 )
             logging.info(f'@E{epoch} val:      miou={val_miou:.4f} macc={val_macc:.4f} oa={val_accs:.4f}')
             if val_miou > best_miou:
-                logging.info(f'@E{epoch} new best: miou {val_miou:.4f} => {best_miou:.4f}')
+                logging.info(f'@E{epoch} new best: miou {best_miou:.4f} => {val_miou:.4f}')
                 is_best = True
                 best_miou = val_miou
                 macc_when_best = val_macc
