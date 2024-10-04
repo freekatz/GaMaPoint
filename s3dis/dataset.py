@@ -85,6 +85,10 @@ class S3DIS(Dataset):
     def __len__(self):
         return len(self.data_paths) * self.loop
 
+    @classmethod
+    def get_classes(cls):
+        return cls.classes
+
     def __getitem__(self, idx):
         if not self.train:
             return self.get_test_item(idx)

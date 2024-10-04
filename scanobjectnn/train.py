@@ -20,7 +20,7 @@ from scanobjectnn.configs import model_configs
 from scanobjectnn.dataset import ScanObjectNN, scanobjectnn_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
-from utils.logger import setup_logger_dist
+from utils.logger import setup_logger_dist, format_dict
 from utils.metrics import Timer, Metric, AverageMeter
 from utils.random import set_random_seed
 
@@ -203,10 +203,8 @@ def main(cfg):
         lr = optimizer.param_groups[0]['lr']
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
-        logging.info(f'@E{epoch} train results: '
-                     + f'lr={lr:.6f} loss={train_loss:.4f} diff={train_diff:.4f} '
-                     + f'macc={train_macc:.4f} accs={train_accs:.4f} '
-                     + f'time_cost={time_cost:.2f}s avg_time_cost={timer_meter.avg:.2f}s')
+        logging.info(
+            f'@E{epoch} train:    macc={train_macc:.4f} oa={train_accs:.4f}')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
@@ -214,17 +212,31 @@ def main(cfg):
                 val_loss, _, val_macc, _, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
+            logging.info(f'@E{epoch} val:      macc={val_macc:.4f} oa={val_accs:.4f}')
             if val_accs > best_accs:
+                logging.info(f'@E{epoch} new best: oa {val_accs:.4f} => {best_accs:.4f}')
                 is_best = True
                 best_accs = val_accs
                 macc_when_best = val_macc
-            with np.printoptions(precision=4, suppress=True):
-                logging.info(f'@E{epoch} val results:   '
-                             + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
-                             + f'best_accs={best_accs:.4f}')
+
+        train_info = {
+            'macc': train_macc,
+            'oa': train_accs,
+            'loss': train_loss,
+            'diff': train_diff,
+            'lr': f"{lr:.6f}",
+            'time_cost': f"{time_cost:.2f}s",
+            'time_cost_avg': f"{timer_meter.avg:.2f}s",
+        }
+        val_info = {
+            'macc': val_macc,
+            'oa': val_accs,
+            'loss': val_loss,
+        }
+        logging.info(f'@E{epoch} summary:'
+                     + f'train: \n{format_dict(train_info)}'
+                     + f'val: \n{format_dict(val_info)}')
         if is_best:
-            logging.info(f'@E{epoch} new best:      '
-                         + f'best_accs={best_accs:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,

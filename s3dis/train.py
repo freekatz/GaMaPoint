@@ -20,7 +20,7 @@ from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
-from utils.logger import setup_logger_dist
+from utils.logger import setup_logger_dist, format_dict, format_list
 from utils.metrics import Timer, Metric, AverageMeter
 from utils.random import set_random_seed
 
@@ -235,10 +235,8 @@ def main(cfg):
         lr = optimizer.param_groups[0]['lr']
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
-        logging.info(f'@E{epoch} train results: '
-                     + f'lr={lr:.6f} loss={train_loss:.4f} diff={train_diff:.4f} '
-                     + f'macc={train_macc:.4f} accs={train_accs:.4f} miou={train_miou:.4f} '
-                     + f'time_cost={time_cost:.2f}s avg_time_cost={timer_meter.avg:.62f}s')
+        logging.info(
+            f'@E{epoch} train:    miou={train_miou:.4f} macc={train_macc:.4f} oa={train_accs:.4f}')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
@@ -246,18 +244,34 @@ def main(cfg):
                 val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
+            logging.info(f'@E{epoch} val:      miou={val_miou:.4f} macc={val_macc:.4f} oa={val_accs:.4f}')
             if val_miou > best_miou:
+                logging.info(f'@E{epoch} new best: miou {val_miou:.4f} => {best_miou:.4f}')
                 is_best = True
                 best_miou = val_miou
                 macc_when_best = val_macc
-            with np.printoptions(precision=4, suppress=True):
-                logging.info(f'@E{epoch} val results:   '
-                             + f'loss={val_loss:.4f} macc={val_macc:.4f} accs={val_accs.detach().cpu().numpy():.4f} '
-                             + f'miou={val_miou:.4f} best_miou={best_miou:.4f}'
-                             + f'\nious={val_ious.detach().cpu().numpy()}')
+
+        train_info = {
+            'miou': train_miou,
+            'macc': train_macc,
+            'oa': train_accs,
+            'loss': train_loss,
+            'diff': train_diff,
+            'lr': f"{lr:.6f}",
+            'time_cost': f"{time_cost:.2f}s",
+            'time_cost_avg': f"{timer_meter.avg:.2f}s",
+        }
+        val_info = {
+            'miou': val_miou,
+            'macc': val_macc,
+            'oa': val_accs,
+            'loss': val_loss,
+        }
+        logging.info(f'@E{epoch} summary:'
+                     + f'train: \n{format_dict(train_info)}'
+                     + f'val: \n{format_dict(val_info)}'
+                     + f'ious: \n{format_list(S3DIS.get_classes(), val_ious)}')
         if is_best:
-            logging.info(f'@E{epoch} new best:      '
-                         + f'best_miou={best_miou:.4f}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
@@ -301,7 +315,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, required=False, default=100)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
     parser.add_argument("--lr", type=float, required=False, default=1e-3)
-    parser.add_argument("--lr_decay", type=float, required=False, default=1.-1e-3)
+    parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')

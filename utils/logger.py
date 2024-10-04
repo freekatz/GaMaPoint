@@ -168,3 +168,53 @@ def resume_exp_directory(cfg, pretrained_path=None):
     if cfg.get('rank', 0) == 0:
         os.makedirs(cfg.run_dir, exist_ok=True)
     cfg.wandb.tags = ['resume']
+
+
+def format_dict(d, digits=4) -> str:
+    s = []
+    for k, v in d.items():
+        if isinstance(v, float):
+            v = f'{round(v, digits)}'
+        else:
+            v = str(v)
+        s.append(f'\t{k:15}: {v:10}')
+    return '\n'.join(s)
+
+
+def format_list(l1, l2, digits=4) -> str:
+    s = []
+    for k, v in zip(l1, l2):
+        if isinstance(v, float):
+            v = f'{round(v, digits)}'
+        else:
+            v = str(v)
+        s.append(f'\t{k:15}: {v:10}')
+    return '\n'.join(s)
+
+
+if __name__ == '__main__':
+    classes = ['ceiling',
+               'floor',
+               'wall',
+               'beam',
+               'column',
+               'window',
+               'door',
+               'chair',
+               'table',
+               'bookcase',
+               'sofa',
+               'board',
+               'clutter']
+    ious = [0.933,0.977,0.8481,0.0005,0.2784,0.6131,0.5104,0.8172,0.8357,0.707,0.7039,0.4704,0.5696]
+    s = format_list(classes, ious, digits=2)
+
+    s2 = format_dict({
+        'loss': 0.89323,
+        'lr': 0.000001,
+        'diff': 1.24142,
+        'time_cost': '12441s'
+    })
+    print(f'ious:\n{s}'
+          + f'\ntrain:\n{s2}')
+
