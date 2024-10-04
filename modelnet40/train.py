@@ -220,25 +220,26 @@ def main(cfg):
                 is_best = True
                 best_accs = val_accs
                 macc_when_best = val_macc
-
-        train_info = {
-            'macc': train_macc,
-            'oa': train_accs,
-            'loss': train_loss,
-            'diff': train_diff,
-            'lr': f"{lr:.6f}",
-            'time_cost': f"{time_cost:.2f}s",
-            'time_cost_avg': f"{timer_meter.avg:.2f}s",
-        }
-        val_info = {
-            'macc': val_macc,
-            'oa': val_accs,
-            'loss': val_loss,
-        }
-        logging.info(f'@E{epoch} summary:'
-                     + f'\ntrain: \n{format_dict(train_info)}'
-                     + f'\nval: \n{format_dict(val_info)}')
+            else:
+                logging.info(f'@E{epoch} cur best: oa {best_accs:.4f}')
         if is_best:
+            train_info = {
+                'macc': train_macc,
+                'oa': train_accs,
+                'loss': train_loss,
+                'diff': train_diff,
+                'lr': f"{lr:.6f}",
+                'time_cost': f"{time_cost:.2f}s",
+                'time_cost_avg': f"{timer_meter.avg:.2f}s",
+            }
+            val_info = {
+                'macc': val_macc,
+                'oa': val_accs,
+                'loss': val_loss,
+            }
+            logging.info(f'@E{epoch} summary:'
+                         + f'\ntrain: \n{format_dict(train_info)}'
+                         + f'\nval: \n{format_dict(val_info)}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,

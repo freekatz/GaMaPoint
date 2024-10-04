@@ -250,28 +250,29 @@ def main(cfg):
                 is_best = True
                 best_miou = val_miou
                 macc_when_best = val_macc
-
-        train_info = {
-            'miou': train_miou,
-            'macc': train_macc,
-            'oa': train_accs,
-            'loss': train_loss,
-            'diff': train_diff,
-            'lr': f"{lr:.6f}",
-            'time_cost': f"{time_cost:.2f}s",
-            'time_cost_avg': f"{timer_meter.avg:.2f}s",
-        }
-        val_info = {
-            'miou': val_miou,
-            'macc': val_macc,
-            'oa': val_accs,
-            'loss': val_loss,
-        }
-        logging.info(f'@E{epoch} summary:'
-                     + f'\ntrain: \n{format_dict(train_info)}'
-                     + f'\nval: \n{format_dict(val_info)}'
-                     + f'\nious: \n{format_list(S3DIS.get_classes(), val_ious)}')
+            else:
+                logging.info(f'@E{epoch} cur best: miou {best_miou:.4f}')
         if is_best:
+            train_info = {
+                'miou': train_miou,
+                'macc': train_macc,
+                'oa': train_accs,
+                'loss': train_loss,
+                'diff': train_diff,
+                'lr': f"{lr:.6f}",
+                'time_cost': f"{time_cost:.2f}s",
+                'time_cost_avg': f"{timer_meter.avg:.2f}s",
+            }
+            val_info = {
+                'miou': val_miou,
+                'macc': val_macc,
+                'oa': val_accs,
+                'loss': val_loss,
+            }
+            logging.info(f'@E{epoch} summary:'
+                         + f'\ntrain: \n{format_dict(train_info)}'
+                         + f'\nval: \n{format_dict(val_info)}'
+                         + f'\nious: \n{format_list(S3DIS.get_classes(), val_ious)}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,

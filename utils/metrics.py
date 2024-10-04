@@ -86,8 +86,8 @@ class Metric():
         self.acc = round(acc.item(), digits)
         macc = self.calc_macc()
         self.macc = round(macc.item(), digits)
-        iou = self.intersection / self.union
-        self.iou = [round(i.item() * 100, digits) for i in iou]
+        iou = self.intersection / self.union * 100
+        self.iou = [round(i.item(), digits) for i in iou]
         miou = iou.mean()
         self.miou = round(miou.item(), digits)
         return acc, macc, miou, iou
