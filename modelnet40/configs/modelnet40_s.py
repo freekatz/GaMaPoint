@@ -9,8 +9,8 @@ from modelnet40.configs.config import BaseConfig
 
 class ModelNet40Config(BaseConfig):
     name = 'ModelNet40Config'
-    k = [24, 24, 24]
-    k_gs = [6, 6, 6]
+    k = [20, 20, 20]
+    k_gs = [5, 5, 5]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024
@@ -21,8 +21,8 @@ class ModelNet40Config(BaseConfig):
 
 class ModelNet40WarmupConfig(BaseConfig):
     name = 'ModelNet40WarmupConfig'
-    k = [24, 24, 24]
-    k_gs = [6, 6, 6]
+    k = [20, 20, 20]
+    k_gs = [5, 5, 5]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024
