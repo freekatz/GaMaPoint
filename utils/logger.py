@@ -176,9 +176,9 @@ def format_dict(d, digits=4) -> str:
     s = []
     for k, v in d.items():
         if isinstance(v, float):
-            v = f'{round(v, digits)}'
+            v = round(v, digits)
         if isinstance(v, torch.Tensor):
-            v = v.float()
+            v = round(v.float(), digits)
         else:
             v = str(v)
         s.append(f'\t{k:15}: {v:10}')
@@ -189,9 +189,9 @@ def format_list(l1, l2, digits=4) -> str:
     s = []
     for k, v in zip(l1, l2):
         if isinstance(v, float):
-            v = f'{round(v, digits)}'
+            v = round(v, digits)
         if isinstance(v, torch.Tensor):
-            v = v.float()
+            v = round(v.float(), digits)
         else:
             v = str(v)
         s.append(f'\t{k:15}: {v:10}')
