@@ -1,7 +1,6 @@
 import functools
 import logging
 import os
-import os.path as osp
 import sys
 
 import torch
@@ -172,28 +171,26 @@ def resume_exp_directory(cfg, pretrained_path=None):
     cfg.wandb.tags = ['resume']
 
 
-def format_dict(d, digits=4) -> str:
+def format_dict(d, dec=4) -> str:
     s = []
     for k, v in d.items():
-        if isinstance(v, float):
-            v = round(v, digits)
         if isinstance(v, torch.Tensor):
-            v = round(v.float(), digits)
-        else:
-            v = str(v)
+            v = float(v.detach().cpu().numpy())
+        if isinstance(v, float):
+            v = round(v, dec)
+        v = str(v)
         s.append(f'\t{k:15}: {v:10}')
     return '\n'.join(s)
 
 
-def format_list(l1, l2, digits=4) -> str:
+def format_list(l1, l2, dec=4) -> str:
     s = []
     for k, v in zip(l1, l2):
-        if isinstance(v, float):
-            v = round(v, digits)
         if isinstance(v, torch.Tensor):
-            v = round(v.float(), digits)
-        else:
-            v = str(v)
+            v = float(v.detach().cpu().numpy())
+        if isinstance(v, float):
+            v = round(v, dec)
+        v = str(v)
         s.append(f'\t{k:15}: {v:10}')
     return '\n'.join(s)
 
@@ -213,12 +210,12 @@ if __name__ == '__main__':
                'board',
                'clutter']
     ious = [0.933,0.977,0.8481,0.0005,0.2784,0.6131,0.5104,0.8172,0.8357,0.707,0.7039,0.4704,0.5696]
-    s = format_list(classes, ious, digits=2)
+    s = format_list(classes, ious, dec=2)
 
     s2 = format_dict({
-        'loss': 0.89323,
+        'loss': torch.tensor(0.89323),
         'lr': 0.000001,
-        'diff': 1.24142,
+        'diff': torch.tensor(1.24523),
         'time_cost': '12441s'
     })
     print(f'ious:\n{s}'
