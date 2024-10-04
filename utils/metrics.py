@@ -82,8 +82,8 @@ class Metric():
         return macc
 
     def calc(self, digits=4):
-        acc = self.intersection.sum() / self.count.sum()
-        self.acc = round(acc.item(), digits) * 100
+        acc = self.intersection.sum() / self.count.sum() * 100
+        self.acc = round(acc.item(), digits)
         macc = self.calc_macc()
         self.macc = round(macc.item(), digits)
         iou = self.intersection / self.union * 100
