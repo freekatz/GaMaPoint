@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import SegHead, Stage
+from backbone import SegSemHead, Stage
 from scannetv2.configs import model_configs
 from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -183,7 +183,7 @@ def main(cfg):
     stage = Stage(
         **cfg.gama_cfg.stage_cfg,
     ).to('cuda')
-    model = SegHead(
+    model = SegSemHead(
         stage=stage,
         num_classes=cfg.gama_cfg.num_classes,
         bn_momentum=cfg.gama_cfg.bn_momentum,

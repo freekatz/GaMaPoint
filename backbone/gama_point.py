@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from einops import repeat, rearrange
 from torch.nn.init import trunc_normal_
 from timm.models.layers import DropPath
 
@@ -26,12 +27,12 @@ class Stage(nn.Module):
                  use_cp=False,
                  diff_factor=40.,
                  diff_std=[1.6, 3.2, 6.4, 12.8],
-                 task_type='seg',
+                 task_type='segsem',
                  **kwargs
                  ):
         super().__init__()
-        assert task_type.lower() in ['seg', 'cls']
         self.task_type = task_type.lower()
+        assert self.task_type in ['segsem', 'segpart', 'cls']
         self.use_cp = use_cp
         self.layer_index = layer_index
         is_head = self.layer_index == 0
@@ -85,7 +86,7 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
         )
 
-        if self.task_type == 'seg':
+        if self.task_type == 'segsem':
             self.post_proj = nn.Sequential(
                 nn.BatchNorm1d(self.out_channels, momentum=bn_momentum),
                 nn.Linear(self.out_channels, head_channels, bias=False),
@@ -169,7 +170,7 @@ class Stage(nn.Module):
 
         # 3. decode
         # up sample
-        if self.task_type == 'seg':
+        if self.task_type == 'segsem':
             f = self.post_proj(f)
             if not self.is_head:
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
@@ -182,7 +183,7 @@ class Stage(nn.Module):
         return f, d_sub
 
 
-class SegHead(nn.Module):
+class SegSemHead(nn.Module):
     def __init__(self,
                  stage: Stage,
                  num_classes=13,
@@ -217,11 +218,57 @@ class SegHead(nn.Module):
         return self.head(f)
 
 
+class SegPartHead(nn.Module):
+    def __init__(self,
+                 stage: Stage,
+                 num_classes=50,
+                 shape_classes=16,
+                 bn_momentum=0.1,
+                 **kwargs
+                 ):
+        super().__init__()
+        self.stage = stage
+
+        self.proj = nn.Sequential(
+            nn.Linear(shape_classes, 64, bias=False),
+            nn.BatchNorm1d(64, momentum=bn_momentum),
+            nn.Linear(64, stage.head_channels, bias=False)
+        )
+        self.head = nn.Sequential(
+            nn.BatchNorm1d(stage.head_channels, momentum=bn_momentum),
+            nn.GELU(),
+            nn.Linear(stage.head_channels, num_classes),
+        )
+
+        self.apply(self.__init_weights)
+
+    def __init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, gs: NaiveGaussian3D, shape):
+        p = gs.gs_points.p
+        p_gs = gs.gs_points.p_gs
+        f = gs.gs_points.f
+
+        f, diff = self.stage(p, p_gs, f, gs)
+        shape = nn.functional.one_hot(shape, self.shape_classes).float()
+        shape = self.proj(shape)
+        shape = repeat(shape, 'b c -> b n c', n=f.shape[0]//gs.batch_size)
+        shape = rearrange(shape, 'b n c -> (b n) c')
+        f = f + shape
+        if self.training:
+            return self.head(f), diff
+        return self.head(f)
+
+
 class ClsHead(nn.Module):
     def __init__(self,
                  stage: Stage,
                  num_classes=13,
-                 bn_momentum=0.02,
+                 bn_momentum=0.1,
                  **kwargs
                  ):
         super().__init__()
