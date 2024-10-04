@@ -277,7 +277,7 @@ if __name__ == '__main__':
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=300)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=30)
-    parser.add_argument("--lr", type=float, required=False, default=1e-3)
+    parser.add_argument("--lr", type=float, required=False, default=3e-3)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
