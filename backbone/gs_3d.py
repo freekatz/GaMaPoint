@@ -531,7 +531,7 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
 
 def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     assert len(gs_list) > 0
-    new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=gs_list[0].batch_size)
+    new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=len(gs_list))
 
     p_all = []
     p_gs_all = []
