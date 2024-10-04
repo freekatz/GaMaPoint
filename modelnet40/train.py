@@ -210,7 +210,7 @@ def main(cfg):
         logging.info(f'@E{epoch} train results: '
                      + f'lr={lr:.6f} loss={train_loss:.4f} diff={train_diff:.4f} '
                      + f'macc={train_macc:.4f} accs={train_accs:.4f} '
-                     + f'time_cost={time_cost:.6f}s avg_time_cost={timer_meter.avg:.6f}s')
+                     + f'time_cost={time_cost:.2f}s avg_time_cost={timer_meter.avg:.2f}s')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
