@@ -62,7 +62,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     diff_meter = AverageMeter()
     steps_per_epoch = len(train_loader)
     for idx, gs in pbar:
-        lam = scheduler_steps/(epoch*steps_per_epoch)
+        lam = scheduler_steps / (epoch * steps_per_epoch)
         lam = 3e-3 ** lam * 0.25
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
@@ -73,11 +73,11 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss + diff*lam).backward()
+            scaler.scale(loss + diff * lam).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = loss + diff*lam
+            loss = loss + diff * lam
             loss.backward()
             optimizer.step()
 
@@ -204,12 +204,14 @@ def main(cfg):
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        logging.info(f"Resume model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        logging.info(
+            f"Resume model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     if cfg.mode == 'finetune':
         model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         best_epoch = model_dict['best_epoch']
         best_miou = model_dict['best_miou']
-        logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        logging.info(
+            f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
 
     steps_per_epoch = len(train_loader)
     scheduler_steps = steps_per_epoch * (start_epoch - 1)
@@ -236,7 +238,9 @@ def main(cfg):
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(
-            f'@E{epoch} train:    miou={train_miou:.4f} macc={train_macc:.4f} oa={train_accs:.4f} loss={train_loss:.4f} lr={lr:.6f}')
+            f'@E{epoch} train:    '
+            + f'miou={train_miou:.4f} macc={train_macc:.4f} oa={train_accs:.4f} loss={train_loss:.4f} '
+            + f'diff={train_diff:.4f} lr={lr:.6f}')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
@@ -244,7 +248,8 @@ def main(cfg):
                 val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
-            logging.info(f'@E{epoch} val:      miou={val_miou:.4f} macc={val_macc:.4f} oa={val_accs:.4f} loss={val_loss:.4f}')
+            logging.info(f'@E{epoch} val:      '
+                         + f'miou={val_miou:.4f} macc={val_macc:.4f} oa={val_accs:.4f} loss={val_loss:.4f}')
             if val_miou > best_miou:
                 logging.info(f'@E{epoch} new best: miou {best_miou:.4f} => {val_miou:.4f}')
                 is_best = True

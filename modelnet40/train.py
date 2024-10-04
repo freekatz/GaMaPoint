@@ -206,7 +206,9 @@ def main(cfg):
         time_cost = timer.record(f'epoch_{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(
-            f'@E{epoch} train:    macc={train_macc:.4f} oa={train_accs:.4f} loss={train_loss:.4f} lr={lr:.6f}')
+            f'@E{epoch} train:    '
+            + f'macc={train_macc:.4f} oa={train_accs:.4f} loss={train_loss:.4f} '
+            + f'diff={train_diff:.4f} lr={lr:.6f}')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
@@ -214,7 +216,8 @@ def main(cfg):
                 val_loss, _, val_macc, _, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
-            logging.info(f'@E{epoch} val:      macc={val_macc:.4f} oa={val_accs:.4f} loss={val_loss:.4f}')
+            logging.info(f'@E{epoch} val:      '
+                         + f'macc={val_macc:.4f} oa={val_accs:.4f} loss={val_loss:.4f}')
             if val_accs > best_accs:
                 logging.info(f'@E{epoch} new best: oa {best_accs:.4f} => {val_accs:.4f}')
                 is_best = True
