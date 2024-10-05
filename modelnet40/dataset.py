@@ -1,3 +1,5 @@
+import __init__
+
 from pathlib import Path
 
 import h5py

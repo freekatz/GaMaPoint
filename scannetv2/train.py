@@ -1,3 +1,5 @@
+import __init__
+
 import argparse
 import logging
 import os
