@@ -137,9 +137,9 @@ class Stage(nn.Module):
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
         gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-        f_local_gs = self.sa_gs(p_gs, f, gs_group_idx)
-        alpha = self.alpha.sigmoid()
-        f_local = f_local * alpha + f_local_gs * (1 - alpha)
+        # f_local_gs = self.sa_gs(p_gs, f, gs_group_idx)
+        # alpha = self.alpha.sigmoid()
+        # f_local = f_local * alpha + f_local_gs * (1 - alpha)
         # invert residual connections: local feature aggregation and propagation
         pts = gs.gs_points.pts_list[self.layer_index].tolist()
         f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \

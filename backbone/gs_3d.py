@@ -519,11 +519,11 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
 
         # group
         k = ks[i]
-        k_gs = ks_gs[i]
+        # k_gs = ks_gs[i]
         kdt = KDTree(p)
-        kdt_gs = KDTree(p_gs)
+        # kdt_gs = KDTree(p_gs)
         idx_group.append(kdt.knn(p, k, False)[0].long())
-        idx_gs_group.append(kdt_gs.knn(p_gs, k_gs, False)[0].long())
+        # idx_gs_group.append(kdt_gs.knn(p_gs, k_gs, False)[0].long())
 
         # up sample
         if i > 0 and up_sample:
@@ -589,7 +589,7 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
                 if up_sample:
                     idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
             idx_group[layer_idx].add_(pts_per_layer[layer_idx])
-            idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
+            # idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
             pts.append(idx_group[layer_idx].shape[0])
         idx_ds_all.append(idx_ds)
         idx_us_all.append(idx_us)
