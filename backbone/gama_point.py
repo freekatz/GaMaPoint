@@ -136,7 +136,7 @@ class Stage(nn.Module):
         # set abstraction: group and abstract the local points set
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
-        gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
+        # gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
         # f_local_gs = self.sa_gs(p_gs, f, gs_group_idx)
         # alpha = self.alpha.sigmoid()
         # f_local = f_local * alpha + f_local_gs * (1 - alpha)
