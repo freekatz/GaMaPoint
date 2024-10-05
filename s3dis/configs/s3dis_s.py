@@ -4,10 +4,10 @@ import torch
 
 from backbone.gs_3d import GaussianOptions
 from backbone.mamba_ssm.models import MambaConfig
-from s3dis.configs.config import BaseConfig
+from utils.config import EasyConfig
 
 
-class S3disConfig(BaseConfig):
+class S3disConfig(EasyConfig):
     name = 'S3disConfig'
     k = [24, 24, 24, 24]
     k_gs = [6, 6, 6, 6]
@@ -18,7 +18,7 @@ class S3disConfig(BaseConfig):
     gs_opts.cam_fovy = 120
 
 
-class S3disWarmupConfig(BaseConfig):
+class S3disWarmupConfig(EasyConfig):
     name = 'S3disWarmupConfig'
     k = [24, 24, 24, 24]
     k_gs = [6, 6, 6, 6]
@@ -29,13 +29,13 @@ class S3disWarmupConfig(BaseConfig):
     gs_opts.cam_fovy = 120
 
 
-class GaMaConfig(BaseConfig):
+class GaMaConfig(EasyConfig):
     name = 'GaMaConfig'
     num_classes = 13
     bn_momentum = 0.02
     drop_path = 0.1
     channel_list = [64, 128, 256, 512]
-    stage_cfg = BaseConfig()
+    stage_cfg = EasyConfig()
     stage_cfg.name = 'StageConfig'
     stage_cfg.in_channels = 4
     stage_cfg.channel_list = channel_list

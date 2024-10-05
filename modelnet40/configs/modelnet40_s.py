@@ -4,10 +4,10 @@ import torch
 
 from backbone.gs_3d import GaussianOptions
 from backbone.mamba_ssm.models import MambaConfig
-from modelnet40.configs.config import BaseConfig
+from utils.config import EasyConfig
 
 
-class ModelNet40Config(BaseConfig):
+class ModelNet40Config(EasyConfig):
     name = 'ModelNet40Config'
     k = [20, 20, 20]
     k_gs = [5, 5, 5]
@@ -19,7 +19,7 @@ class ModelNet40Config(BaseConfig):
     gs_opts.cam_fovy = 120
 
 
-class ModelNet40WarmupConfig(BaseConfig):
+class ModelNet40WarmupConfig(EasyConfig):
     name = 'ModelNet40WarmupConfig'
     k = [20, 20, 20]
     k_gs = [5, 5, 5]
@@ -31,13 +31,13 @@ class ModelNet40WarmupConfig(BaseConfig):
     gs_opts.cam_fovy = 120
 
 
-class GaMaConfig(BaseConfig):
+class GaMaConfig(EasyConfig):
     name = 'GaMaConfig'
     num_classes = 40
     bn_momentum = 0.1
     drop_path = 0.15
     channel_list = [96, 192, 384]
-    stage_cfg = BaseConfig()
+    stage_cfg = EasyConfig()
     stage_cfg.name = 'StageConfig'
     stage_cfg.in_channels = 1
     stage_cfg.channel_list = channel_list

@@ -4,10 +4,10 @@ import torch
 
 from backbone.gs_3d import GaussianOptions
 from backbone.mamba_ssm.models import MambaConfig
-from scannetv2.configs.config import BaseConfig
+from utils.config import EasyConfig
 
 
-class ScanNetV2Config(BaseConfig):
+class ScanNetV2Config(EasyConfig):
     name = 'ScanNetV2Config'
     k = [24, 24, 24, 24, 24]
     k_gs = [6, 6, 6, 6, 6]
@@ -18,7 +18,7 @@ class ScanNetV2Config(BaseConfig):
     gs_opts.cam_fovy = 150
 
 
-class ScanNetV2WarmupConfig(BaseConfig):
+class ScanNetV2WarmupConfig(EasyConfig):
     name = 'ScanNetV2WarmupConfig'
     k = [24, 24, 24, 24, 24]
     k_gs = [6, 6, 6, 6, 6]
@@ -29,13 +29,13 @@ class ScanNetV2WarmupConfig(BaseConfig):
     gs_opts.cam_fovy = 150
 
 
-class GaMaConfig(BaseConfig):
+class GaMaConfig(EasyConfig):
     name = 'GaMaConfig'
     num_classes = 20
     bn_momentum = 0.02
     drop_path = 0.1
     channel_list = [64, 96, 160, 288, 512]
-    stage_cfg = BaseConfig()
+    stage_cfg = EasyConfig()
     stage_cfg.name = 'StageConfig'
     stage_cfg.in_channels = 7
     stage_cfg.channel_list = channel_list
