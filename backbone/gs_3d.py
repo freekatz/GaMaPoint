@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from einops import repeat
 from pytorch3d.ops import sample_farthest_points
 import torch
+from torch import nn
+
 # from torch_kdtree import build_kd_tree
 
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
@@ -207,6 +209,10 @@ class GaussianPoints(object):
     @property
     def p_gs(self):
         return self.__get_attr__('p_gs')
+
+    @property
+    def f_gs(self):
+        return self.__get_attr__('f_gs')
 
     @property
     def cameras(self):
@@ -455,18 +461,19 @@ class NaiveGaussian3D:
         cam_intr = self.gs_points.cam_intr.unsqueeze(0)
         cam_extr = self.gs_points.cam_extr.unsqueeze(0)
         xyz = xyz.unsqueeze(0)
+        cov3d = cov3d.unsqueeze(0)
 
         cov2d_all = []
         for j in range(n_cameras * 2):
             cov2d, _, _ = ewa_project(
                 xyz=xyz,
                 cov3d=cov3d,
-                intr=cam_intr[:, j].squeeze(-1),
-                extr=cam_extr[:, :, j].squeeze(-1),
-                uv=uv[:, :, j].squeeze(-1),
+                intr=cam_intr[:, :, j].squeeze(-1),
+                extr=cam_extr[:, :, :, j].squeeze(-1),
+                uv=uv[:, :, :, j].squeeze(-1),
                 W=cam_width,
                 H=cam_height,
-                visible=visible[:, :, j].squeeze(-1),
+                visible=visible[:, :, :, j].squeeze(-1),
             )
             cov2d_all.append(cov2d)
         cov2d = torch.stack(cov2d_all, dim=-1).squeeze(0)
@@ -527,6 +534,25 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
     gs_points.__update_attr__('idx_group', idx_group)
     gs_points.__update_attr__('idx_gs_group', idx_gs_group)
     return gs_points
+
+
+def make_gs_features(gs: NaiveGaussian3D):
+    uv = gs.gs_points.uv
+    depths = gs.gs_points.depths
+    gs_group_idx = gs.gs_points.idx_gs_group[0]
+    cov3d = gs.cov3d(gs.gs_points.p[gs_group_idx])
+    cov2d = gs.cov2d(gs.gs_points.p, cov3d)
+    # gs feature
+    delta = torch.round((uv % 1) * 1e5) / 1e5  # [N, 2, n_cameras*2]
+    power = -(
+            0.5 * cov2d[:, 0, :] * delta[:, 0, :] * delta[:, 0, :]
+            + 0.5 * cov2d[:, 2, :] * delta[:, 1, :] * delta[:, 1, :]
+            + cov2d[:, 1, :] * delta[:, 0, :] * delta[:, 1, :])  # [N, n_cameras*2]
+    opacity = nn.functional.softmax(depths.squeeze(1), dim=0)  # [N, n_cameras*2]
+    alpha = torch.clamp(torch.exp(power), min=1.0 / 255.0, max=0.99)  # [N, n_cameras*2]
+    colors = opacity * alpha * (1 - alpha)  # [N, n_cameras*2]
+    colors = torch.stack([colors[:, 0], colors[:, 1:].max(1)[0] + colors[:, 1:].mean(1)[0]], dim=-1)
+    return colors
 
 
 def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
@@ -592,3 +618,20 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     new_gs.gs_points.__update_attr__('pts_list', pts_list)
     return new_gs
 
+
+if __name__ == '__main__':
+    xyz = torch.randn((20, 3))
+    gs = NaiveGaussian3D(
+        opt=GaussianOptions.default(),
+        batch_size=1,
+    )
+    gs.projects(xyz)
+    gs.gs_points = make_gs_points(
+        gs.gs_points,
+        [4],
+        [4],
+        None,
+        [1, 2]
+    )
+    colors = make_gs_features(gs)
+    print(colors.shape)

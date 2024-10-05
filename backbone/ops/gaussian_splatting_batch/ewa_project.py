@@ -35,6 +35,14 @@ def ewa_project(
     """
     device = xyz.device
     block_height = block_width
+    B, N, _ = xyz.shape
+    if visible is None:
+        visible = torch.ones((B, N, 1), device=xyz.device)
+    else:
+        visible = visible.sum(dim=-1, keepdim=False)
+        visible = (visible > 0).int()
+    visible = visible.squeeze(dim=-1)
+
     # use the upper-right corner of cov3d
     cov3d = torch.stack([cov3d[:, :, 0, 0], cov3d[:, :, 0, 1],
                          cov3d[:, :, 0, 2], cov3d[:, :, 1, 1],
@@ -130,3 +138,14 @@ def ewa_project(
 
     return conic, radius.int().unsqueeze(-1), tiles.int().unsqueeze(-1)
 
+
+if __name__ == '__main__':
+    xyz = torch.randn((1, 20, 3))
+    cov3d = torch.randn((1, 20, 3, 3))
+    intr = torch.randn((1, 4))
+    extr = torch.randn((1, 4, 4))
+    uv = torch.randn((1, 20, 2))
+    visible = torch.randn((1, 20, 1))
+
+    cov2d, _, _ = ewa_project(xyz, cov3d, intr, extr, uv, 512, 512, None)
+    print(cov2d.shape, cov2d)
