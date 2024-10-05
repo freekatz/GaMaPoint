@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import ClsHead, Stage
+from backbone.gama_point import ClsHead, Stage
 from modelnet40.configs import model_configs
 from modelnet40.dataset import ModelNet40, modelnet40_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
