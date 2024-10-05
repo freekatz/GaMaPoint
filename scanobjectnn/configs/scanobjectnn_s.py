@@ -9,8 +9,8 @@ from utils.config import EasyConfig
 
 class ScanObjectNNConfig(EasyConfig):
     name = 'ScanObjectNNConfig'
-    k = [24, 24, 24]
-    k_gs = [6, 6, 6]
+    k = [32, 32, 32]
+    k_gs = [8, 8, 8]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024
@@ -21,8 +21,8 @@ class ScanObjectNNConfig(EasyConfig):
 
 class ScanObjectNNWarmupConfig(EasyConfig):
     name = 'ScanObjectNNWarmupConfig'
-    k = [24, 24, 24]
-    k_gs = [6, 6, 6]
+    k = [32, 32, 32]
+    k_gs = [8, 8, 8]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024

@@ -9,8 +9,8 @@ from utils.config import EasyConfig
 
 class ModelNet40Config(EasyConfig):
     name = 'ModelNet40Config'
-    k = [20, 20, 20]
-    k_gs = [5, 5, 5]
+    k = [32, 32, 32]
+    k_gs = [8, 8, 8]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024
@@ -21,8 +21,8 @@ class ModelNet40Config(EasyConfig):
 
 class ModelNet40WarmupConfig(EasyConfig):
     name = 'ModelNet40WarmupConfig'
-    k = [20, 20, 20]
-    k_gs = [5, 5, 5]
+    k = [32, 32, 32]
+    k_gs = [8, 8, 8]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024
