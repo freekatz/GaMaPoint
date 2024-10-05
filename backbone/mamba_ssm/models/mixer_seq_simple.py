@@ -1,22 +1,20 @@
 # Copyright (c) 2023, Albert Gu, Tri Dao.
 
+import copy
 import math
 from functools import partial
-import copy
 
 import torch
 import torch.nn as nn
-from einops import repeat
-
-from mamba_ssm.modules.mlp import GatedMLP
 from mamba_ssm.modules.block import Block
+from mamba_ssm.modules.mlp import GatedMLP
 
 from utils.dict_utils import ObjDict
-from ..custom.order import Order, BaseOrder
+from ..custom.order import Order
 from ..custom.structured_mask import StructuredMask
-from ...gs_3d import NaiveGaussian3D
 from ..modules.mamba2 import Mamba2
 from ..modules.mha import MHA
+from ...gs_3d import NaiveGaussian3D
 
 try:
     from mamba_ssm.ops.triton.layer_norm import RMSNorm, layer_norm_fn, rms_norm_fn

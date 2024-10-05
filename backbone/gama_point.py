@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from einops import repeat, rearrange
-from torch.nn.init import trunc_normal_
 from timm.models.layers import DropPath
+from torch.nn.init import trunc_normal_
 
 from backbone.gs_3d import NaiveGaussian3D
 from backbone.layers import InvResMLP, PointMambaLayer, SetAbstraction, LocalAggregation

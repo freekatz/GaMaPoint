@@ -4,10 +4,10 @@
 # -*- coding: utf-8 -*-
 import argparse
 import os
-import time
-import urllib.request  #(for python3)
-#import urllib
+# import urllib
 import tempfile
+import time
+import urllib.request  # (for python3)
 
 BASE_URL = 'http://kaldir.vc.in.tum.de/scannet/'
 TOS_URL = BASE_URL + 'ScanNet_TOS.pdf'

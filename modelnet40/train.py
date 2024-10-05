@@ -1,15 +1,12 @@
-import __init__
-
 import argparse
 import logging
 import os
 from glob import glob
 
 import numpy as np
-from timm.scheduler.cosine_lr import CosineLRScheduler
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from timm.scheduler.cosine_lr import CosineLRScheduler
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter

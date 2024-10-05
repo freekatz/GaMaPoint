@@ -1,11 +1,10 @@
-import __init__
+from pathlib import Path
 
 import h5py
 import torch
 from torch.utils.data import Dataset
-from pathlib import Path
 
-from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list, fps_sample, make_gs_features
+from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list, fps_sample
 
 
 class ModelNet40(Dataset):

@@ -6,7 +6,6 @@ import torch.nn as nn
 from timm.models.layers import DropPath
 
 from backbone.gs_3d import NaiveGaussian3D
-from backbone.mamba_ssm.custom import StructuredMask
 from backbone.mamba_ssm.custom.order import Order
 from backbone.mamba_ssm.models import MambaConfig, MixerModel
 from utils.cutils import knn_edge_maxpooling

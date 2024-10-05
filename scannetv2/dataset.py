@@ -1,16 +1,14 @@
-import __init__
+import math
+import random
+from pathlib import Path
 
 import numpy as np
 import scipy
 import torch
-import random
-import math
 from torch.utils.data import Dataset
-from pathlib import Path
 
 from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list
 from utils.cutils import grid_subsampling, grid_subsampling_test
-
 
 train_file = Path(__file__).parent / "scannetv2_train.txt"
 val_file = Path(__file__).parent / "scannetv2_val.txt"
