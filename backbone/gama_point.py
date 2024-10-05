@@ -282,14 +282,14 @@ class ClsHead(nn.Module):
         )
 
         self.head = nn.Sequential(
-            nn.Linear(stage.head_channels * 2, 384, bias=False),
-            nn.BatchNorm1d(384, momentum=bn_momentum),
+            nn.Linear(stage.head_channels * 2, 512, bias=False),
+            nn.BatchNorm1d(512, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(384, 384, bias=False),
-            nn.BatchNorm1d(384, momentum=bn_momentum),
+            nn.Linear(512, 256, bias=False),
+            nn.BatchNorm1d(256, momentum=bn_momentum),
             nn.GELU(),
             nn.Dropout(.5),
-            nn.Linear(384, num_classes)
+            nn.Linear(256, num_classes)
         )
 
         self.apply(self.__init_weights)
