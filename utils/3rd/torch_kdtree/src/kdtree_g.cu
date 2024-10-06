@@ -11,7 +11,7 @@ template
 __device__ void compQuadrDistLeafPartitionBlockwise(const Vec<T, dims>& point, const PartitionLeaf<T, dims>& partition_leaf,
 									T* local_dist_buf,
                                     PingPongBuffer<T>& best_dist_pp, PingPongBuffer<point_i_t>& best_knn_pp,
-									const point_i_knn_t nr_nns_searches, T& worst_dist)
+									const point_i_knn_t nr_nns_searches, const float alpha, T& worst_dist)
 {
 	//2D indices
 	//const int block_size = blockDim.x * blockDim.y;
@@ -29,7 +29,7 @@ __device__ void compQuadrDistLeafPartitionBlockwise(const Vec<T, dims>& point, c
 		const auto remaining_partition_size = partition_size - (buf_run_i * local_dist_buf_size);
 		const auto current_length = min(static_cast<int>(remaining_partition_size), local_dist_buf_size);
 		compDists<T, dims>(point, partition_data + (buf_run_i * local_dist_buf_size),
-				current_length,
+				current_length, alpha
 				local_dist_buf);
 		__syncthreads();
 		for(point_i_t ref_i = 0; ref_i < current_length; ref_i++)
@@ -286,7 +286,8 @@ template
 <typename T, typename T_calc, dim_t dims>
 __global__ void KDTreeKernel(PartitionInfoDevice<T, dims>* partition_info,
 	const point_i_t nr_query, 
-	const Vec<T, dims>* points_query, T* all_best_dists_d, point_i_knn_t* all_best_i_d, const point_i_knn_t nr_nns_searches)
+	const Vec<T, dims>* points_query, T* all_best_dists_d, point_i_knn_t* all_best_i_d,
+	const point_i_knn_t nr_nns_searches, const float alpha)
 {
 	assert(nr_nns_searches <= partition_info->nr_points);
 
@@ -367,7 +368,7 @@ __global__ void KDTreeKernel(PartitionInfoDevice<T, dims>* partition_info,
 
 			//Now compute each leaf with all threads in the current block
 			compQuadrDistLeafPartitionBlockwise<T, T_calc, dims>(point, leaf, local_dist_buf, *best_dist_pp, best_knn_pp,
-					 nr_nns_searches, worst_dist);
+					 nr_nns_searches, alpha, worst_dist);
 
 			if(tidx == 0)
 			{
@@ -381,7 +382,7 @@ __global__ void KDTreeKernel(PartitionInfoDevice<T, dims>* partition_info,
 				const PartitionLeaf<T, dims>& leaf = (!lower_than_median ? tree->getLeftLeaf() : tree->getRightLeaf());
 				//printf("Comp Dist 2\n");
 				compQuadrDistLeafPartitionBlockwise<T, T_calc, dims>(point, leaf, local_dist_buf, *best_dist_pp, best_knn_pp,
-					nr_nns_searches, worst_dist);
+					nr_nns_searches, alpha, worst_dist);
 			}
 
 			//__syncthreads();
@@ -410,7 +411,8 @@ template
 <typename T, typename T_calc, dim_t dims>
 void KDTreeKNNGPUSearch(PartitionInfoDevice<T, dims>* partition_info,
                     const point_i_t nr_query, 
-                    const std::array<T, dims>* points_query, T * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches)
+                    const std::array<T, dims>* points_query, T * dist, point_i_t* idx,
+                    const point_i_knn_t nr_nns_searches, const float alpha)
 {
 	//TODO: Dynamic implementation
 	/*if(partition_info->nr_partitions > max_partitions || partition_info->nr_leaves > max_leaves)
@@ -441,7 +443,7 @@ void KDTreeKNNGPUSearch(PartitionInfoDevice<T, dims>* partition_info,
 	#endif*/
 
 	const auto points_query_eig = reinterpret_cast<const Vec<T, dims>*>(points_query);
-	KDTreeKernel<T, T_calc, dims><<<grid_dims, block_dims>>>(partition_info, nr_query, points_query_eig, dist, idx, nr_nns_searches);
+	KDTreeKernel<T, T_calc, dims><<<grid_dims, block_dims>>>(partition_info, nr_query, points_query_eig, dist, idx, nr_nns_searches, alpha);
 
 	#ifndef NDEBUG
 	gpuErrchk( cudaPeekAtLastError() );
@@ -466,24 +468,24 @@ template void compQuadrDistLeafPartition<double, double, 3>(const std::array<dou
 
 template void KDTreeKNNGPUSearch<float, float, 1>(PartitionInfoDevice<float, 1>* partition_info,
                     const point_i_t nr_query, 
-                    const std::array<float, 1>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+                    const std::array<float, 1>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 template void KDTreeKNNGPUSearch<double, double, 1>(PartitionInfoDevice<double, 1>* partition_info, 
     const point_i_t nr_query, 
-    const std::array<double, 1>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+    const std::array<double, 1>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 	
 template void KDTreeKNNGPUSearch<float, float, 2>(PartitionInfoDevice<float, 2>* partition_info,
 		const point_i_t nr_query, 
-		const std::array<float, 2>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+		const std::array<float, 2>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 template void KDTreeKNNGPUSearch<double, double, 2>(PartitionInfoDevice<double, 2>* partition_info,
 	const point_i_t nr_query, 
-	const std::array<double, 2>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+	const std::array<double, 2>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template void KDTreeKNNGPUSearch<float, float, 3>(PartitionInfoDevice<float, 3>* partition_info,
 	const point_i_t nr_query, 
-	const std::array<float, 3>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+	const std::array<float, 3>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 template void KDTreeKNNGPUSearch<double, double, 3>(PartitionInfoDevice<double, 3>* partition_info,
 	const point_i_t nr_query, 
-	const std::array<double, 3>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+	const std::array<double, 3>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template PartitionInfoDevice<float, 1>* copyPartitionToGPU(const PartitionInfo<float, 1>& partition_info);
 template PartitionInfoDevice<float, 2>* copyPartitionToGPU(const PartitionInfo<float, 2>& partition_info);

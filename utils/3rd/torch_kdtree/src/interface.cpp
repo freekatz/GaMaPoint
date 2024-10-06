@@ -57,7 +57,7 @@ struct KDTree
         return std::move(structured_points_arr);
     }
 
-    void query_recast(const T* points_query, const size_t nr_query_points, const point_i_knn_t nr_nns_searches, T* dist_arr, point_i_knn_t* knn_idx)
+    void query_recast(const T* points_query, const size_t nr_query_points, const point_i_knn_t nr_nns_searches, const float alpha, T* dist_arr, point_i_knn_t* knn_idx)
     {
         {
             py::gil_scoped_release release;
@@ -65,24 +65,24 @@ struct KDTree
             {
                 KDTreeKNNGPUSearch<T, T, dims>(partition_info_d,
                     nr_query_points, reinterpret_cast<const std::array<T, dims>*>(points_query),
-                    dist_arr, knn_idx, nr_nns_searches);
+                    dist_arr, knn_idx, nr_nns_searches, alpha);
             }
             else
             {
                 KDTreeKNNSearch<T, T, dims>(*partition_info,
                     nr_query_points, reinterpret_cast<const std::array<T, dims>*>(points_query),
-                    dist_arr, knn_idx, nr_nns_searches);
+                    dist_arr, knn_idx, nr_nns_searches, alpha);
             }
         }
     }
 
-    void query(const size_t points_query_ptr, const size_t nr_query_points, const point_i_knn_t nr_nns_searches, const size_t dist_arr_ptr, const size_t knn_idx_ptr)
+    void query(const size_t points_query_ptr, const size_t nr_query_points, const point_i_knn_t nr_nns_searches, const float alpha, const size_t dist_arr_ptr, const size_t knn_idx_ptr)
     {
         //Necessary for CUDA raw pointers being passed around. They can NOT be converted to a py::array_t
         T* points_query = reinterpret_cast<T*>(points_query_ptr);
         T* dist_arr = reinterpret_cast<T*>(dist_arr_ptr);
         point_i_knn_t* knn_idx = reinterpret_cast<point_i_knn_t*>(knn_idx_ptr);
-        this->query_recast(points_query, nr_query_points, nr_nns_searches, dist_arr, knn_idx);
+        this->query_recast(points_query, nr_query_points, nr_nns_searches, alpha, dist_arr, knn_idx);
     }
 
     ~KDTree()
@@ -124,6 +124,16 @@ PYBIND11_MODULE(torch_knn, mod) {
            KDTreeCPU3DF
            check_for_gpu
     )pbdoc";
+
+    KDTREE_INSTANTIATION(float, 3+16, false, "KDTreeCPU19DF");
+    KDTREE_INSTANTIATION(double,3+16, false, "KDTreeCPU19D");
+    KDTREE_INSTANTIATION(float, 3+16, true, "KDTreeGPU19DF");
+    KDTREE_INSTANTIATION(double, 3+16, true, "KDTreeGPU19D");
+
+    KDTREE_INSTANTIATION(float, 3+32, false, "KDTreeCPU35DF");
+    KDTREE_INSTANTIATION(double, 3+32, false, "KDTreeCPU35D");
+    KDTREE_INSTANTIATION(float, 3+32, true, "KDTreeGPU35DF");
+    KDTREE_INSTANTIATION(double, 3+32, true, "KDTreeGPU35D");
 
     KDTREE_INSTANTIATION(float, 3, false, "KDTreeCPU3DF");
     KDTREE_INSTANTIATION(double, 3, false, "KDTreeCPU3D");

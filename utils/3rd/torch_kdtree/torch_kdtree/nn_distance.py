@@ -57,7 +57,7 @@ class TorchKDTree:
     def _search_kd_tree_cpu(self, points_query, nr_nns_searches, result_dists, result_idx):
         torch_knn.searchKDTreeCPU(points_query, nr_nns_searches, self.part_nr, result_dists, result_idx)
 
-    def query(self, points_query : torch.Tensor, nr_nns_searches : int=1, 
+    def query(self, points_query : torch.Tensor, nr_nns_searches : int=1, alpha: float=0.,
                 result_dists : torch.Tensor=None, result_idx : torch.Tensor=None):
         """Searches the specified KD-Tree for KNN of the given points
 
@@ -115,7 +115,7 @@ class TorchKDTree:
         dists_ptr = result_dists.data_ptr()
         knn_idx_ptr = result_idx.data_ptr()
 
-        self.kdtree.query(points_query_ptr, points_query.shape[0], nr_nns_searches, dists_ptr, knn_idx_ptr)
+        self.kdtree.query(points_query_ptr, points_query.shape[0], nr_nns_searches, alpha, dists_ptr, knn_idx_ptr)
         dists = result_dists
         inds = self.shuffled_ind[result_idx.long()]
 

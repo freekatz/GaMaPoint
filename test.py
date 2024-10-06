@@ -1,12 +1,8 @@
 import torch
 import torch.nn.functional as F
-from einops import rearrange, repeat
+from einops import rearrange
+depths = torch.tensor([[0., 2., 3., 0.2], [1.1, 2., 0., 4.]])
+print(depths.shape)
+visible = (depths != 0).int()
+print(visible, visible.shape)
 
-camid = torch.tensor([[[0, 2, 3, 0]], [[1, 0, 0, 4]]], dtype=torch.float)
-print(camid.shape)
-n_cameras = 2
-i = torch.arange(1, n_cameras*2+1)
-i = repeat(i, 'c -> n d c', n=camid.shape[0], d=1)
-print(camid.mean(dim=-1))
-camid = camid * i
-print(camid.mean(dim=-1))

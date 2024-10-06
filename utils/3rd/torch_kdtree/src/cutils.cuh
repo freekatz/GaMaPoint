@@ -281,16 +281,22 @@ __device__ void insertAndShiftArrayRight(const T* source_arr, T* target_arr, con
  * @param dest Destination array for the computed squared distances
  */
 template <typename T, uint32_t dims>
-__device__ inline void compDists(const Vec<T, dims>& point, const Vec<T, dims>* ref_leaf, const size_t nr_ref, T* dest)
+__device__ inline void compDists(const Vec<T, dims>& point, const Vec<T, dims>* ref_leaf, const size_t nr_ref, const float alpha, T* dest)
 {
 	//2D indices
 	//const int blockidx = blockIdx.x + blockIdx.y*gridDim.x;
 	const int block_size = blockDim.x * blockDim.y; // * blockDim.z;
 	const int tidx = threadIdx.y * blockDim.x + threadIdx.x;
-
+    Vec<T, 3> xyz = point.head(3)
+    Vec<T, dims-3> code = point.tail(dims-3)
 	for(size_t i = tidx; i < nr_ref; i += block_size)
 	{
-		dest[i] = (point - ref_leaf[i]).squaredNorm();
+	    Vec<T, 3> ref_xyz = ref_leaf[i].head(3)
+        Vec<T, dims-3> ref_code = ref_leaf[i].tail(dims-3)
+		dest[i] = (xyz - ref_xyz).squaredNorm();
+		if (alpha > 0) {
+		    dest[i] += (code ^ ref_code).mean() * alpha
+		}
 	}
 }
 

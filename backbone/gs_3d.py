@@ -4,14 +4,13 @@ import torch
 from einops import repeat
 from pytorch3d.ops import sample_farthest_points
 from torch import nn
+from torch_kdtree import build_kd_tree
 
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
-from utils.cutils import grid_subsampling, KDTree
-
-
-# from torch_kdtree import build_kd_tree
+from backbone.ops.neighbors import build_tree, build_dist_fn, knn
+from utils.cutils import grid_subsampling
 
 
 def create_sampler(sampler='random', **kwargs):
@@ -486,7 +485,8 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
     assert (grid_size is None and strides is None) is False
     n_layers = len(ks)
     p = gs_points.p
-    p_gs = gs_points.p_gs
+    p = points_scaler(p.unsqueeze(0), scale=1.0).squeeze(0)
+    visible = gs_points.visible
 
 
     # gs_points.apply_index(idx)
@@ -514,20 +514,21 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
                     _, ds_idx = fps_sample(p.unsqueeze(0), p.shape[0]//stride)
                     ds_idx = ds_idx.squeeze(0)
             p = p[ds_idx]
-            p_gs = p_gs[ds_idx]
+            visible = visible[ds_idx]
             idx_ds.append(ds_idx)
 
         # group
+        pc = torch.cat([p, visible.squeeze(1)], dim=-1)
         k = ks[i]
         # k_gs = ks_gs[i]
-        kdt = KDTree(p)
-        # kdt_gs = KDTree(p_gs)
-        idx_group.append(kdt.knn(p, k, False)[0].long())
-        # idx_gs_group.append(kdt_gs.knn(p_gs, k_gs, False)[0].long())
+        kdt = build_kd_tree(pc)
+        # kdt_gs = build_kd_tree(p_gs)
+        idx_group.append(kdt.query(pc, nr_nns_searches=k, alpha=0.2)[1].long())
+        # idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k_gs)[1].long())
 
         # up sample
         if i > 0 and up_sample:
-            us_idx = kdt.knn(gs_points.p, 1, False)[0].squeeze(-1)
+            us_idx = kdt.query(torch.cat([gs_points.p, gs_points.visible.squeeze(1)], dim=-1), 1)[1].squeeze(-1)
             idx_us.append(us_idx)
 
     gs_points.__update_attr__('idx_ds', idx_ds)
