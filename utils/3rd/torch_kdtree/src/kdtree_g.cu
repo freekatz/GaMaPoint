@@ -29,7 +29,7 @@ __device__ void compQuadrDistLeafPartitionBlockwise(const Vec<T, dims>& point, c
 		const auto remaining_partition_size = partition_size - (buf_run_i * local_dist_buf_size);
 		const auto current_length = min(static_cast<int>(remaining_partition_size), local_dist_buf_size);
 		compDists<T, dims>(point, partition_data + (buf_run_i * local_dist_buf_size),
-				current_length, alpha
+				current_length, alpha,
 				local_dist_buf);
 		__syncthreads();
 		for(point_i_t ref_i = 0; ref_i < current_length; ref_i++)

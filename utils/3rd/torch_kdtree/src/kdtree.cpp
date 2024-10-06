@@ -114,7 +114,8 @@ template
 void compQuadrDistNode(const std::array<T, dims>& point, const Partition<T>* partitions, const PartitionLeaf<T, dims>* leaves,
                                 const tree_ind_t lin_ind,
                                     std::vector<T>& best_dists, std::vector<point_i_knn_t>& best_idx,
-                                    const int current_level, const std::array<T, dims>& point_proj, const point_i_knn_t nr_nns_searches)
+                                    const int current_level, const std::array<T, dims>& point_proj,
+                                    const point_i_knn_t nr_nns_searches)
 {
     const auto& partition = partitions[lin_ind];
     dim_t current_axis = partition.axis_split;
@@ -122,14 +123,14 @@ void compQuadrDistNode(const std::array<T, dims>& point, const Partition<T>* par
 
     if(current_level == 0)
     {
-        const PartitionLeaf<T, dims>& partition_leaf_first = (lower_than_median ? 
-                                                leaves[TreeTraversal<T, dims>::compLeftLeafInd(lin_ind)] : 
+        const PartitionLeaf<T, dims>& partition_leaf_first = (lower_than_median ?
+                                                leaves[TreeTraversal<T, dims>::compLeftLeafInd(lin_ind)] :
                                                 leaves[TreeTraversal<T, dims>::compRightLeafInd(lin_ind)]);
         compQuadrDistLeafPartition<T, T_calc, dims>(point, partition_leaf_first, best_dists, best_idx, nr_nns_searches);
         if(partitionNecessary<T, T_calc, dims>(point, point_proj, partition, best_dists.back()))
         {
-            const PartitionLeaf<T, dims>& partition_leaf_second = (!lower_than_median ? 
-                                                leaves[TreeTraversal<T, dims>::compLeftLeafInd(lin_ind)] : 
+            const PartitionLeaf<T, dims>& partition_leaf_second = (!lower_than_median ?
+                                                leaves[TreeTraversal<T, dims>::compLeftLeafInd(lin_ind)] :
                                                 leaves[TreeTraversal<T, dims>::compRightLeafInd(lin_ind)]);
             compQuadrDistLeafPartition<T, T_calc, dims>(point, partition_leaf_second, best_dists, best_idx, nr_nns_searches);
         }
@@ -137,7 +138,7 @@ void compQuadrDistNode(const std::array<T, dims>& point, const Partition<T>* par
     else
     {
         const tree_ind_t left_child_ind = TreeTraversal<T, dims>::compLeftChildInd(lin_ind), right_child_ind = TreeTraversal<T, dims>::compRightChildInd(lin_ind);
-        compQuadrDistNode<T, T_calc, dims>(point, partitions, leaves, lower_than_median ? left_child_ind : right_child_ind, 
+        compQuadrDistNode<T, T_calc, dims>(point, partitions, leaves, lower_than_median ? left_child_ind : right_child_ind,
 					best_dists, best_idx, current_level-1, point_proj, nr_nns_searches);
 
         if(partitionNecessary<T, T_calc, dims>(point, point_proj, partition, best_dists.back()))
@@ -148,7 +149,7 @@ void compQuadrDistNode(const std::array<T, dims>& point, const Partition<T>* par
             best_dists, best_idx, current_level-1,
                                point_proj_new, nr_nns_searches);
         }
-    }    
+    }
 }
 
 template
@@ -164,8 +165,9 @@ void compQuadrDistNode(const std::array<T, dims>& point, const std::vector<Parti
 template
 <typename T, typename T_calc, dim_t dims>
 void KDTreeKNNSearch(PartitionInfo<T, dims>& partition_info,
-                    const point_i_t nr_query, 
-                    const std::array<T, dims>* points_query, T * dist, point_i_knn_t* idx, const point_i_knn_t nr_nns_searches)
+                    const point_i_t nr_query,
+                    const std::array<T, dims>* points_query, T * dist, point_i_knn_t* idx,
+                    const point_i_knn_t nr_nns_searches, const float alpha)
 {
     const auto levels = partition_info.levels;
     const auto& partitions = partition_info.partitions;
@@ -176,7 +178,7 @@ void KDTreeKNNSearch(PartitionInfo<T, dims>& partition_info,
         const std::array<T, dims> query_point = points_query[query_i];
 		std::vector<T_calc> best_dists(nr_nns_searches, std::numeric_limits<T_calc>::infinity());
 		std::vector<point_i_knn_t> best_i(nr_nns_searches, 0);
-    
+
         searchKDTreeIteratively<T, T_calc, dims>(query_point, partition_info, best_dists, best_i, nr_nns_searches);
 
         #ifndef NDEBUG
@@ -194,28 +196,28 @@ void KDTreeKNNSearch(PartitionInfo<T, dims>& partition_info,
 }
 
 template void KDTreeKNNSearch<float, float, 3>(PartitionInfo<float, 3>& partition_info,
-                    const point_i_t nr_query, 
-                    const std::array<float, 3>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+                    const point_i_t nr_query,
+                    const std::array<float, 3>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template void KDTreeKNNSearch<double, double, 3>(PartitionInfo<double, 3>& partition_info,
-                    const point_i_t nr_query, 
-                    const std::array<double, 3>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+                    const point_i_t nr_query,
+                    const std::array<double, 3>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template void KDTreeKNNSearch<float, float, 2>(PartitionInfo<float, 2>& partition_info,
-                    const point_i_t nr_query, 
-                    const std::array<float, 2>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+                    const point_i_t nr_query,
+                    const std::array<float, 2>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template void KDTreeKNNSearch<double, double, 2>(PartitionInfo<double, 2>& partition_info,
-                    const point_i_t nr_query, 
-                    const std::array<double, 2>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+                    const point_i_t nr_query,
+                    const std::array<double, 2>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template void KDTreeKNNSearch<float, float, 1>(PartitionInfo<float, 1>& partition_info,
-                    const point_i_t nr_query, 
-                    const std::array<float, 1>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+                    const point_i_t nr_query,
+                    const std::array<float, 1>* points_query, float * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template void KDTreeKNNSearch<double, double, 1>(PartitionInfo<double, 1>& partition_info,
-                    const point_i_t nr_query, 
-                    const std::array<double, 1>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches);
+                    const point_i_t nr_query,
+                    const std::array<double, 1>* points_query, double * dist, point_i_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 
 template <typename T, dim_t dims, bool delete_partitions>
 PartitionInfo<T, dims, delete_partitions>::PartitionInfo(std::vector<Partition<T>>&& parts, std::vector<PartitionLeaf<T, dims>>&& leaves_, point_i_t* shuffled_inds_, const point_i_t nr_points_) : 

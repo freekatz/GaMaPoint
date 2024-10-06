@@ -98,8 +98,10 @@ struct KDTree
                                                 .def(py::init<py::array_t<T>, int>(), py::arg("points_ref"), py::arg("levels")) \
                                                 .def("get_shuffled_inds", &KDTree<T, dims, use_gpu>::get_shuffled_inds, "Returns the shuffled indices to translate from local to global indices") \
                                                 .def("get_structured_points", &KDTree<T, dims, use_gpu>::get_structured_points, "Returns the ordered points how they are used in the KD-Tree") \
+                                                .def("query_recast", &KDTree<T, dims, use_gpu>::query, py::arg("points_query"), py::arg("nr_query_points"), py::arg("nr_nns_searches"), \
+                                                                                                py::arg("alpha"), py::arg("dist_arr"), py::arg("knn_idx")) \
                                                 .def("query", &KDTree<T, dims, use_gpu>::query, py::arg("points_query_ptr"), py::arg("nr_query_points"), py::arg("nr_nns_searches"), \
-                                                                                                py::arg("dist_arr_ptr"), py::arg("knn_idx_ptr")), \
+                                                                                                py::arg("alpha"), py::arg("dist_arr_ptr"), py::arg("knn_idx_ptr")), \
                                                                                                 "Queries the KNN from the KD-Tree and puts the results in the array pointed to by dist_arr_ptr and knn_idx_ptr")
 
 bool check_for_gpu()
@@ -125,15 +127,16 @@ PYBIND11_MODULE(torch_knn, mod) {
            check_for_gpu
     )pbdoc";
 
-    KDTREE_INSTANTIATION(float, 3+16, false, "KDTreeCPU19DF");
-    KDTREE_INSTANTIATION(double,3+16, false, "KDTreeCPU19D");
-    KDTREE_INSTANTIATION(float, 3+16, true, "KDTreeGPU19DF");
-    KDTREE_INSTANTIATION(double, 3+16, true, "KDTreeGPU19D");
+    KDTREE_INSTANTIATION(float, 19, false, "KDTreeCPU19DF");
+    KDTREE_INSTANTIATION(double, 19, false, "KDTreeCPU19D");
+    KDTREE_INSTANTIATION(float, 19, true, "KDTreeGPU19DF");
+    KDTREE_INSTANTIATION(double, 19, true, "KDTreeGPU19D");
 
-    KDTREE_INSTANTIATION(float, 3+32, false, "KDTreeCPU35DF");
-    KDTREE_INSTANTIATION(double, 3+32, false, "KDTreeCPU35D");
-    KDTREE_INSTANTIATION(float, 3+32, true, "KDTreeGPU35DF");
-    KDTREE_INSTANTIATION(double, 3+32, true, "KDTreeGPU35D");
+    KDTREE_INSTANTIATION(float, 35, false, "KDTreeCPU35DF");
+    KDTREE_INSTANTIATION(double, 35, false, "KDTreeCPU35D");
+    KDTREE_INSTANTIATION(float, 35, true, "KDTreeGPU35DF");
+    KDTREE_INSTANTIATION(double, 35, true, "KDTreeGPU35D");
+
 
     KDTREE_INSTANTIATION(float, 3, false, "KDTreeCPU3DF");
     KDTREE_INSTANTIATION(double, 3, false, "KDTreeCPU3D");

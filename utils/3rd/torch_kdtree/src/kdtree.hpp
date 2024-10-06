@@ -755,5 +755,5 @@ template
 <typename T, typename T_calc, dim_t dims>
 void KDTreeKNNSearch(PartitionInfo<T, dims>& partition_info,
                     const point_i_t nr_query, 
-                    const std::array<T, dims>* points_query, T * dist, point_i_knn_t* idx, const point_i_knn_t nr_nns_searches);
+                    const std::array<T, dims>* points_query, T * dist, point_i_knn_t* idx, const point_i_knn_t nr_nns_searches, const float alpha);
 

@@ -4,12 +4,11 @@ import torch
 from einops import repeat
 from pytorch3d.ops import sample_farthest_points
 from torch import nn
-from torch_kdtree import build_kd_tree
 
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
-from backbone.ops.neighbors import build_tree, build_dist_fn, knn
+from backbone.ops.kdtree import KDTree
 from utils.cutils import grid_subsampling
 
 
@@ -518,17 +517,18 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
             idx_ds.append(ds_idx)
 
         # group
-        pc = torch.cat([p, visible.squeeze(1)], dim=-1)
         k = ks[i]
         # k_gs = ks_gs[i]
-        kdt = build_kd_tree(pc)
+        kdt = KDTree(p, visible, alpha=0.2)
         # kdt_gs = build_kd_tree(p_gs)
-        idx_group.append(kdt.query(pc, nr_nns_searches=k, alpha=0.2)[1].long())
+        _, idx = kdt.query(p, visible, k=k)
+        idx_group.append(torch.from_numpy(idx).long())
         # idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k_gs)[1].long())
 
         # up sample
         if i > 0 and up_sample:
-            us_idx = kdt.query(torch.cat([gs_points.p, gs_points.visible.squeeze(1)], dim=-1), 1)[1].squeeze(-1)
+            _, us_idx = kdt.query(gs_points.p, gs_points.visible.squeeze(1), k=1)
+            idx_group.append(torch.from_numpy(us_idx.squeeze(-1)).long())
             idx_us.append(us_idx)
 
     gs_points.__update_attr__('idx_ds', idx_ds)
