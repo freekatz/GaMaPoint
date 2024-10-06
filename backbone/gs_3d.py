@@ -485,7 +485,7 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
     n_layers = len(ks)
     p = gs_points.p
     p = points_scaler(p.unsqueeze(0), scale=1.0).squeeze(0)
-    visible = gs_points.visible
+    visible = gs_points.visible.squeeze(1)
 
 
     # gs_points.apply_index(idx)
