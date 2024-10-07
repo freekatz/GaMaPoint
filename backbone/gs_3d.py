@@ -5,9 +5,9 @@ from einops import repeat
 from pytorch3d.ops import sample_farthest_points
 from torch import nn
 
-from backbone.ops import points_centroid, points_scaler
-from backbone.ops.camera import OrbitCamera
-from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
+from utils.point_utils import points_centroid, points_scaler
+from utils.camera import OrbitCamera
+from utils.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from pykdtree.kdtree import KDTree
 from utils.cutils import grid_subsampling
 
