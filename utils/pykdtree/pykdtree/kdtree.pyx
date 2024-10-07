@@ -113,6 +113,8 @@ cdef class KDTree:
         # Get data content
         cdef np.ndarray[float, ndim=1] data_array_float
         cdef np.ndarray[double, ndim=1] data_array_double
+        cdef np.ndarray[float, ndim=1] code_float
+        cdef np.ndarray[double, ndim=1] code_double
 
         if data_pts.dtype == np.float32:
             data_array_float = np.ascontiguousarray(data_pts.ravel(), dtype=np.float32)
@@ -222,8 +224,12 @@ cdef class KDTree:
         # Get query points data
         cdef np.ndarray[float, ndim=1] query_array_float
         cdef np.ndarray[double, ndim=1] query_array_double
+        cdef np.ndarray[float, ndim=1] query_code_float
+        cdef np.ndarray[double, ndim=1] query_code_double
         cdef float *query_array_data_float
         cdef double *query_array_data_double
+        cdef float *query_code_float_data
+        cdef double *query_code_double_data
         cdef np.ndarray[np.uint8_t, ndim=1] query_mask
         cdef np.uint8_t *query_mask_data
 
