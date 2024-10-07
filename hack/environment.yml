@@ -1,4 +1,4 @@
-name: gama_points
+name: mtxai
 channels:
   - pytorch
   - nvidia

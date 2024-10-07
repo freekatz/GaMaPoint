@@ -10,7 +10,7 @@ cd $PWD
 # activate env
 source activate
 conda deactivate
-conda activate gama_points
+conda activate mtxai
 
 # setup packages
 pip install --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/Triton-Nightly/pypi/simple/ triton-nightly
