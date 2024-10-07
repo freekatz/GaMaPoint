@@ -1,8 +1,37 @@
 import torch
-import torch.nn.functional as F
-from einops import rearrange
-depths = torch.tensor([[0., 2., 3., 0.2], [1.1, 2., 0., 4.]])
-print(depths.shape)
-visible = (depths != 0).int()
-print(visible, visible.shape)
+from pykdtree.kdtree import KDTree
 
+xyz = torch.randn((200, 3))
+xyz_c = xyz.clone()
+xyz = xyz.detach().numpy()
+visible = torch.randn(200, 16)
+# visible = (visible != 0).int()
+visible = visible.detach().numpy()
+import time
+start_time = time.time()
+kd_tree = KDTree(xyz, visible, alpha=0)
+dist, idx = kd_tree.query(xyz, visible, k=8)
+dist = torch.from_numpy(dist)
+idx = torch.from_numpy(idx).long()
+xyz = torch.from_numpy(xyz)
+visible = torch.from_numpy(visible)
+end_time = time.time()
+print(end_time - start_time)
+print(dist.shape, idx.shape)
+print(dist)
+print(idx)
+
+xyz_c = xyz_c.detach().numpy()
+visible = visible.detach().numpy()
+start_time = time.time()
+kd_tree = KDTree(xyz_c, visible, alpha=0.2)
+dist, idx = kd_tree.query(xyz_c, visible, k=8)
+dist = torch.from_numpy(dist)
+idx = torch.from_numpy(idx).long()
+xyz_c = torch.from_numpy(xyz_c)
+visible = torch.from_numpy(visible)
+end_time = time.time()
+print(end_time - start_time)
+print(dist.shape, idx.shape)
+print(dist)
+print(idx)

@@ -8,7 +8,7 @@ from torch import nn
 from backbone.ops import points_centroid, points_scaler
 from backbone.ops.camera import OrbitCamera
 from backbone.ops.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
-from backbone.ops.kdtree import KDTree
+from pykdtree.kdtree import KDTree
 from utils.cutils import grid_subsampling
 
 
@@ -486,6 +486,8 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
     p = gs_points.p
     p = points_scaler(p.unsqueeze(0), scale=1.0).squeeze(0)
     visible = gs_points.visible.squeeze(1)
+    full_p = gs_points.p.detach().cpu().numpy()
+    full_visible = gs_points.visible.squeeze(1).detach().cpu().numpy()
 
 
     # gs_points.apply_index(idx)
@@ -519,15 +521,17 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
         # group
         k = ks[i]
         # k_gs = ks_gs[i]
-        kdt = KDTree(p, visible, alpha=0.2)
+        _p = p.detach().cpu().numpy()
+        _v = visible.detach().cpu().numpy()
+        kdt = KDTree(_p, _v, alpha=0.)
         # kdt_gs = build_kd_tree(p_gs)
-        _, idx = kdt.query(p, visible, k=k)
+        _, idx = kdt.query(_p, _v, k=k)
         idx_group.append(torch.from_numpy(idx).long())
         # idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k_gs)[1].long())
 
         # up sample
         if i > 0 and up_sample:
-            _, us_idx = kdt.query(gs_points.p, gs_points.visible.squeeze(1), k=1)
+            _, us_idx = kdt.query(full_p, full_visible, k=1)
             idx_group.append(torch.from_numpy(us_idx.squeeze(-1)).long())
             idx_us.append(us_idx)
 
