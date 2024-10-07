@@ -89,7 +89,7 @@ cdef class KDTree:
     cdef float *_data_pts_data_float
     cdef double *_data_pts_data_double
     cdef float *_code_float_data
-    cdef float *_code_double_data
+    cdef double *_code_double_data
     cdef readonly uint32_t n
     cdef readonly int8_t ndim
     cdef readonly int8_t ndim_code
