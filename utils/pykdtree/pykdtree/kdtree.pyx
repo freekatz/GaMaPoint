@@ -124,11 +124,11 @@ cdef class KDTree:
             self.data_pts = data_array_double
 
         if code.dtype == np.float32:
-            cdef np.ndarray code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
+            code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
             self._code_float_data = <float *> code_float.data
             self.code = code_float
         else:
-            cdef np.ndarray code_double = np.ascontiguousarray(code.ravel(), dtype=np.float64)
+            code_double = np.ascontiguousarray(code.ravel(), dtype=np.float64)
             self._code_double_data = <double *> code_double.data
             self.code = code_double
 
@@ -249,10 +249,10 @@ cdef class KDTree:
             query_array_data_double = <double *> query_array_double.data
 
         if query_code.dtype == np.float32 and self.code.dtype == np.float32:
-            cdef np.ndarray query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
+            query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
             query_code_float_data = <float *> query_code_float.data
         else:
-            cdef np.ndarray query_code_double = np.ascontiguousarray(query_code.ravel(), dtype=np.float64)
+            query_code_double = np.ascontiguousarray(query_code.ravel(), dtype=np.float64)
             query_code_double_data = <double *> query_code_double.data
 
         # Setup distance_upper_bound
