@@ -65,8 +65,7 @@ cdef extern void search_tree_float(tree_float *kdtree, float *pa, float *code, f
                                    uint8_t *mask, uint32_t *closest_idxs, float *closest_dists) nogil
 cdef extern void delete_tree_float(tree_float *kdtree)
 
-cdef extern tree_double * construct_tree_double(double *pa, float *code, int8_t no_dims, int8_t code_dims, uint32_t n,
-                                                float alpha, uint32_t bsp) nogil
+cdef extern tree_double * construct_tree_double(double *pa, float *code, int8_t no_dims, int8_t code_dims, uint32_t n, uint32_t bsp) nogil
 cdef extern void search_tree_double(tree_double *kdtree, double *pa, float *code, double *point_coords,
                                     float *query_code, uint32_t num_points, uint32_t k, double distance_upper_bound, double alpha,
                                     double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists) nogil
@@ -91,8 +90,7 @@ cdef class KDTree:
     cdef readonly np.ndarray data
     cdef float *_data_pts_data_float
     cdef double *_data_pts_data_double
-    cdef float *_code_float_data
-    cdef double *_code_double_data
+    cdef float *_code_data
     cdef readonly uint32_t n
     cdef readonly int8_t ndim
     cdef readonly int8_t ndim_code
@@ -127,15 +125,9 @@ cdef class KDTree:
             self._data_pts_data_double = <double *> data_array_double.data
             self.data_pts = data_array_double
 
-        if code.dtype == np.float32:
-            code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
-            self._code_float_data = <float *> code_float.data
-            self.code = code_float
-        else:
-            code_double = np.ascontiguousarray(code.ravel(), dtype=np.float64)
-            self._code_double_data = <double *> code_double.data
-            self.code = code_double
-
+        code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
+        self._code_data = <float *> code_float.data
+        self.code = code_float
 
         # scipy interface compatibility
         self.data = self.data_pts
@@ -154,11 +146,11 @@ cdef class KDTree:
         # Release GIL and construct tree
         if data_pts.dtype == np.float32:
             with nogil:
-                self._kdtree_float = construct_tree_float(self._data_pts_data_float, self._code_float_data, self.ndim,
+                self._kdtree_float = construct_tree_float(self._data_pts_data_float, self._code_data, self.ndim,
                                                           self.ndim_code, self.n, self.leafsize)
         else:
             with nogil:
-                self._kdtree_double = construct_tree_double(self._data_pts_data_double, self._code_double_data,
+                self._kdtree_double = construct_tree_double(self._data_pts_data_double,self._code_data,
                                                             self.ndim, self.ndim_code, self.n,  self.leafsize)
 
     def query(KDTree self, np.ndarray query_pts not None, np.ndarray query_code not None, k=1, alpha=0.0, eps=1e-12,
