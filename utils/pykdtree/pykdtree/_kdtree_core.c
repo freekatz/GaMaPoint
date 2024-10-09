@@ -584,9 +584,9 @@ Params:
     closest_idx : index of closest data point found (return)
     closest_dist : distance to closest point (return)
 ************************************************/
-void search_leaf_float(float *restrict pa, double *restrict code, uint32_t *restrict pidx, int8_t no_dims, int8_t code_dims, uint32_t start_idx, uint32_t n,
-                double *restrict point_coord, float *restrict query_code,
-                 uint32_t k, double alpha, uint32_t *restrict closest_idx, float *restrict closest_dist)
+void search_leaf_float(float *restrict pa, float *restrict code, uint32_t *restrict pidx, int8_t no_dims, int8_t code_dims, uint32_t start_idx, uint32_t n,
+                float *restrict point_coord, float *restrict query_code,
+                 uint32_t k, float alpha, uint32_t *restrict closest_idx, float *restrict closest_dist)
 {
     float cur_dist;
     uint32_t i;
@@ -1406,8 +1406,8 @@ Params:
     closest_idx : index of closest data point found (return)
     closest_dist : distance to closest point (return)
 ************************************************/
-void search_tree_double(Tree_double *tree, double *pa, float *code, double *point_coords, float *query_code,
-                 uint32_t num_points, uint32_t k, double distance_upper_bound, float alpha,
+void search_tree_double(Tree_double *tree, double *pa, double *code, double *point_coords, double *query_code,
+                 uint32_t num_points, uint32_t k, double distance_upper_bound, double alpha,
                  double eps, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists)
 {
     double min_dist;
