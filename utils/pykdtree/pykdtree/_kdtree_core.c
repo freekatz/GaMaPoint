@@ -1416,5 +1416,3 @@ void search_tree_double(Tree_float *tree, double *pa, double *code, double *poin
         }
     }
 }
-
-C笔记
