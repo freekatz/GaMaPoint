@@ -569,7 +569,7 @@ Params:
     closest_dist : distance to closest point (return)
 ************************************************/
 void search_leaf_float(float *restrict pa, uint32_t *restrict pidx, float *restrict code, int8_t no_dims, uint32_t start_idx, uint32_t n, float *restrict point_coord,
-                            int8_t code_dims, float *restrict query_code, uint32_t k, float alpha, uint32_t *restrict closest_idx, float *restrict closest_dist);
+                            int8_t code_dims, float *restrict query_code, uint32_t k, float alpha, uint32_t *restrict closest_idx, float *restrict closest_dist)
 {
     float cur_dist;
     uint32_t i;
