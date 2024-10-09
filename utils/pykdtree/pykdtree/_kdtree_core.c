@@ -75,8 +75,6 @@ typedef struct
     double *bbox;
     int8_t no_dims;
     int8_t code_dims;
-    float *code;
-    float alpha;
     uint32_t *pidx;
     struct Node_double *root;
 } Tree_double;
