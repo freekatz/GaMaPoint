@@ -177,25 +177,25 @@ class MixerModel(nn.Module):
             )
             self.layers_name[f'{i}_block_1'] = layer_name
 
-            block, block_type = create_block(
-                d_model,
-                d_intermediate=d_intermediate,
-                ssm_cfg=ssm_cfg,
-                attn_layer_idx=attn_layer_idx,
-                attn_cfg=attn_cfg,
-                norm_epsilon=norm_epsilon,
-                rms_norm=rms_norm,
-                residual_in_fp32=residual_in_fp32,
-                fused_add_norm=fused_add_norm,
-                layer_idx=layer_idx,
-                **factory_kwargs,
-            )
-            layer_name = f'layer_{i}_{layer_idx}_{block_type}_2'
-            self.layers.add_module(
-                layer_name,
-                block
-            )
-            self.layers_name[f'{i}_block_2'] = layer_name
+            # block, block_type = create_block(
+            #     d_model,
+            #     d_intermediate=d_intermediate,
+            #     ssm_cfg=ssm_cfg,
+            #     attn_layer_idx=attn_layer_idx,
+            #     attn_cfg=attn_cfg,
+            #     norm_epsilon=norm_epsilon,
+            #     rms_norm=rms_norm,
+            #     residual_in_fp32=residual_in_fp32,
+            #     fused_add_norm=fused_add_norm,
+            #     layer_idx=layer_idx,
+            #     **factory_kwargs,
+            # )
+            # layer_name = f'layer_{i}_{layer_idx}_{block_type}_2'
+            # self.layers.add_module(
+            #     layer_name,
+            #     block
+            # )
+            # self.layers_name[f'{i}_block_2'] = layer_name
 
         self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(
             d_model, eps=norm_epsilon, **factory_kwargs
