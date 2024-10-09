@@ -1,6 +1,4 @@
 Cython
-cumm-cu118
-spconv-cu118
 easydict
 einops
 h5py
