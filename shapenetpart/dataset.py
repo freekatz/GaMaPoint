@@ -202,6 +202,7 @@ class ShapeNetPartNormal(Dataset):
         jitter = torch.empty_like(xyz).normal_(std=0.001)
         xyz += jitter
 
+        xyz -= xyz.min(dim=0)[0]
         height = xyz[:, 2:] / 10
         height -= height.min(dim=0, keepdim=True)[0]
         if self.train:
@@ -228,6 +229,7 @@ class ShapeNetPartNormal(Dataset):
         shape = self.shape[idx]
         seg = self.seg[idx]
 
+        xyz -= xyz.min(dim=0)[0]
         height = xyz[:, 2:] / 10
         height -= height.min(dim=0, keepdim=True)[0]
         norm = torch.cat([norm, height], dim=-1)

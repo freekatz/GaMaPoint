@@ -57,6 +57,7 @@ class ModelNet40(Dataset):
 
         xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
         xyz = xyz.squeeze(0)
+        xyz -= xyz.min(dim=0)[0]
         height = xyz[:, 2:] * 4
         height -= height.min(dim=0, keepdim=True)[0]
         if self.train:
