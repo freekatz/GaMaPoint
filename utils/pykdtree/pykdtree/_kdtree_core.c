@@ -98,7 +98,7 @@ void search_leaf_float(float *restrict pa, uint32_t *restrict pidx, float *restr
 void search_leaf_float_mask(float *restrict pa, uint32_t *restrict pidx, float *restrict code, int8_t no_dims, uint32_t start_idx, uint32_t n, float *restrict point_coord,
                             int8_t code_dims, float *restrict query_code, uint32_t k, float alpha, uint8_t *mask, uint32_t *restrict closest_idx, float *restrict closest_dist);
 void search_splitnode_float(Node_float *root, float *pa, uint32_t *pidx, float *code, int8_t no_dims, float *point_coord, int8_t code_dims,
-                      float *query_code, float min_dist, uint32_t k, float alpha, float distance_upper_bound, float eps_fac, uint8_t *mask, uint32_t *  closest_idx, float *closest_dist);
+                      float *query_code, float min_dist, uint32_t k, float alpha, float distance_upper_bound, float eps, uint8_t *mask, uint32_t *  closest_idx, float *closest_dist);
 void search_tree_float(Tree_float *tree, float *pa, float *code, float *point_coords, float *query_code,
                        uint32_t num_points, uint32_t k, float alpha, int8_t code_dims, float distance_upper_bound,
                        float eps_fac, uint8_t *mask, uint32_t *closest_idxs, float *closest_dists);
@@ -119,11 +119,11 @@ double get_cube_offset_double(int8_t dim, double *point_coord, double *bbox);
 double get_min_dist_double(double *point_coord, int8_t no_dims, double *bbox);
 void search_leaf_double(double *restrict pa, uint32_t *restrict pidx, double *restrict code, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
                             int8_t code_dims, double *restrict query_code, uint32_t k, float alpha, uint32_t *restrict closest_idx, double *restrict closest_dist);
-void search_leaf_double_mask(float *restrict pa, uint32_t *restrict pidx, double *restrict code, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
+void search_leaf_double_mask(double *restrict pa, uint32_t *restrict pidx, double *restrict code, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
                             int8_t code_dims, double *restrict query_code, uint32_t k, float alpha, uint8_t *mask, uint32_t *restrict closest_idx, double *restrict closest_dist);
-void search_splitnode_double(Node_float *root, double *pa, uint32_t *pidx, double *code, int8_t no_dims, double *point_coord, int8_t code_dims,
-                      double *query_code, double min_dist, uint32_t k, float alpha, double distance_upper_bound, double eps_fac, uint8_t *mask, uint32_t *  closest_idx, double *closest_dist);
-void search_tree_double(Tree_float *tree, double *pa, double *code, double *point_coords, double *query_code,
+void search_splitnode_double(Node_double *root, double *pa, uint32_t *pidx, double *code, int8_t no_dims, double *point_coord, int8_t code_dims,
+                      double *query_code, double min_dist, uint32_t k, float alpha, double distance_upper_bound, double eps, uint8_t *mask, uint32_t *  closest_idx, double *closest_dist);
+void search_tree_double(Tree_double *tree, double *pa, double *code, double *point_coords, double *query_code,
                        uint32_t num_points, uint32_t k, float alpha, int8_t code_dims, double distance_upper_bound,
                        double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists);
 
@@ -1245,7 +1245,7 @@ Params:
     closest_idx : index of closest data point found (return)
     closest_dist : distance to closest point (return)
 ************************************************/
-void search_leaf_double_mask(float *restrict pa, uint32_t *restrict pidx, double *restrict code, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
+void search_leaf_double_mask(double *restrict pa, uint32_t *restrict pidx, double *restrict code, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
                             int8_t code_dims, double *restrict query_code, uint32_t k, float alpha, uint8_t *mask, uint32_t *restrict closest_idx, double *restrict closest_dist)
 {
     double cur_dist;
