@@ -488,6 +488,12 @@ void print_tree_float(Node_float *root, int level)
         print_tree_float((Node_float *)root->right_child, level + 1);
 }
 
+float dot_product_float(float A[], float B[], int n) { float result = 0; for (int i = 0; i < n; i++) { result += A[i] * B[i]; } return result; }
+
+float vector_length_float(float A[], int n) { float result = 0; for (int i = 0; i < n; i++) { result += A[i] * A[i]; } return sqrt(result); }
+
+float cosine_similarity_float(float A[], float B[], int n) { return dot_product_float(A, B, n) / (vector_length_float(A, n) * vector_length_float(B, n)); }
+
 /************************************************
 Calculate squared cartesian distance between points
 Params:
@@ -497,12 +503,30 @@ Params:
 float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, float *code2, int8_t no_dims, int8_t code_dims, float alpha)
 {
     /* Calculate squared distance */
-    float dist = 0, dim_dist;
-    int8_t i;
-    for (i = 0; i < no_dims; i++)
-    {
-        dim_dist = point2_coord[i] - point1_coord[i];
-        dist += dim_dist * dim_dist;
+    float dist1 = 0, dim_dist;
+    if (alpha >= 0) {
+        int8_t i;
+        for (i = 0; i < no_dims; i++)
+        {
+            dim_dist = point2_coord[i] - point1_coord[i];
+            dist1 += dim_dist * dim_dist;
+        }
+    }
+    float dist2 = 0;
+    if (alpha != 0) {
+        int8_t j;
+        for (j = 0; j < code_dims; j++)
+        {
+            dist2 += abs(code2[j] - code1[j]);
+        }
+        dist2 = dist2 / code_dims;
+    }
+//    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
+    float dist = 0;
+    if (alpha >= 0) {
+        dist = dist1 + alpha * dist2;
+    } else {
+        dist = dist2;
     }
     return dist;
 }
@@ -1133,6 +1157,12 @@ void print_tree_double(Node_double *root, int level)
         print_tree_double((Node_double *)root->right_child, level + 1);
 }
 
+double dot_product_double(double A[], double B[], int n) { double result = 0; for (int i = 0; i < n; i++) { result += A[i] * B[i]; } return result; }
+
+double vector_length_double(double A[], int n) { double result = 0; for (int i = 0; i < n; i++) { result += A[i] * A[i]; } return sqrt(result); }
+
+double cosine_similarity_double(double A[], double B[], int n) { return dot_product_double(A, B, n) / (vector_length_double(A, n) * vector_length_double(B, n)); }
+
 /************************************************
 Calculate squared cartesian distance between points
 Params:
@@ -1142,14 +1172,31 @@ Params:
 double calc_dist_double(double *point1_coord, double *code1, double *point2_coord, double *code2, int8_t no_dims, int8_t code_dims, float alpha)
 {
     /* Calculate squared distance */
-    double dist = 0, dim_dist;
-    int8_t i;
-    for (i = 0; i < no_dims; i++)
-    {
-        dim_dist = point2_coord[i] - point1_coord[i];
-        dist += dim_dist * dim_dist;
+    double dist1 = 0, dim_dist;
+    if (alpha >= 0) {
+        int8_t i;
+        for (i = 0; i < no_dims; i++)
+        {
+            dim_dist = point2_coord[i] - point1_coord[i];
+            dist1 += dim_dist * dim_dist;
+        }
     }
-    return dist;
+    double dist2 = 0;
+    if (alpha != 0) {
+        int8_t j;
+        for (j = 0; j < code_dims; j++)
+        {
+            dist2 += abs(code2[j] - code1[j]);
+        }
+        dist2 = dist2 / code_dims;
+    }
+//    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
+    double dist = 0;
+    if (alpha >= 0) {
+        dist = dist1 + alpha * dist2;
+    } else {
+        dist = dist2;
+    }
 }
 
 /************************************************
