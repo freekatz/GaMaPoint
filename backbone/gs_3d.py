@@ -432,17 +432,14 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
     assert (grid_size is not None and strides is not None) is False
     assert (grid_size is None and strides is None) is False
     n_layers = len(ks)
-    p = gs_points.p
-    visible = gs_points.visible.squeeze(1).float()
-    p = points_scaler(p.unsqueeze(0), scale=1.0).squeeze(0)
-    full_p = p.clone()
+    full_p = gs_points.p
+    full_visible = gs_points.visible.squeeze(1).float()
+    p = points_scaler(full_p.unsqueeze(0), scale=1.0).squeeze(0)
     p_pow = (full_p - full_p.min(0)[0]).pow(2).sum(dim=-1)
     scale_max = p_pow.max(0)[0]
     scale_min = p_pow.min(0)[0]
     scaled_alpha = alpha * (scale_max - scale_min)
-
-    full_p = full_p.detach().cpu().numpy()
-    full_visible = gs_points.visible.squeeze(1).float().detach().cpu().numpy()
+    visible = gs_points.visible.squeeze(1).float()
 
     idx_ds = []
     idx_us = []
@@ -469,14 +466,16 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
             idx_ds.append(ds_idx)
 
         # group
+        _p = p.clone()
+        _v = visible.clone()
         k = ks[i]
-        kdt = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy())
-        _, idx = kdt.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=k, alpha=scaled_alpha)
+        kdt = KDTree(_p.numpy(), _v.numpy())
+        _, idx = kdt.query(_p.numpy(), _v.numpy(), k=k, alpha=scaled_alpha)
         idx_group.append(torch.from_numpy(idx).long())
 
         # up sample
         if i > 0 and up_sample:
-            _, us_idx = kdt.query(full_p, full_visible, k=1, alpha=0.)
+            _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1, alpha=0.)
             idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)
