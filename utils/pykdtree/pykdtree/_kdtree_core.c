@@ -128,11 +128,11 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
 double get_cube_offset_double(int8_t dim, double *point_coord, double *bbox);
 double get_min_dist_double(double *point_coord, int8_t no_dims, double *bbox);
 void search_leaf_double(double *restrict pa, double *restrict code, uint32_t *restrict pidx, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
-                 int8_t code_dims, double *restrict query_code, uint32_t k, float alpha, uint32_t *restrict closest_idx, double *restrict closest_dist);
+                 int8_t code_dims, double *restrict query_code, uint32_t k, double alpha, uint32_t *restrict closest_idx, double *restrict closest_dist);
 void search_leaf_double_mask(double *restrict pa, double *restrict code, uint32_t *restrict pidx, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
-                 int8_t code_dims, double *restrict query_code, uint32_t k, float alpha, uint8_t *restrict mask, uint32_t *restrict closest_idx, double *restrict closest_dist);
+                 int8_t code_dims, double *restrict query_code, uint32_t k, double alpha, uint8_t *restrict mask, uint32_t *restrict closest_idx, double *restrict closest_dist);
 void search_splitnode_double(Node_double *root, double *pa, double *code, uint32_t *pidx, int8_t no_dims, double *point_coord,
-                      int8_t code_dims, double *query_code, double min_dist, uint32_t k, float alpha,
+                      int8_t code_dims, double *query_code, double min_dist, uint32_t k, double alpha,
                       double distance_upper_bound, double eps_fac, uint8_t *mask,
                       uint32_t *closest_idx, double *closest_dist);
 void search_tree_double(Tree_double *tree, double *pa, double *code, double *point_coords, double *query_code,
