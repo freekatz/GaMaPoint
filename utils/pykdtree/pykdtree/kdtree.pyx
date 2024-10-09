@@ -36,7 +36,6 @@ cdef struct node_float:
 cdef struct tree_float:
     float *bbox
     int8_t no_dims
-    int8_t code_dims
     uint32_t *pidx
     node_float *root
 
@@ -53,20 +52,19 @@ cdef struct node_double:
 cdef struct tree_double:
     double *bbox
     int8_t no_dims
-    int8_t code_dims
     uint32_t *pidx
     node_double *root
 
-cdef extern tree_float * construct_tree_float(float *pa, int8_t no_dims, int8_t code_dims, uint32_t n, uint32_t bsp) nogil
+cdef extern tree_float * construct_tree_float(float *pa, int8_t no_dims, uint32_t n, uint32_t bsp) nogil
 cdef extern void search_tree_float(tree_float *kdtree, float *pa, float *code, float *point_coords, float *query_code,
-                                   uint32_t num_points, uint32_t k, float alpha, float distance_upper_bound,
+                                   uint32_t num_points, uint32_t k, float alpha, int8_t code_dims, float distance_upper_bound,
                                    float eps_fac, uint8_t *mask, uint32_t *closest_idxs,
                                    float *closest_dists) nogil
 cdef extern void delete_tree_float(tree_float *kdtree)
 
-cdef extern tree_double * construct_tree_double(double *pa, int8_t no_dims, int8_t code_dims, uint32_t n, uint32_t bsp) nogil
+cdef extern tree_double * construct_tree_double(double *pa, int8_t no_dims, uint32_t n, uint32_t bsp) nogil
 cdef extern void search_tree_double(tree_double *kdtree, double *pa, double *code, double *point_coords, double *query_code,
-                                    uint32_t num_points, uint32_t k, double alpha, double distance_upper_bound,
+                                    uint32_t num_points, uint32_t k, float alpha, int8_t code_dims, double distance_upper_bound,
                                     double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists) nogil
 cdef extern void delete_tree_double(tree_double *kdtree)
 
@@ -85,15 +83,16 @@ cdef class KDTree:
     cdef tree_float *_kdtree_float
     cdef tree_double *_kdtree_double
     cdef readonly np.ndarray data_pts
-    cdef readonly np.ndarray code
     cdef readonly np.ndarray data
+    cdef readonly np.ndarray code
+
     cdef float *_data_pts_data_float
     cdef double *_data_pts_data_double
     cdef float *_data_code_data_float
     cdef double *_data_code_data_double
+
     cdef readonly uint32_t n
     cdef readonly int8_t ndim
-    cdef readonly int8_t code_dims
     cdef readonly uint32_t leafsize
 
     def __cinit__(KDTree self):
@@ -140,7 +139,6 @@ cdef class KDTree:
 
         # Get tree info
         self.n = <uint32_t> data_pts.shape[0]
-        self.code_dims = <int8_t> code.shape[1]
         self.leafsize = <uint32_t> leafsize
         if data_pts.ndim == 1:
             self.ndim = 1
@@ -152,16 +150,13 @@ cdef class KDTree:
         # Release GIL and construct tree
         if data_pts.dtype == np.float32:
             with nogil:
-                self._kdtree_float = construct_tree_float(self._data_pts_data_float, self.ndim,
-                                                          self.code_dims, self.n, self.leafsize)
+                self._kdtree_float = construct_tree_float(self._data_pts_data_float, self.ndim, self.n, self.leafsize)
         else:
             with nogil:
-                self._kdtree_double = construct_tree_double(self._data_pts_data_double, self.ndim,
-                                                            self.code_dims, self.n, self.leafsize)
+                self._kdtree_double = construct_tree_double(self._data_pts_data_double, self.ndim, self.n, self.leafsize)
 
     def query(KDTree self, np.ndarray query_pts not None, np.ndarray query_code not None,
-              alpha=0., k=1, eps=0,
-              distance_upper_bound=None, sqr_dists=False, mask=None):
+              alpha=0., k=1, eps=0, distance_upper_bound=None, sqr_dists=False, mask=None):
         """Query the kd-tree for nearest neighbors
 
         :Parameters:
@@ -202,6 +197,8 @@ cdef class KDTree:
         else:
             q_ndim = query_pts.shape[1]
 
+        code_dims = query_code.shape[1]
+
         if self.ndim != q_ndim:
             raise ValueError('Data and query points must have same dimensions')
 
@@ -232,7 +229,6 @@ cdef class KDTree:
         cdef np.ndarray[np.uint8_t, ndim=1] query_mask
         cdef np.uint8_t *query_mask_data
         cdef float alpha_float
-        cdef double alpha_double
 
         if mask is not None and mask.size != self.n:
             raise ValueError('Mask must have the same size as data points')
@@ -258,11 +254,11 @@ cdef class KDTree:
         if query_code.dtype == np.float32 and self.code.dtype == np.float32:
             query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
             query_code_data_float = <float *> query_code_float.data
-            alpha_float = <float> alpha
         else:
             query_code_double = np.ascontiguousarray(query_code.ravel(), dtype=np.float64)
             query_code_data_double = <double *> query_code_double.data
-            alpha_double = <double> alpha
+
+        alpha_float = <float> alpha
 
         # Setup distance_upper_bound
         cdef float dub_float
@@ -286,13 +282,13 @@ cdef class KDTree:
         if self.data_pts.dtype == np.float32:
             with nogil:
                 search_tree_float(self._kdtree_float, self._data_pts_data_float, self._data_code_data_float,
-                                  query_array_data_float, query_code_data_float, num_qpoints, num_n, alpha_float,
+                                  query_array_data_float, query_code_data_float, num_qpoints, num_n, alpha_float, code_dims,
                                   dub_float, epsilon_float, query_mask_data, closest_idxs_data, closest_dists_data_float)
 
         else:
             with nogil:
                 search_tree_double(self._kdtree_double, self._data_pts_data_double, self._data_code_data_double,
-                                   query_array_data_double, query_code_data_double, num_qpoints, num_n, alpha_double,
+                                   query_array_data_double, query_code_data_double, num_qpoints, num_n, alpha_float, code_dims,
                                    dub_double, epsilon_double, query_mask_data, closest_idxs_data, closest_dists_data_double)
 
         # Shape result
