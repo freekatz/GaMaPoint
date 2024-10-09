@@ -97,6 +97,7 @@ class ShapeNetPartNormal(Dataset):
 
         if self.presample_path != '' and not train and os.path.exists(presample_path):
             self.xyz, self.norm, self.shape, self.seg = torch.load(presample_path)
+            self.presample = False
             return
         else:
             self.presample = True

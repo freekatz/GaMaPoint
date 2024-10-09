@@ -242,7 +242,7 @@ def main(cfg):
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
                 val_ins_miou, val_cls_miou, val_ious = validate(
-                    cfg, model, val_loader, epoch, class2parts=train_ds.class2parts
+                    cfg, model, val_loader, epoch, class2parts=presample_ds.class2parts
                 )
             logging.info(f'@E{epoch} val:      '
                          + f'ins_miou={val_ins_miou:.4f} cls_miou={val_cls_miou:.4f}')

@@ -435,12 +435,15 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).float()
-    p = points_scaler(full_p.unsqueeze(0), scale=1.0).squeeze(0)
     p_pow = (full_p - full_p.min(0)[0]).pow(2).sum(dim=-1)
     scale_max = p_pow.max(0)[0]
     scale_min = p_pow.min(0)[0]
     scaled_alpha = alpha * math.sqrt((scale_max - scale_min))
-    visible = gs_points.visible.squeeze(1).float()
+
+    full_p = full_p.contiguous()
+    full_visible = full_visible.contiguous()
+    visible = full_visible
+    p = full_p
 
     idx_ds = []
     idx_us = []
