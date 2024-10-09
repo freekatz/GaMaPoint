@@ -72,7 +72,7 @@ class GaussianPoints(object):
         keys = self.keys()
         for key in keys:
             item = self.__get_attr__(key)
-            if isinstance(self.__get_attr__(key), torch.Tensor):
+            if isinstance(item, torch.Tensor):
                 item = item.cuda(non_blocking=non_blocking)
             if isinstance(item, list):
                 for i in range(len(item)):

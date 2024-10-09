@@ -119,7 +119,21 @@ def main(cfg):
     torch.backends.cudnn.enabled = True
 
     logging.info(f'Config:\n{cfg.__str__()}')
-    train_ds = ShapeNetPartNormal(
+    presample_ds = ShapeNetPartNormal(
+            dataset_dir=cfg.dataset,
+            presample_path=cfg.presample_path,
+            train=False,
+            warmup=False,
+            voxel_max=cfg.shapenetpart_cfg.voxel_max,
+            k=cfg.shapenetpart_cfg.k,
+            strides=cfg.shapenetpart_cfg.strides,
+            alpha=cfg.shapenetpart_cfg.alpha,
+            batch_size=cfg.batch_size,
+            gs_opts=cfg.shapenetpart_cfg.gs_opts
+        )
+    presample_ds.presampling()
+    train_loader = DataLoader(
+        ShapeNetPartNormal(
             dataset_dir=cfg.dataset,
             presample_path=cfg.presample_path,
             train=True,
@@ -130,10 +144,7 @@ def main(cfg):
             alpha=cfg.shapenetpart_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.shapenetpart_cfg.gs_opts
-        )
-    train_ds.presample()
-    train_loader = DataLoader(
-        train_ds,
+        ),
         batch_size=cfg.batch_size,
         collate_fn=shapenetpart_collate_fn,
         shuffle=True,

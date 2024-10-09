@@ -95,9 +95,11 @@ class ShapeNetPartNormal(Dataset):
         self.batch_size = batch_size
         self.gs_opts = gs_opts
 
-        if self.presample_path != '' and not train:
+        if self.presample_path != '' and not train and os.path.exists(presample_path):
             self.xyz, self.norm, self.shape, self.seg = torch.load(presample_path)
             return
+        else:
+            self.presample = True
 
         self.catfile = os.path.join(dataset_dir, 'synsetoffset2category.txt')
         self.cat = {}
@@ -153,7 +155,7 @@ class ShapeNetPartNormal(Dataset):
         self.cache_size = 20000
 
     def __len__(self):
-        if self.train:
+        if self.train or self.presample:
             return len(self.data_paths)
         else:
             return self.xyz.shape[0]
@@ -239,7 +241,7 @@ class ShapeNetPartNormal(Dataset):
                                       alpha=self.alpha)
         return gs, shape
 
-    def presample(self):
+    def presampling(self):
         logging.info(f'Presample start')
         if os.path.exists(self.presample_path):
             logging.info( f'Presample has done, skip')

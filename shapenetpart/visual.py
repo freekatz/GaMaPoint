@@ -13,7 +13,7 @@ if __name__ == '__main__':
     presample_path = './dataset_link/shapenetpart_presample.pt'
     xyz, norm, shape, seg = torch.load(presample_path)
     idx_all = torch.nonzero((shape == 10).int())
-    idx = idx_all[100]
+    idx = idx_all[10]
     p = xyz[idx]
     s = shape[idx]
     print(s)
@@ -29,14 +29,13 @@ if __name__ == '__main__':
     gs.projects(p, cam_seed=1, cam_batch=gs.opt.n_cameras * 2)
 
     visible = gs.gs_points.visible.squeeze(1).float()
-    kdt_1 = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), alpha=0.)
-    _, group_idx_1 = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=64)
+    kdt_1 = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy())
+    _, group_idx_1 = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=132, alpha=0.)
     group_idx_1 = torch.from_numpy(group_idx_1)
 
-    kdt_2 = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), alpha=alpha)
-    _, group_idx_2 = kdt_2.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=64)
+    _, group_idx_2 = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=132, alpha=-alpha)
     group_idx_2 = torch.from_numpy(group_idx_2)
 
     # vis_knn(p, 10, group_idx_1)
-    vis_knn2(p, 64, group_idx_1, group_idx_2, point_size=12)
+    vis_knn2(p, 156, group_idx_1, group_idx_2, point_size=24)
     # vis_knn3(p, 10, group_idx_1, group_idx_2)
