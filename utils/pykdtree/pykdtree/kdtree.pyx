@@ -219,13 +219,11 @@ cdef class KDTree:
         cdef np.ndarray[float, ndim=1] query_code_float
         cdef np.ndarray[double, ndim=1] query_code_double
         cdef float *query_array_data_float
-        cdef double *query_array_data_double
         cdef float *query_code_float_data
         cdef double *query_code_double_data
         cdef np.ndarray[np.uint8_t, ndim=1] query_mask
         cdef np.uint8_t *query_mask_data
         cdef float alpha_float
-        cdef double alpha_double
 
         if mask is not None and mask.size != self.n:
             raise ValueError('Mask must have the same size as data points')
@@ -248,14 +246,9 @@ cdef class KDTree:
             query_array_double = np.ascontiguousarray(query_pts.ravel(), dtype=np.float64)
             query_array_data_double = <double *> query_array_double.data
 
-        if query_code.dtype == np.float32 and self.code.dtype == np.float32:
-            query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
-            query_code_float_data = <float *> query_code_float.data
-            alpha_float = <float> alpha
-        else:
-            query_code_double = np.ascontiguousarray(query_code.ravel(), dtype=np.float64)
-            query_code_double_data = <double *> query_code_double.data
-            alpha_double = <double> alpha
+        query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
+        query_code_float_data = <float *> query_code_float.data
+        alpha_float = <float> alpha
 
         # Setup distance_upper_bound
         cdef float dub_float
@@ -278,15 +271,15 @@ cdef class KDTree:
         # Release GIL and query tree
         if self.data_pts.dtype == np.float32:
             with nogil:
-                search_tree_float(self._kdtree_float, self._data_pts_data_float, self._code_float_data,
+                search_tree_float(self._kdtree_float, self._data_pts_data_float, self._code_data,
                                   query_array_data_float, query_code_float_data, num_qpoints, num_n, dub_float,
                                   alpha_float, epsilon_float, query_mask_data, closest_idxs_data, closest_dists_data_float)
 
         else:
             with nogil:
-                search_tree_double(self._kdtree_double, self._data_pts_data_double, self._code_double_data,
-                                   query_array_data_double, query_code_double_data, num_qpoints, num_n, dub_double,
-                                   alpha_double, epsilon_double, query_mask_data, closest_idxs_data, closest_dists_data_double)
+                search_tree_double(self._kdtree_double, self._data_pts_data_double, self._code_data,
+                                   query_array_data_double, query_code_float_data, num_qpoints, num_n, dub_double,
+                                   alpha_float, epsilon_double, query_mask_data, closest_idxs_data, closest_dists_data_double)
 
         # Shape result
         if k > 1:
