@@ -101,7 +101,7 @@ cdef class KDTree:
         self._kdtree_float = NULL
         self._kdtree_double = NULL
 
-    def __init__(KDTree self, np.ndarray data_pts not None, np.ndarray code not None, double alpha=0.0, int leafsize=16):
+    def __init__(KDTree self, np.ndarray data_pts not None, np.ndarray code not None, int leafsize=16):
 
         # Check arguments
         if leafsize < 1:
@@ -130,12 +130,10 @@ cdef class KDTree:
             code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
             self._code_float_data = <float *> code_float.data
             self.code = code_float
-            self.alpha_float = <float> alpha
         else:
             code_double = np.ascontiguousarray(code.ravel(), dtype=np.float64)
             self._code_double_data = <double *> code_double.data
             self.code = code_double
-            self.alpha_double = <double> alpha
 
 
         # scipy interface compatibility
