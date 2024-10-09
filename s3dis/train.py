@@ -50,7 +50,7 @@ def warmup(cfg, model: nn.Module, warmup_loader):
         target = gs.gs_points.y
         with autocast():
             pred, diff = model(gs)
-            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index)
+            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
         loss.backward()
 
 
@@ -73,11 +73,11 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss).backward()
+            scaler.scale(loss + diff * lam).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = loss
+            loss = loss + diff * lam
             loss.backward()
             optimizer.step()
 
