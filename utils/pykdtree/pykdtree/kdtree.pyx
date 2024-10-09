@@ -55,8 +55,7 @@ cdef struct tree_double:
     uint32_t *pidx
     node_double *root
 
-cdef extern tree_float * construct_tree_float(float *pa, int8_t no_dims, uint32_t n,
-                                              float alpha, uint32_t bsp) nogil
+cdef extern tree_float * construct_tree_float(float *pa, int8_t no_dims, uint32_t n, uint32_t bsp) nogil
 cdef extern void search_tree_float(tree_float *kdtree, float *pa, float *code, float *point_coords, float *query_code,
                                    uint32_t num_points, uint32_t k, int8_t code_dims, float alpha,
                                    float distance_upper_bound, float eps_fac, uint8_t *mask, uint32_t *closest_idxs,
