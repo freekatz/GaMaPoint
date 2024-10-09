@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass, field
 
 import torch
@@ -438,7 +439,7 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
     p_pow = (full_p - full_p.min(0)[0]).pow(2).sum(dim=-1)
     scale_max = p_pow.max(0)[0]
     scale_min = p_pow.min(0)[0]
-    scaled_alpha = alpha * (scale_max - scale_min)
+    scaled_alpha = alpha * math.sqrt((scale_max - scale_min))
     visible = gs_points.visible.squeeze(1).float()
 
     idx_ds = []
