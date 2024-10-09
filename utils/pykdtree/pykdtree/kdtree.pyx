@@ -132,7 +132,7 @@ cdef class KDTree:
             self.code = code_float
         else:
             code_double = np.ascontiguousarray(code.ravel(), dtype=np.float64)
-            self._data_code_data_double = <float *> code_double.data
+            self._data_code_data_double = <double *> code_double.data
             self.code = code_double
 
         # scipy interface compatibility
