@@ -26,11 +26,17 @@ pip install --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_pa
 # pip install causal_conv1d-1.4.0+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 pip install -r $HACK_DIR/requirements.txt
 
-# install eigen
+# setup kdtree cuda extensions
+cd $PWD/backbone/ops/pykdtree
+pip install .
+cd $PWD
+
+
+# install eigen (if setup pykdtree failed)
 sudo apt-get install libeigen3-dev
 sudo ln -s /usr/include/eigen3/Eigen /usr/include/Eigen
 
-# setup openmp
+# setup openmp (if setup pykdtree failed)
 sudo apt-get install cmake autoconf automake libtool flex
 autoreconf -f -i
 mkdir $PWD/tmp
@@ -45,8 +51,3 @@ cd $PWD
 sudo mv $PWD/tmp/openmpi-4.1.6 /usr/local/openmpi
 export PATH="$PATH:/usr/local/openmpi/bin"
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/openmpi/lib"
-
-# setup kdtree cuda extensions
-cd $PWD/backbone/ops/pykdtree
-pip install .
-cd $PWD

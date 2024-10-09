@@ -258,11 +258,11 @@ cdef class KDTree:
         if query_code.dtype == np.float32 and self.code.dtype == np.float32:
             query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
             query_code_float_data = <float *> query_code_float.data
-            alpha_float = alpha
+            alpha_float = <float> alpha
         else:
             query_code_double = np.ascontiguousarray(query_code.ravel(), dtype=np.float64)
             query_code_double_data = <double *> query_code_double.data
-            alpha_double = alpha
+            alpha_double = <double> alpha
 
         # Setup distance_upper_bound
         cdef float dub_float
