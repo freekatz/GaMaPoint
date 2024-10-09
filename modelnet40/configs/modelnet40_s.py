@@ -13,13 +13,12 @@ class ModelNet40Config(EasyConfig):
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024
-    alpha = k[0] / num_points
-    for s in strides:
-        alpha *= s
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120
-
+    alpha = gs_opts.n_cameras * 2 / num_points
+    for s in strides:
+        alpha *= s
 
 class ModelNet40WarmupConfig(EasyConfig):
     name = 'ModelNet40WarmupConfig'
@@ -27,12 +26,12 @@ class ModelNet40WarmupConfig(EasyConfig):
     strides = [1, 4, 4]
     visible_sample_stride = 0.
     num_points = 1024
-    alpha = k[0] / num_points
-    for s in strides:
-        alpha *= s
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120
+    alpha = gs_opts.n_cameras * 2 / num_points
+    for s in strides:
+        alpha *= s
 
 
 class GaMaConfig(EasyConfig):
