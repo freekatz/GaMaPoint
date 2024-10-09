@@ -94,13 +94,14 @@ cdef class KDTree:
     cdef readonly int8_t ndim
     cdef readonly int8_t ndim_code
     cdef readonly uint32_t leafsize
-    cdef readonly float alpha
+    cdef readonly float alpha_float
+    cdef readonly double alpha_double
 
     def __cinit__(KDTree self):
         self._kdtree_float = NULL
         self._kdtree_double = NULL
 
-    def __init__(KDTree self, np.ndarray data_pts not None, np.ndarray code not None, float alpha=0.0, int leafsize=16):
+    def __init__(KDTree self, np.ndarray data_pts not None, np.ndarray code not None, double alpha=0.0, int leafsize=16):
 
         # Check arguments
         if leafsize < 1:
@@ -129,10 +130,13 @@ cdef class KDTree:
             code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
             self._code_float_data = <float *> code_float.data
             self.code = code_float
+            self.alpha_float = <float> alpha
         else:
             code_double = np.ascontiguousarray(code.ravel(), dtype=np.float64)
             self._code_double_data = <double *> code_double.data
             self.code = code_double
+            self.alpha_double = <double> alpha
+
 
         # scipy interface compatibility
         self.data = self.data_pts
@@ -140,7 +144,6 @@ cdef class KDTree:
         # Get tree info
         self.n = <uint32_t> data_pts.shape[0]
         self.leafsize = <uint32_t> leafsize
-        self.alpha = <float> alpha
         if data_pts.ndim == 1:
             self.ndim = 1
         elif data_pts.shape[1] > 127:
@@ -154,12 +157,12 @@ cdef class KDTree:
             with nogil:
                 self._kdtree_float = construct_tree_float(self._data_pts_data_float, self._code_float_data, self.ndim,
                                                           self.ndim_code,
-                                                          self.n, self.alpha, self.leafsize)
+                                                          self.n, self.alpha_float, self.leafsize)
         else:
             with nogil:
                 self._kdtree_double = construct_tree_double(self._data_pts_data_double, self._code_double_data,
                                                             self.ndim, self.ndim_code,
-                                                            self.n, self.alpha, self.leafsize)
+                                                            self.n, self.alpha_double, self.leafsize)
 
     def query(KDTree self, np.ndarray query_pts not None, np.ndarray query_code not None, k=1, eps=1e-12,
               distance_upper_bound=None, mask=None):
