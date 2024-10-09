@@ -50,7 +50,7 @@ def warmup(cfg, model: nn.Module, warmup_loader):
         target = gs.gs_points.y
         with autocast():
             pred, diff = model(gs)
-            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
+            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index)
         loss.backward()
 
 
@@ -73,11 +73,11 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss + diff * lam).backward()
+            scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = loss + diff * lam
+            loss = loss
             loss.backward()
             optimizer.step()
 
@@ -116,7 +116,6 @@ def main(cfg):
     set_random_seed(cfg.seed, deterministic=True)
     torch.set_float32_matmul_precision("high")
     torch.backends.cudnn.enabled = True
-    torch.backends.cudnn.benchmark = False
 
     logging.info(f'Config:\n{cfg.__str__()}')
 
