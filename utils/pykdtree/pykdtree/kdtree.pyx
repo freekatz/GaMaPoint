@@ -315,7 +315,7 @@ cdef class KDTree:
         if not sqr_dists:  # Return actual cartesian distances
             closest_dists_res = np.sqrt(closest_dists_res)
 
-        return closest_dists_res, closest_idxs_res
+        return closest_dists_res, closest_idxs_res.astype(np.uint32)
 
     def __dealloc__(KDTree self):
         if self._kdtree_float != NULL:
