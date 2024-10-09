@@ -11,8 +11,8 @@ class ScanNetV2Config(EasyConfig):
     name = 'ScanNetV2Config'
     k = [24, 24, 24, 24, 24]
     grid_size = [0.04, 0.08, 0.16, 0.32]
-    alpha = 0.1
     voxel_max = 64000
+    alpha = k[0] / voxel_max * 4 ** len(grid_size)
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16
     gs_opts.cam_fovy = 150
@@ -22,8 +22,8 @@ class ScanNetV2WarmupConfig(EasyConfig):
     name = 'ScanNetV2WarmupConfig'
     k = [24, 24, 24, 24, 24]
     grid_size = [0.04, 0.08, 0.16, 0.32]
-    alpha = 0.1
     voxel_max = 64000
+    alpha = k[0] / voxel_max * 4 ** len(grid_size)
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16
     gs_opts.cam_fovy = 150

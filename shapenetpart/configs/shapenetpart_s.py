@@ -11,8 +11,10 @@ class ShapeNetPartConfig(EasyConfig):
     name = 'ShapeNetPartConfig'
     k = [32, 32, 32, 32]
     strides = [1, 4, 2, 2]
-    alpha = 0.1
     voxel_max = 2048
+    alpha = k[0] / voxel_max
+    for s in strides:
+        alpha *= s
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120
@@ -22,8 +24,10 @@ class ShapeNetPartWarmupConfig(EasyConfig):
     name = 'ShapeNetPartWarmupConfig'
     k = [32, 32, 32, 32]
     strides = [1, 4, 2, 2]
-    alpha = 0.1
     voxel_max = 2048
+    alpha = k[0] / voxel_max
+    for s in strides:
+        alpha *= s
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120

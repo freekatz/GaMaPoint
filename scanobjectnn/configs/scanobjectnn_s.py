@@ -12,8 +12,10 @@ class ScanObjectNNConfig(EasyConfig):
     k = [32, 32, 32]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
-    alpha = 0.2
     num_points = 1024
+    alpha = k[0] / num_points
+    for s in strides:
+        alpha *= s
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120
@@ -24,8 +26,10 @@ class ScanObjectNNWarmupConfig(EasyConfig):
     k = [32, 32, 32]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
-    alpha = 0.2
     num_points = 1024
+    alpha = k[0] / num_points
+    for s in strides:
+        alpha *= s
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120
