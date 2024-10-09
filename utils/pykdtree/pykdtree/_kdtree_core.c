@@ -118,7 +118,7 @@ void insert_point_double(uint32_t *closest_idx, double *closest_dist, uint32_t p
 void get_bounding_box_double(double *pa, uint32_t *pidx, int8_t no_dims, uint32_t n, double *bbox);
 int partition_double(double *pa, uint32_t *pidx, int8_t no_dims, uint32_t start_idx, uint32_t n, double *bbox, int8_t *cut_dim,
               double *cut_val, uint32_t *n_lo);
-Tree_double* construct_tree_double(double *pa, double *code, int8_t no_dims, int8_t code_dims, uint32_t n, float alpha, uint32_t bsp);
+Tree_double* construct_tree_double(double *pa, double *code, int8_t no_dims, int8_t code_dims, uint32_t n, double alpha, uint32_t bsp);
 Node_double* construct_subtree_double(double *pa, uint32_t *pidx, int8_t no_dims, uint32_t start_idx, uint32_t n, uint32_t bsp, double *bbox);
 Node_double * create_node_double(uint32_t start_idx, uint32_t n, int is_leaf);
 void delete_subtree_double(Node_double *root);
@@ -1078,7 +1078,7 @@ Params:
     n :  number of data points
     bsp : number of points per leaf
 ************************************************/
-Tree_double* construct_tree_double(double *pa, double *code, int8_t no_dims, int8_t code_dims, uint32_t n, float alpha, uint32_t bsp)
+Tree_double* construct_tree_double(double *pa, double *code, int8_t no_dims, int8_t code_dims, uint32_t n, double alpha, uint32_t bsp)
 {
     Tree_double *tree = (Tree_double *)malloc(sizeof(Tree_double));
     uint32_t i;

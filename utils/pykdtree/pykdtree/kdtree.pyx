@@ -63,7 +63,7 @@ cdef extern void search_tree_float(tree_float *kdtree, float *pa, float *code, f
 cdef extern void delete_tree_float(tree_float *kdtree)
 
 cdef extern tree_double * construct_tree_double(double *pa, double *code, int8_t no_dims, int8_t code_dims, uint32_t n,
-                                                float alpha, uint32_t bsp) nogil
+                                                double alpha, uint32_t bsp) nogil
 cdef extern void search_tree_double(tree_double *kdtree, double *pa, double *code, double *point_coords,
                                     double *query_code, uint32_t num_points, uint32_t k, double distance_upper_bound,
                                     double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists) nogil
