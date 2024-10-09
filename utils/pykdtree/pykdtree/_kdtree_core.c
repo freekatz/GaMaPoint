@@ -122,7 +122,7 @@ Node_double * create_node_double(uint32_t start_idx, uint32_t n, int is_leaf);
 void delete_subtree_double(Node_double *root);
 void delete_tree_double(Tree_double *tree);
 void print_tree_double(Node_double *root, int level);
-double calc_dist_double(double *point1_coord, double *code1, double *point2_coord, double *code2, int8_t no_dims, int8_t code_dims, double alpha);
+double calc_dist_double(double *point1_coord, float *code1, double *point2_coord, float *code2, int8_t no_dims, int8_t code_dims, float alpha);
 double get_cube_offset_double(int8_t dim, double *point_coord, double *bbox);
 double get_min_dist_double(double *point_coord, int8_t no_dims, double *bbox);
 void search_leaf_double(double *restrict pa, float *restrict code, uint32_t *restrict pidx, int8_t no_dims, uint32_t start_idx, uint32_t n, double *restrict point_coord,
@@ -1188,7 +1188,7 @@ Params:
     point1_coord : point 1
     point2_coord : point 2
 ************************************************/
-double calc_dist_double(double *point1_coord, float *code1, double *point2_coord, double *code2, int8_t no_dims, int8_t code_dims, float alpha)
+double calc_dist_double(double *point1_coord, float *code1, double *point2_coord, float *code2, int8_t no_dims, int8_t code_dims, float alpha)
 {
     /* Calculate squared distance */
     double dist1 = 0, dim_dist;
