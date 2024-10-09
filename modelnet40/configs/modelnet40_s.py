@@ -12,7 +12,7 @@ class ModelNet40Config(EasyConfig):
     k = [32, 32, 32]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
-    alpha = 0.2
+    alpha = 0.
     num_points = 1024
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
@@ -24,7 +24,7 @@ class ModelNet40WarmupConfig(EasyConfig):
     k = [32, 32, 32]
     strides = [1, 4, 4]
     visible_sample_stride = 0.
-    alpha = 0.2
+    alpha = 0.
     num_points = 1024
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 8
