@@ -138,9 +138,8 @@ class S3DIS(Dataset):
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', lbl)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None,
-                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride)
         return gs
 
     def get_test_item(self, idx):

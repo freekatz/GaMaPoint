@@ -115,6 +115,7 @@ def validate(cfg, model, val_loader, epoch):
 
 
 def main(cfg):
+    torch.cuda.set_device(0)
     set_random_seed(cfg.seed, deterministic=True)
     torch.set_float32_matmul_precision("high")
     torch.backends.cudnn.enabled = True

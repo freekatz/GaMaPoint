@@ -36,8 +36,7 @@ cdef struct node_float:
 cdef struct tree_float:
     float *bbox
     int8_t no_dims
-    int8_t code_dims;
-    float *code;
+    int8_t code_dims
     uint32_t *pidx
     node_float *root
 
@@ -54,20 +53,20 @@ cdef struct node_double:
 cdef struct tree_double:
     double *bbox
     int8_t no_dims
-    int8_t code_dims;
-    double *code;
+    int8_t code_dims
     uint32_t *pidx
     node_double *root
 
-cdef extern tree_float * construct_tree_float(float *pa, float *code, int8_t no_dims, int8_t code_dims, uint32_t n, uint32_t bsp) nogil
+cdef extern tree_float * construct_tree_float(float *pa, int8_t no_dims, int8_t code_dims, uint32_t n, uint32_t bsp) nogil
 cdef extern void search_tree_float(tree_float *kdtree, float *pa, float *code, float *point_coords, float *query_code,
-                                   uint32_t num_points, uint32_t k, float distance_upper_bound, float alpha, float eps_fac,
-                                   uint8_t *mask, uint32_t *closest_idxs, float *closest_dists) nogil
+                                   uint32_t num_points, uint32_t k, float alpha, float distance_upper_bound,
+                                   float eps_fac, uint8_t *mask, uint32_t *closest_idxs,
+                                   float *closest_dists) nogil
 cdef extern void delete_tree_float(tree_float *kdtree)
 
-cdef extern tree_double * construct_tree_double(double *pa, float *code, int8_t no_dims, int8_t code_dims, uint32_t n, uint32_t bsp) nogil
-cdef extern void search_tree_double(tree_double *kdtree, double *pa, float *code, double *point_coords,
-                                    float *query_code, uint32_t num_points, uint32_t k, double distance_upper_bound, double alpha,
+cdef extern tree_double * construct_tree_double(double *pa, int8_t no_dims, int8_t code_dims, uint32_t n, uint32_t bsp) nogil
+cdef extern void search_tree_double(tree_double *kdtree, double *pa, double *code, double *point_coords, double *query_code,
+                                    uint32_t num_points, uint32_t k, double alpha, double distance_upper_bound,
                                     double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists) nogil
 cdef extern void delete_tree_double(tree_double *kdtree)
 
@@ -90,10 +89,11 @@ cdef class KDTree:
     cdef readonly np.ndarray data
     cdef float *_data_pts_data_float
     cdef double *_data_pts_data_double
-    cdef float *_code_data
+    cdef float *_data_code_data_float
+    cdef double *_data_code_data_double
     cdef readonly uint32_t n
     cdef readonly int8_t ndim
-    cdef readonly int8_t ndim_code
+    cdef readonly int8_t code_dims
     cdef readonly uint32_t leafsize
 
     def __cinit__(KDTree self):
@@ -113,8 +113,6 @@ cdef class KDTree:
         # Get data content
         cdef np.ndarray[float, ndim=1] data_array_float
         cdef np.ndarray[double, ndim=1] data_array_double
-        cdef np.ndarray[float, ndim=1] code_float
-        cdef np.ndarray[double, ndim=1] code_double
 
         if data_pts.dtype == np.float32:
             data_array_float = np.ascontiguousarray(data_pts.ravel(), dtype=np.float32)
@@ -125,15 +123,24 @@ cdef class KDTree:
             self._data_pts_data_double = <double *> data_array_double.data
             self.data_pts = data_array_double
 
-        code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
-        self._code_data = <float *> code_float.data
-        self.code = code_float
+        cdef np.ndarray[float, ndim=1] code_float
+        cdef np.ndarray[double, ndim=1] code_double
+
+        if data_pts.dtype == np.float32:
+            code_float = np.ascontiguousarray(code.ravel(), dtype=np.float32)
+            self._data_code_data_float = <float *> code_float.data
+            self.code = code_float
+        else:
+            code_double = np.ascontiguousarray(code.ravel(), dtype=np.float64)
+            self._data_code_data_double = <float *> code_double.data
+            self.code = code_double
 
         # scipy interface compatibility
         self.data = self.data_pts
 
         # Get tree info
         self.n = <uint32_t> data_pts.shape[0]
+        self.code_dims = <int8_t> code.shape[1]
         self.leafsize = <uint32_t> leafsize
         if data_pts.ndim == 1:
             self.ndim = 1
@@ -141,19 +148,19 @@ cdef class KDTree:
             raise ValueError('Max 127 dimensions allowed')
         else:
             self.ndim = <int8_t> data_pts.shape[1]
-        self.ndim_code = <int8_t> code.shape[1]
 
         # Release GIL and construct tree
         if data_pts.dtype == np.float32:
             with nogil:
-                self._kdtree_float = construct_tree_float(self._data_pts_data_float, self._code_data, self.ndim,
-                                                          self.ndim_code, self.n, self.leafsize)
+                self._kdtree_float = construct_tree_float(self._data_pts_data_float, self.ndim,
+                                                          self.code_dims, self.n, self.leafsize)
         else:
             with nogil:
-                self._kdtree_double = construct_tree_double(self._data_pts_data_double,self._code_data,
-                                                            self.ndim, self.ndim_code, self.n,  self.leafsize)
+                self._kdtree_double = construct_tree_double(self._data_pts_data_double, self.ndim,
+                                                            self.code_dims, self.n, self.leafsize)
 
-    def query(KDTree self, np.ndarray query_pts not None, np.ndarray query_code not None, k=1, alpha=0.0, eps=1e-12,
+    def query(KDTree self, np.ndarray query_pts not None, np.ndarray query_code not None,
+              alpha=0., k=1, eps=0,
               distance_upper_bound=None, sqr_dists=False, mask=None):
         """Query the kd-tree for nearest neighbors
 
@@ -219,11 +226,13 @@ cdef class KDTree:
         cdef np.ndarray[float, ndim=1] query_code_float
         cdef np.ndarray[double, ndim=1] query_code_double
         cdef float *query_array_data_float
-        cdef float *query_code_float_data
-        cdef double *query_code_double_data
+        cdef double *query_array_data_double
+        cdef float *query_code_data_float
+        cdef double *query_code_data_double
         cdef np.ndarray[np.uint8_t, ndim=1] query_mask
         cdef np.uint8_t *query_mask_data
         cdef float alpha_float
+        cdef double alpha_double
 
         if mask is not None and mask.size != self.n:
             raise ValueError('Mask must have the same size as data points')
@@ -246,9 +255,14 @@ cdef class KDTree:
             query_array_double = np.ascontiguousarray(query_pts.ravel(), dtype=np.float64)
             query_array_data_double = <double *> query_array_double.data
 
-        query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
-        query_code_float_data = <float *> query_code_float.data
-        alpha_float = <float> alpha
+        if query_code.dtype == np.float32 and self.code.dtype == np.float32:
+            query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
+            query_code_data_float = <float *> query_code_float.data
+            alpha_float = <float> alpha
+        else:
+            query_code_double = np.ascontiguousarray(query_code.ravel(), dtype=np.float64)
+            query_code_data_double = <double *> query_code_double.data
+            alpha_double = <double> alpha
 
         # Setup distance_upper_bound
         cdef float dub_float
@@ -271,15 +285,15 @@ cdef class KDTree:
         # Release GIL and query tree
         if self.data_pts.dtype == np.float32:
             with nogil:
-                search_tree_float(self._kdtree_float, self._data_pts_data_float, self._code_data,
-                                  query_array_data_float, query_code_float_data, num_qpoints, num_n, dub_float,
-                                  alpha_float, epsilon_float, query_mask_data, closest_idxs_data, closest_dists_data_float)
+                search_tree_float(self._kdtree_float, self._data_pts_data_float, self._data_code_data_float,
+                                  query_array_data_float, query_code_data_float, num_qpoints, num_n, alpha_float,
+                                  dub_float, epsilon_float, query_mask_data, closest_idxs_data, closest_dists_data_float)
 
         else:
             with nogil:
-                search_tree_double(self._kdtree_double, self._data_pts_data_double, self._code_data,
-                                   query_array_data_double, query_code_float_data, num_qpoints, num_n, dub_double,
-                                   alpha_float, epsilon_double, query_mask_data, closest_idxs_data, closest_dists_data_double)
+                search_tree_double(self._kdtree_double, self._data_pts_data_double, self._data_code_data_double,
+                                   query_array_data_double, query_code_data_double, num_qpoints, num_n, alpha_double,
+                                   dub_double, epsilon_double, query_mask_data, closest_idxs_data, closest_dists_data_double)
 
         # Shape result
         if k > 1:
@@ -301,7 +315,7 @@ cdef class KDTree:
         if not sqr_dists:  # Return actual cartesian distances
             closest_dists_res = np.sqrt(closest_dists_res)
 
-        return closest_dists_res, closest_idxs_res.astype(np.int32)
+        return closest_dists_res, closest_idxs_res
 
     def __dealloc__(KDTree self):
         if self._kdtree_float != NULL:
