@@ -116,6 +116,7 @@ def main(cfg):
     set_random_seed(cfg.seed, deterministic=True)
     torch.set_float32_matmul_precision("high")
     torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = False
 
     logging.info(f'Config:\n{cfg.__str__()}')
 

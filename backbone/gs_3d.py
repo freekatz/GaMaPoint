@@ -479,8 +479,6 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
             _, us_idx = kdt.query(full_p, full_visible, k=1, alpha=0.)
             idx_us.append(torch.from_numpy(us_idx).long())
 
-        kdt.__dealloc__()
-
     gs_points.__update_attr__('idx_ds', idx_ds)
     gs_points.__update_attr__('idx_us', idx_us)
     gs_points.__update_attr__('idx_group', idx_group)
