@@ -29,6 +29,7 @@ Anne M. Archibald and libANN by David M. Mount and Sunil Arya.
 #include <float.h>
 
 #define PA(i,d)			(pa[no_dims * pidx[i] + d])
+#define CODEA(i,d)			(code[code_dims * pidx[i] + d])
 #define PASWAP(a,b) { uint32_t tmp = pidx[a]; pidx[a] = pidx[b]; pidx[b] = tmp; }
 
 #ifdef _MSC_VER
