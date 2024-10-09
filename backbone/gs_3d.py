@@ -470,13 +470,13 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
 
         # group
         k = ks[i]
-        kdt = KDTree(p.detach().cpu().numpy())
-        _, idx = kdt.query(p.detach().cpu().numpy(), k=k)
+        kdt = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy())
+        _, idx = kdt.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=k, alpha=scaled_alpha)
         idx_group.append(torch.from_numpy(idx).long())
 
         # up sample
         if i > 0 and up_sample:
-            _, us_idx = kdt.query(full_p, k=1)
+            _, us_idx = kdt.query(full_p, full_visible, k=1, alpha=0.)
             idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)

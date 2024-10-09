@@ -205,7 +205,7 @@ setup(
     author='Esben S. Nielsen',
     author_email='storpipfugl@gmail.com',
     packages=['pykdtree'],
-    python_requires='>=3.8',
+    python_requires='>=3.9',
     install_requires=['numpy'],
     tests_require=['pytest'],
     zip_safe=False,
