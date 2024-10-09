@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 
 import torch
 from einops import repeat
-from pytorch3d.ops import sample_farthest_points
 from torch import nn
 
 from utils.point_utils import points_centroid, points_scaler
@@ -10,56 +9,7 @@ from utils.camera import OrbitCamera
 from utils.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from pykdtree.kdtree import KDTree
 from utils.cutils import grid_subsampling
-
-
-def create_sampler(sampler='random', **kwargs):
-    if sampler == 'random':
-        return random_sample
-    elif sampler == 'fps':
-        return fps_sample
-    else:
-        raise NotImplementedError(
-            f'sampler {sampler} not implemented')
-
-
-def fps_sample(xyz, n_samples, **kwargs):
-    """
-    :param xyz: [B, N, 3]
-    :return: [B, n_samples, 3], [B, n_samples]
-    """
-    random_start_point = kwargs.get('random_start', False)
-    xyz_sampled, xyz_idx = sample_farthest_points(
-        points=xyz,
-        K=n_samples,
-        random_start_point=random_start_point,
-    )
-    return xyz_sampled, xyz_idx
-
-
-def random_sample(xyz, n_samples, **kwargs):
-    """
-    :param xyz: [B, N, 3]
-    :return: [B, n_samples, 3], [B, n_samples]
-    """
-    B, N, _ = xyz.shape
-    xyz_idx = torch.randint(0, N, (B, n_samples), device=xyz.device)
-    xyz_sampled = torch.gather(xyz, 1, xyz_idx.unsqueeze(-1).expand((-1, -1, 3)))
-    return xyz_sampled, xyz_idx
-
-
-def visible_sample(xyz, visible, n_samples, **kwargs):
-    """
-    :param xyz: [B, N, 3]
-    :param visible: [B, N, 1, n_cameras*2]
-    :return: [B, n_samples, 3], [B, n_samples]
-    """
-    B, N, _ = xyz.shape
-    n_cameras = visible.shape[-1]
-    visible = visible.sum(dim=-1, keepdim=False).squeeze(-1)
-    visible = visible / n_cameras
-    xyz_idx = torch.multinomial(visible.float().softmax(dim=1), n_samples, replacement=False)
-    xyz_sampled = torch.gather(xyz, 1, xyz_idx.unsqueeze(-1).expand((-1, -1, 3)))
-    return xyz_sampled, xyz_idx
+from utils.subsample import create_sampler, fps_sample, visible_sample
 
 
 @dataclass
@@ -274,6 +224,7 @@ class NaiveGaussian3D:
         self.opt = opt
         self.batch_size = batch_size
         self.device = device
+        self.cam_sampler = create_sampler(self.opt.cam_sampler)
 
         self.gs_points = GaussianPoints()
 
@@ -302,10 +253,9 @@ class NaiveGaussian3D:
         n_cameras = self.opt.n_cameras
         cam_fovy = self.opt.cam_fovy
         cam_width, cam_height = self.opt.cam_field_size
-        cam_sampler = create_sampler(self.opt.cam_sampler)
 
         centroid = points_centroid(xyz.unsqueeze(0)).squeeze(0)
-        xyz_sampled, _ = cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras)
+        xyz_sampled, _ = self.cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras)
         xyz_sampled = xyz_sampled.squeeze(0)
         outside_cameras = inside_cameras = []
         for j in range(n_cameras):
@@ -343,9 +293,8 @@ class NaiveGaussian3D:
         cam_fovy = self.opt.cam_fovy
         cam_width, cam_height = self.opt.cam_field_size
         assert self.opt.cam_sampler == 'fps'
-        cam_sampler = create_sampler(self.opt.cam_sampler)
 
-        xyz_sampled, _ = cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras * 2 + 1)
+        xyz_sampled, _ = self.cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras * 2 + 1)
         xyz_sampled = xyz_sampled.squeeze(0)
         cameras_all = []
         for j in range(1, n_cameras * 2 + 1):
@@ -479,24 +428,25 @@ class NaiveGaussian3D:
         return cov2d
 
 
-def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample=True, visible_sample_stride=0.) -> GaussianPoints:
+def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, visible_sample_stride=0., alpha=0.) -> GaussianPoints:
     assert (grid_size is not None and strides is not None) is False
     assert (grid_size is None and strides is None) is False
     n_layers = len(ks)
     p = gs_points.p
+    visible = gs_points.visible.squeeze(1).float()
     p = points_scaler(p.unsqueeze(0), scale=1.0).squeeze(0)
-    visible = gs_points.visible.squeeze(1)
-    full_p = gs_points.p.detach().cpu().numpy()
-    full_visible = gs_points.visible.squeeze(1).detach().cpu().numpy()
+    full_p = p.clone()
+    p_pow = (full_p - full_p.min(0)[0]).pow(2).sum(dim=-1)
+    scale_max = p_pow.max(0)[0]
+    scale_min = p_pow.min(0)[0]
+    scaled_alpha = alpha * (scale_max - scale_min)
 
-
-    # gs_points.apply_index(idx)
+    full_p = full_p.detach().cpu().numpy()
+    full_visible = gs_points.visible.squeeze(1).float().detach().cpu().numpy()
 
     idx_ds = []
     idx_us = []
     idx_group = []
-    idx_gs_group = []
-
     for i in range(n_layers):
         # down sample
         if i > 0:
@@ -520,25 +470,20 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, strides=None, up_sample
 
         # group
         k = ks[i]
-        # k_gs = ks_gs[i]
         _p = p.detach().cpu().numpy()
         _v = visible.detach().cpu().numpy()
-        kdt = KDTree(_p, _v, alpha=0.)
-        # kdt_gs = build_kd_tree(p_gs)
+        kdt = KDTree(_p, _v, alpha=scaled_alpha)
         _, idx = kdt.query(_p, _v, k=k)
         idx_group.append(torch.from_numpy(idx).long())
-        # idx_gs_group.append(kdt_gs.query(p_gs, nr_nns_searches=k_gs)[1].long())
 
         # up sample
         if i > 0 and up_sample:
             _, us_idx = kdt.query(full_p, full_visible, k=1)
-            idx_group.append(torch.from_numpy(us_idx.squeeze(-1)).long())
-            idx_us.append(us_idx)
+            idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)
     gs_points.__update_attr__('idx_us', idx_us)
     gs_points.__update_attr__('idx_group', idx_group)
-    gs_points.__update_attr__('idx_gs_group', idx_gs_group)
     return gs_points
 
 
@@ -572,7 +517,6 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     idx_ds_all = []
     idx_us_all = []
     idx_group_all = []
-    idx_gs_group_all = []
     pts_all = []
     n_layers = len(gs_list[0].gs_points.idx_group)
     pts_per_layer = [0] * n_layers
@@ -586,7 +530,6 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
         idx_ds = gs.gs_points.idx_ds
         idx_us = gs.gs_points.idx_us
         idx_group = gs.gs_points.idx_group
-        idx_gs_group = gs.gs_points.idx_gs_group
         pts = []
         for layer_idx in range(n_layers):
             if layer_idx < len(idx_ds):
@@ -594,12 +537,10 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
                 if up_sample:
                     idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
             idx_group[layer_idx].add_(pts_per_layer[layer_idx])
-            # idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
             pts.append(idx_group[layer_idx].shape[0])
         idx_ds_all.append(idx_ds)
         idx_us_all.append(idx_us)
         idx_group_all.append(idx_group)
-        idx_gs_group_all.append(idx_gs_group)
         pts_all.append(pts)
         pts_per_layer = [pt + idx.shape[0] for (pt, idx) in zip(pts_per_layer, idx_group)]
 
@@ -610,7 +551,6 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     idx_ds = [torch.cat(idx, dim=0) for idx in zip(*idx_ds_all)]
     idx_us = [torch.cat(idx, dim=0) for idx in zip(*idx_us_all)]
     idx_group = [torch.cat(idx, dim=0) for idx in zip(*idx_group_all)]
-    idx_gs_group = [torch.cat(idx, dim=0) for idx in zip(*idx_gs_group_all)]
     new_gs.gs_points.__update_attr__('p', p)
     new_gs.gs_points.__update_attr__('p_gs', p_gs)
     new_gs.gs_points.__update_attr__('f', f)
@@ -618,7 +558,6 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     new_gs.gs_points.__update_attr__('idx_ds', idx_ds)  # layer_idx: [1, 2, 3]
     new_gs.gs_points.__update_attr__('idx_us', idx_us)  # layer_idx: [2, 1, 0]
     new_gs.gs_points.__update_attr__('idx_group', idx_group)  # layer_idx: [0, 1, 2, 3]
-    new_gs.gs_points.__update_attr__('idx_gs_group', idx_gs_group)  # layer_idx: [0, 1, 2, 3]
     pts_list = torch.tensor(pts_all, dtype=torch.int64)
     pts_list = pts_list.view(-1, n_layers).transpose(0, 1).contiguous()  # batch_size * layer_idx: [0, 1, 2, 3]
     new_gs.gs_points.__update_attr__('pts_list', pts_list)

@@ -268,13 +268,9 @@ class PointMambaLayer(nn.Module):
         self.mixer = create_mixer(config, channels, hybrid_args)
         self.bn = nn.BatchNorm1d(channels, momentum=bn_momentum)
 
-    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
+    def forward(self, p, f, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
 
-        # get order
-        # cam_order = p_gs[:, 2]
-        # idx = torch.argsort(cam_order, dim=0, descending=True)
-        # order = Order(idx.unsqueeze(0))
         order = None
         f = f.unsqueeze(0)
         B, N, C = f.shape

@@ -10,8 +10,8 @@ from utils.config import EasyConfig
 class ScanNetV2Config(EasyConfig):
     name = 'ScanNetV2Config'
     k = [24, 24, 24, 24, 24]
-    k_gs = [6, 6, 6, 6, 6]
     grid_size = [0.04, 0.08, 0.16, 0.32]
+    alpha = 0.2
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16
@@ -21,8 +21,8 @@ class ScanNetV2Config(EasyConfig):
 class ScanNetV2WarmupConfig(EasyConfig):
     name = 'ScanNetV2WarmupConfig'
     k = [24, 24, 24, 24, 24]
-    k_gs = [6, 6, 6, 6, 6]
     grid_size = [0.04, 0.08, 0.16, 0.32]
+    alpha = 0.2
     voxel_max = 80000
     gs_opts = GaussianOptions.default()
     gs_opts.n_cameras = 16

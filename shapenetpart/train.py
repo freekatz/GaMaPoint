@@ -7,7 +7,6 @@ from glob import glob
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from timm.scheduler.cosine_lr import CosineLRScheduler
 from torch.cuda.amp import GradScaler, autocast
@@ -15,9 +14,9 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.gama_point import SegSemHead, Stage
-from scannetv2.configs import model_configs
-from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
+from backbone.gama_point import SegPartHead, Stage
+from shapenetpart.configs import model_configs
+from shapenetpart.dataset import ShapeNetPartNormal, shapenetpart_collate_fn, get_ins_mious
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist, format_dict, format_list
@@ -33,8 +32,10 @@ def prepare_exp(cfg):
     cfg.exp_name = f'{cfg.exp}-{exp_id:03d}'
     cfg.exp_dir = f'{exp_root}/{cfg.exp_name}'
     cfg.log_path = f'{cfg.exp_dir}/train.log'
-    cfg.best_small_ckpt_path = f'{cfg.exp_dir}/best_small.ckpt'
-    cfg.best_ckpt_path = f'{cfg.exp_dir}/best.ckpt'
+    cfg.best_small_ins_ckpt_path = f'{cfg.exp_dir}/best_small_ins.ckpt'
+    cfg.best_small_cls_ckpt_path = f'{cfg.exp_dir}/best_small_cls.ckpt'
+    cfg.best_ins_ckpt_path = f'{cfg.exp_dir}/best_ins.ckpt'
+    cfg.best_cls_ckpt_path = f'{cfg.exp_dir}/best_cls.ckpt'
     cfg.last_ckpt_path = f'{cfg.exp_dir}/last.ckpt'
 
     os.makedirs(cfg.exp_dir, exist_ok=True)
@@ -42,77 +43,75 @@ def prepare_exp(cfg):
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
-def warmup(cfg, model: nn.Module, warmup_loader):
-    model.train()
-    pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
-    for idx, gs in pbar:
-        gs.gs_points.to_cuda(non_blocking=True)
-        target = gs.gs_points.y
-        with autocast():
-            pred, diff = model(gs)
-            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
-        loss.backward()
-
-
 def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps):
     model.train()
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
-    m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
     diff_meter = AverageMeter()
     steps_per_epoch = len(train_loader)
     for idx, gs in pbar:
-        lam = scheduler_steps/(epoch*steps_per_epoch)
-        lam = 3e-3 ** lam * 0.2
+        lam = scheduler_steps / (epoch * steps_per_epoch)
+        lam = 3e-3 ** lam * 0.25
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
         gs.gs_points.to_cuda(non_blocking=True)
+        shape = gs.gs_points.__get_attr__('shape')
         target = gs.gs_points.y
-        mask = target != 20
         with autocast():
-            pred, diff = model(gs)
+            pred, diff = model(gs, shape)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss + diff*lam).backward()
+            scaler.scale(loss + diff * lam).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = loss + diff*lam
+            loss = loss + diff * lam
             loss.backward()
             optimizer.step()
-
-        m.update(pred[mask], target[mask])
         loss_meter.update(loss.item())
         diff_meter.update(diff.item())
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
-                             + f"Diff {diff_meter.avg:.4f} "
-                             + f"mACC {m.calc_macc():.4f}")
-    acc, macc, miou, iou = m.calc()
-    return loss_meter.avg, diff_meter.avg, miou, macc, iou, acc, scheduler_steps
+                             + f"Diff {diff_meter.avg:.4f}")
+    return loss_meter.avg, diff_meter.avg, scheduler_steps
 
 
-def validate(cfg, model, val_loader, epoch):
+def validate(cfg, model, val_loader, epoch, **kwargs):
+    class2parts = kwargs.get('class2parts', None)
     model.eval()
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
-    m = Metric(cfg.num_classes)
-    loss_meter = AverageMeter()
+    cls_mious = torch.zeros(cfg.shape_classes, dtype=torch.float32, device="cuda")
+    cls_nums = torch.zeros(cfg.shape_classes, dtype=torch.int32, device="cuda")
+    ins_miou_list = []
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
+        shape = gs.gs_points.__get_attr__('shape')
         target = gs.gs_points.y
-        mask = target != cfg.ignore_index
+        B, N = cfg.batch_size, target.shape[0] // cfg.batch_size
         with autocast():
-            pred = model(gs)
-            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
-        m.update(pred[mask], target[mask])
-        loss_meter.update(loss.item())
-        pbar.set_description(f"Val Epoch [{epoch}/{cfg.epochs}] "
-                             + f"Loss {loss_meter.avg:.4f} "
-                             + f"mACC {m.calc_macc():.4f}")
-    acc, macc, miou, iou = m.calc()
-    return loss_meter.avg, miou, macc, iou, acc
+            pred = model(gs, shape)
+            pred = pred.max(dim=1)[1].view(B, N)
+            target = target.view(B, N)
+        ins_mious = get_ins_mious(pred, target, shape, class2parts)
+        ins_miou_list += ins_mious
+        for shape_idx in range(shape.shape[0]):  # sample_idx
+            gt_label = int(shape[shape_idx].cpu().numpy())
+            # add the iou belongs to this cat
+            cls_mious[gt_label] += ins_mious[shape_idx]
+            cls_nums[gt_label] += 1
 
+        pbar.set_description(f"Val Epoch [{epoch}/{cfg.epochs}]")
+    ins_mious_sum, count = torch.sum(torch.stack(ins_miou_list)), torch.tensor(len(ins_miou_list)).cuda()
+    for cat_idx in range(16):
+        # indicating this cat is included during previous iou appending
+        if cls_nums[cat_idx] > 0:
+            cls_mious[cat_idx] = cls_mious[cat_idx] / cls_nums[cat_idx]
+
+    ins_miou = ins_mious_sum / count
+    cls_miou = torch.mean(cls_mious)
+    cls_mious = [round(cm, 2) for cm in cls_mious.tolist()]
+    return ins_miou, cls_miou, cls_mious
 
 def main(cfg):
     set_random_seed(cfg.seed, deterministic=True)
@@ -120,40 +119,23 @@ def main(cfg):
     torch.backends.cudnn.enabled = True
 
     logging.info(f'Config:\n{cfg.__str__()}')
-
-    warmup_loader = DataLoader(
-        ScanNetV2(
+    train_ds = ShapeNetPartNormal(
             dataset_dir=cfg.dataset,
-            loop=cfg.batch_size,
-            train=True,
-            warmup=True,
-            voxel_max=cfg.scannetv2_warmup_cfg.voxel_max,
-            k=cfg.scannetv2_warmup_cfg.k,
-            grid_size=cfg.scannetv2_warmup_cfg.grid_size,
-            alpha=cfg.scannetv2_warmup_cfg.alpha,
-            batch_size=1,
-            gs_opts=cfg.scannetv2_warmup_cfg.gs_opts
-        ),
-        batch_size=1,
-        collate_fn=scannetv2_collate_fn,
-        pin_memory=True,
-        num_workers=cfg.num_workers,
-    )
-    train_loader = DataLoader(
-        ScanNetV2(
-            dataset_dir=cfg.dataset,
-            loop=cfg.train_loop,
+            presample_path=cfg.presample_path,
             train=True,
             warmup=False,
-            voxel_max=cfg.scannetv2_cfg.voxel_max,
-            k=cfg.scannetv2_cfg.k,
-            grid_size=cfg.scannetv2_cfg.grid_size,
-            alpha=cfg.scannetv2_cfg.alpha,
+            voxel_max=cfg.shapenetpart_cfg.voxel_max,
+            k=cfg.shapenetpart_cfg.k,
+            strides=cfg.shapenetpart_cfg.strides,
+            alpha=cfg.shapenetpart_cfg.alpha,
             batch_size=cfg.batch_size,
-            gs_opts=cfg.scannetv2_cfg.gs_opts
-        ),
+            gs_opts=cfg.shapenetpart_cfg.gs_opts
+        )
+    train_ds.presample()
+    train_loader = DataLoader(
+        train_ds,
         batch_size=cfg.batch_size,
-        collate_fn=scannetv2_collate_fn,
+        collate_fn=shapenetpart_collate_fn,
         shuffle=True,
         pin_memory=True,
         persistent_workers=True,
@@ -161,31 +143,34 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     val_loader = DataLoader(
-        ScanNetV2(
+        ShapeNetPartNormal(
             dataset_dir=cfg.dataset,
-            loop=cfg.val_loop,
+            presample_path=cfg.presample_path,
             train=False,
             warmup=False,
-            voxel_max=cfg.scannetv2_cfg.voxel_max,
-            k=cfg.scannetv2_cfg.k,
-            grid_size=cfg.scannetv2_cfg.grid_size,
-            alpha=cfg.scannetv2_cfg.alpha,
-            batch_size=1,
-            gs_opts=cfg.scannetv2_cfg.gs_opts
+            voxel_max=cfg.shapenetpart_cfg.voxel_max,
+            k=cfg.shapenetpart_cfg.k,
+            strides=cfg.shapenetpart_cfg.strides,
+            alpha=cfg.shapenetpart_cfg.alpha,
+            batch_size=cfg.batch_size,
+            gs_opts=cfg.shapenetpart_cfg.gs_opts
         ),
-        batch_size=1,
-        collate_fn=scannetv2_collate_fn,
+        batch_size=cfg.batch_size,
+        collate_fn=shapenetpart_collate_fn,
         pin_memory=True,
         persistent_workers=True,
+        drop_last = True,
         num_workers=cfg.num_workers,
     )
 
     stage = Stage(
         **cfg.gama_cfg.stage_cfg,
+        task_type='segpart',
     ).to('cuda')
-    model = SegSemHead(
+    model = SegPartHead(
         stage=stage,
         num_classes=cfg.gama_cfg.num_classes,
+        shape_classes=cfg.shape_classes,
         bn_momentum=cfg.gama_cfg.bn_momentum,
     ).to('cuda')
     model_size, trainable_model_size = cal_model_params(model)
@@ -196,19 +181,24 @@ def main(cfg):
     scaler = GradScaler()
     start_epoch = 1
     best_epoch = 0
-    best_miou = 0
+    best_ins_miou = 0
+    best_cls_miou = 0
     if cfg.mode == 'resume':
         cfg.ckpt = cfg.last_ckpt_path
         model_dict = resume_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
-        best_miou = model_dict['best_miou']
-        logging.info(f"Resume model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        best_ins_miou = model_dict['best_ins_miou']
+        best_cls_miou = model_dict['best_cls_miou']
+        logging.info(
+            f"Resume model from {cfg.ckpt}, best_ins_miou={best_ins_miou:.4f}, best_cls_miou={best_cls_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     if cfg.mode == 'finetune':
         model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         best_epoch = model_dict['best_epoch']
-        best_miou = model_dict['best_miou']
-        logging.info(f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+        best_ins_miou = model_dict['best_ins_miou']
+        best_cls_miou = model_dict['best_cls_miou']
+        logging.info(
+            f"Finetune model from {cfg.ckpt}, best_ins_miou={best_ins_miou:.4f}, best_cls_miou={best_cls_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
 
     steps_per_epoch = len(train_loader)
     scheduler_steps = steps_per_epoch * (start_epoch - 1)
@@ -219,16 +209,14 @@ def main(cfg):
                                   warmup_t=cfg.warmup_epochs * steps_per_epoch,
                                   warmup_lr_init=cfg.lr / 20)
 
-    val_miou, val_macc, val_ious, val_accs = 0., 0., [], []
-    macc_when_best = 0.
+    val_ins_miou, val_cls_miou, val_ious = 0., 0., []
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
 
-    warmup(cfg, model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_diff, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
+        train_loss, train_diff, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
@@ -236,29 +224,28 @@ def main(cfg):
         timer_meter.update(time_cost)
         logging.info(
             f'@E{epoch} train:    '
-            + f'miou={train_miou:.4f} macc={train_macc:.4f} oa={train_accs:.4f} loss={train_loss:.4f} '
-            + f'diff={train_diff:.4f} lr={lr:.6f}')
+            + f'loss={train_loss:.4f} diff={train_diff:.4f} lr={lr:.6f}')
 
-        is_best = False
+        is_best_ins, is_best_cls = False, False
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
-                val_loss, val_miou, val_macc, val_ious, val_accs = validate(
-                    cfg, model, val_loader, epoch,
+                val_ins_miou, val_cls_miou, val_ious = validate(
+                    cfg, model, val_loader, epoch, class2parts=train_ds.class2parts
                 )
             logging.info(f'@E{epoch} val:      '
-                         + f'miou={val_miou:.4f} macc={val_macc:.4f} oa={val_accs:.4f} loss={val_loss:.4f}')
-            if val_miou > best_miou:
-                logging.info(f'@E{epoch} new best: miou {best_miou:.4f} => {val_miou:.4f}')
-                is_best = True
-                best_miou = val_miou
-                macc_when_best = val_macc
+                         + f'ins_miou={val_ins_miou:.4f} cls_miou={val_cls_miou:.4f}')
+            if val_ins_miou > best_ins_miou:
+                logging.info(f'@E{epoch} new best: ins miou {best_ins_miou:.4f} => {val_ins_miou:.4f}')
+                is_best_ins = True
+                best_ins_miou = val_ins_miou
+            if val_cls_miou > best_cls_miou:
+                logging.info(f'@E{epoch} new best: cls miou {best_cls_miou:.4f} => {val_cls_miou:.4f}')
+                is_best_cls = True
+                best_cls_miou = val_cls_miou
             else:
-                logging.info(f'@E{epoch} cur best: miou {best_miou:.4f}')
-        if is_best:
+                logging.info(f'@E{epoch} cur best: ins miou {best_ins_miou:.4f}, cls miou {best_cls_miou:.4f}')
+        if is_best_ins or is_best_cls:
             train_info = {
-                'miou': train_miou,
-                'macc': train_macc,
-                'oa': train_accs,
                 'loss': train_loss,
                 'diff': train_diff,
                 'lr': f"{lr:.6f}",
@@ -266,40 +253,42 @@ def main(cfg):
                 'time_cost_avg': f"{timer_meter.avg:.2f}s",
             }
             val_info = {
-                'miou': val_miou,
-                'macc': val_macc,
-                'oa': val_accs,
-                'loss': val_loss,
+                'ins_miou': val_ins_miou,
+                'cls_miou': val_cls_miou,
             }
             logging.info(f'@E{epoch} summary:'
                          + f'\ntrain: \n{format_dict(train_info)}'
                          + f'\nval: \n{format_dict(val_info)}'
-                         + f'\nious: \n{format_list(ScanNetV2.get_classes(), val_ious)}')
+                         + f'\nious: \n{format_list(ShapeNetPartNormal.get_classes(), val_ious)}')
             best_epoch = epoch
-            save_state(cfg.best_small_ckpt_path, model=model)
-            save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                       best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
+            if is_best_ins:
+                save_state(cfg.best_small_ins_ckpt_path, model=model)
+                save_state(cfg.best_ins_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
+                           best_epoch=best_epoch, last_epoch=epoch, best_ins_miou=best_ins_miou,
+                           best_cls_miou=best_cls_miou)
+            if is_best_cls:
+                save_state(cfg.best_small_cls_ckpt_path, model=model)
+                save_state(cfg.best_cls_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
+                           best_epoch=best_epoch, last_epoch=epoch, best_ins_miou=best_ins_miou,
+                           best_cls_miou=best_cls_miou)
         save_state(cfg.last_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                   best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
+                   best_epoch=best_epoch, last_epoch=epoch, best_ins_miou=best_ins_miou, best_cls_miou=best_cls_miou)
         if writer is not None:
-            writer.add_scalar('best_miou', best_miou, epoch)
-            writer.add_scalar('val_miou', val_miou, epoch)
-            writer.add_scalar('macc_when_best', macc_when_best, epoch)
-            writer.add_scalar('val_macc', val_macc, epoch)
-            writer.add_scalar('val_loss', val_loss, epoch)
+            writer.add_scalar('best_ins_miou', best_ins_miou, epoch)
+            writer.add_scalar('best_cls_miou', best_cls_miou, epoch)
+            writer.add_scalar('val_ins_miou', val_ins_miou, epoch)
+            writer.add_scalar('val_cls_miou', val_cls_miou, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
             writer.add_scalar('train_diff', train_diff, epoch)
-            writer.add_scalar('train_miou', train_miou, epoch)
-            writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
             writer.add_scalar('time_cost_avg', timer_meter.avg, epoch)
             writer.add_scalar('time_cost', time_cost, epoch)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('scannetv2 training')
+    parser = argparse.ArgumentParser('shapenetpart training')
     # for prepare
-    parser.add_argument('--exp', type=str, required=False, default='scannetv2')
+    parser.add_argument('--exp', type=str, required=False, default='shapenetpart')
     parser.add_argument('--mode', type=str, required=False, default='train', choices=['train', 'finetune', 'resume'])
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
@@ -308,16 +297,15 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
-    parser.add_argument('--train_loop', type=int, required=False, default=6)
-    parser.add_argument('--val_loop', type=int, required=False, default=1)
-    parser.add_argument('--batch_size', type=int, required=False, default=4)
+    parser.add_argument('--presample', type=str, required=False, default='shapenetpart_presample.pt')
+    parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
-    parser.add_argument('--epochs', type=int, required=False, default=200)
-    parser.add_argument("--warmup_epochs", type=int, required=False, default=20)
-    parser.add_argument("--lr", type=float, required=False, default=1e-3)
-    parser.add_argument("--lr_decay", type=float, required=False, default=1.-1e-3)
+    parser.add_argument('--epochs', type=int, required=False, default=100)
+    parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
+    parser.add_argument("--lr", type=float, required=False, default=2e-3)
+    parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')
@@ -332,21 +320,23 @@ if __name__ == '__main__':
     cfg = EasyConfig()
     cfg.load_args(args)
 
-    scannetv2_cfg, scannetv2_warmup_cfg, gama_cfg = model_configs[cfg.model_size]
-    cfg.scannetv2_cfg = scannetv2_cfg
-    cfg.scannetv2_warmup_cfg = scannetv2_warmup_cfg
+    shapenetpart_cfg, shapenetpart_warmup_cfg, gama_cfg = model_configs[cfg.model_size]
+    cfg.shapenetpart_cfg = shapenetpart_cfg
+    cfg.shapenetpart_warmup_cfg = shapenetpart_warmup_cfg
     cfg.gama_cfg = gama_cfg
     cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
         cfg.gama_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
+    cfg.presample_path = os.path.join(cfg.dataset, cfg.presample)
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''
     cfg.use_amp = not cfg.no_amp
 
-    # scannetv2
-    cfg.num_classes = 20
-    cfg.ignore_index = 20
+    # shapenetpart
+    cfg.num_classes = 50
+    cfg.shape_classes = 16
+    cfg.ignore_index = -100
 
     prepare_exp(cfg)
     main(cfg)

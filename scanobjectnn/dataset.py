@@ -18,9 +18,9 @@ class ScanObjectNN(Dataset):
                  warmup=False,
                  num_points=1024,
                  k=[24, 24, 24],
-                 k_gs=[6, 6, 6],
                  strides=[1, 4, 4],
                  visible_sample_stride=0.,
+                 alpha=0.,
                  batch_size=32,
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
@@ -31,9 +31,9 @@ class ScanObjectNN(Dataset):
         self.warmup = warmup
         self.num_points = num_points
         self.k = k
-        self.k_gs = k_gs
         self.strides = strides
         self.visible_sample_stride = visible_sample_stride
+        self.alpha = alpha
         self.batch_size = batch_size
         self.gs_opts = gs_opts
 
@@ -72,8 +72,9 @@ class ScanObjectNN(Dataset):
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, None, self.strides,
-                                      up_sample=False, visible_sample_stride=self.visible_sample_stride)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.strides,
+                                      up_sample=False, visible_sample_stride=self.visible_sample_stride,
+                                      alpha=self.alpha)
         # colors = make_gs_features(gs)
         # feature = torch.cat([feature, colors], dim=-1)
         gs.gs_points.__update_attr__('f', feature)

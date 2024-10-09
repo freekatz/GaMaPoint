@@ -60,14 +60,6 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
             use_cp=use_cp,
         )
-        self.sa_gs = SetAbstraction(
-            layer_index=layer_index,
-            in_channels=in_channels,
-            channel_list=channel_list,
-            bn_momentum=bn_momentum,
-            use_cp=use_cp,
-        )
-        self.alpha = nn.Parameter(torch.tensor([0.8], dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -86,7 +78,7 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
         )
 
-        if self.task_type == 'segsem':
+        if self.task_type != 'cls':
             self.post_proj = nn.Sequential(
                 nn.BatchNorm1d(self.out_channels, momentum=bn_momentum),
                 nn.Linear(self.out_channels, head_channels, bias=False),
@@ -122,7 +114,7 @@ class Stage(nn.Module):
                 diff_std=diff_std,
             )
 
-    def forward(self, p, p_gs, f, gs: NaiveGaussian3D):
+    def forward(self, p, f, gs: NaiveGaussian3D):
         # 1. encode
         # down sample
         if self.is_head:
@@ -130,29 +122,24 @@ class Stage(nn.Module):
         if not self.is_head:
             idx = gs.gs_points.idx_ds[self.layer_index - 1]
             p = p[idx]
-            p_gs = p_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
         # set abstraction: group and abstract the local points set
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
-        # gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-        # f_local_gs = self.sa_gs(p_gs, f, gs_group_idx)
-        # alpha = self.alpha.sigmoid()
-        # f_local = f_local * alpha + f_local_gs * (1 - alpha)
         # invert residual connections: local feature aggregation and propagation
         pts = gs.gs_points.pts_list[self.layer_index].tolist()
         f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
             else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx.unsqueeze(0), pts)
         f_local = f_local.squeeze(0)
         # point mamba: extract the global feature from center points of local
-        f_global = self.pm(p, p_gs, f_local, gs)
+        f_global = self.pm(p, f_local, gs)
         # fuse local and global feature
         f = f_global + f_local
 
         # 2. netx stage
         if not self.is_tail:
-            f_sub, d_sub = self.sub_stage(p, p_gs, f, gs)
+            f_sub, d_sub = self.sub_stage(p, f, gs)
         else:
             f_sub = d_sub = None
 
@@ -209,10 +196,9 @@ class SegSemHead(nn.Module):
 
     def forward(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
-        p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, p_gs, f, gs)
+        f, diff = self.stage(p, f, gs)
         if self.training:
             return self.head(f), diff
         return self.head(f)
@@ -228,6 +214,7 @@ class SegPartHead(nn.Module):
                  ):
         super().__init__()
         self.stage = stage
+        self.shape_classes = shape_classes
 
         self.proj = nn.Sequential(
             nn.Linear(shape_classes, 64, bias=False),
@@ -250,10 +237,9 @@ class SegPartHead(nn.Module):
 
     def forward(self, gs: NaiveGaussian3D, shape):
         p = gs.gs_points.p
-        p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, p_gs, f, gs)
+        f, diff = self.stage(p, f, gs)
         shape = nn.functional.one_hot(shape, self.shape_classes).float()
         shape = self.proj(shape)
         shape = repeat(shape, 'b c -> b n c', n=f.shape[0]//gs.batch_size)
@@ -302,10 +288,9 @@ class ClsHead(nn.Module):
 
     def forward(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
-        p_gs = gs.gs_points.p_gs
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, p_gs, f, gs)
+        f, diff = self.stage(p, f, gs)
         f = self.proj(f)
         f = f.view(gs.batch_size, -1, self.stage.head_channels)
         f = torch.cat([f[:, 0], f[:, 1:].max(1)[0] + f[:, 1:].mean(1)[0]], dim=-1)

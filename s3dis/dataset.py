@@ -12,20 +12,12 @@ from utils.cutils import grid_subsampling, grid_subsampling_test
 
 
 class S3DIS(Dataset):
-    classes = ['ceiling',
-               'floor',
-               'wall',
-               'beam',
-               'column',
-               'window',
-               'door',
-               'chair',
-               'table',
-               'bookcase',
-               'sofa',
-               'board',
-               'clutter']
-    num_classes = 13
+    classes = [
+        'ceiling', 'floor', 'wall', 'beam',
+        'column', 'window', 'door', 'chair',
+        'table', 'bookcase', 'sofa', 'board',
+        'clutter']
+    num_classes = len(classes)
     class2color = {'ceiling': [0, 255, 0],
                    'floor': [0, 0, 255],
                    'wall': [0, 255, 255],
@@ -49,9 +41,9 @@ class S3DIS(Dataset):
                  warmup=False,
                  voxel_max=24000,
                  k=[16, 16, 16, 16],
-                 k_gs=[4, 4, 4, 4],
                  grid_size=[0.08, 0.16, 0.32],
                  visible_sample_stride=0.,
+                 alpha=0.,
                  batch_size=8,
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
@@ -62,9 +54,9 @@ class S3DIS(Dataset):
         self.warmup = warmup
         self.voxel_max = voxel_max
         self.k = k
-        self.k_gs = k_gs
         self.grid_size = grid_size
         self.visible_sample_stride = visible_sample_stride
+        self.alpha = alpha
         self.batch_size = batch_size
         self.gs_opts = gs_opts
 
@@ -146,8 +138,9 @@ class S3DIS(Dataset):
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', lbl)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
-                                      up_sample=True, visible_sample_stride=self.visible_sample_stride)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
+                                      alpha=self.alpha)
         return gs
 
     def get_test_item(self, idx):
@@ -170,8 +163,9 @@ class S3DIS(Dataset):
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', lbl)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
-                                      up_sample=True, visible_sample_stride=self.visible_sample_stride)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
+                                      alpha=self.alpha)
         return gs
 
 

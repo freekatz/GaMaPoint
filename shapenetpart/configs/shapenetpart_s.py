@@ -7,41 +7,42 @@ from backbone.mamba_ssm.models import MambaConfig
 from utils.config import EasyConfig
 
 
-class S3disConfig(EasyConfig):
-    name = 'S3disConfig'
-    k = [24, 24, 24, 24]
-    grid_size = [0.08, 0.16, 0.32]
+class ShapeNetPartConfig(EasyConfig):
+    name = 'ShapeNetPartConfig'
+    k = [32, 32, 32, 32]
+    strides = [1, 4, 3, 3]
     alpha = 0.2
-    voxel_max = 30000
+    voxel_max = 2048
     gs_opts = GaussianOptions.default()
-    gs_opts.n_cameras = 16
+    gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120
 
 
-class S3disWarmupConfig(EasyConfig):
-    name = 'S3disWarmupConfig'
-    k = [24, 24, 24, 24]
-    grid_size = [0.08, 0.16, 0.32]
+class ShapeNetPartWarmupConfig(EasyConfig):
+    name = 'ShapeNetPartWarmupConfig'
+    k = [32, 32, 32, 32]
+    strides = [1, 4, 3, 3]
     alpha = 0.2
-    voxel_max = 30000
+    voxel_max = 2048
     gs_opts = GaussianOptions.default()
-    gs_opts.n_cameras = 16
+    gs_opts.n_cameras = 8
     gs_opts.cam_fovy = 120
 
 
 class GaMaConfig(EasyConfig):
     name = 'GaMaConfig'
-    num_classes = 13
-    bn_momentum = 0.02
-    drop_path = 0.1
-    channel_list = [64, 128, 256, 512]
+    num_classes = 50
+    shape_classes = 16
+    bn_momentum = 0.1
+    drop_path = 0.15
+    channel_list = [96, 192, 320, 512]
     stage_cfg = EasyConfig()
     stage_cfg.name = 'StageConfig'
     stage_cfg.in_channels = 4
     stage_cfg.channel_list = channel_list
-    stage_cfg.head_channels = 256
+    stage_cfg.head_channels = 320
     stage_cfg.mamba_blocks = [1, 1, 1, 1]
-    stage_cfg.res_blocks = [3, 3, 6, 3]
+    stage_cfg.res_blocks = [4, 4, 4, 4]
     stage_cfg.mlp_ratio = 2.
     stage_cfg.bn_momentum = bn_momentum
     drop_rates = torch.linspace(0., drop_path, sum(stage_cfg.res_blocks)).split(stage_cfg.res_blocks)
@@ -50,4 +51,4 @@ class GaMaConfig(EasyConfig):
     stage_cfg.mamba_cfg = MambaConfig.default()
     stage_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
     stage_cfg.diff_factor = 40.
-    stage_cfg.diff_std = [1.6, 3.2, 6.4, 12.8]
+    stage_cfg.diff_std = [0.75, 1.5, 2.5, 4.7]

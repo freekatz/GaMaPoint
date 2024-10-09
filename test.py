@@ -3,6 +3,11 @@ from pykdtree.kdtree import KDTree
 
 xyz = torch.randn((20, 3))
 xyz_c = xyz.clone()
+alpha = 0.2
+p_pow = (xyz - xyz.min(0)[0]).pow(2).sum(dim=-1)
+scale_max = p_pow.max(0)[0]
+scale_min = p_pow.min(0)[0]
+scaled_alpha = alpha * (scale_max - scale_min)
 xyz = xyz.detach().numpy()
 visible = torch.randn(20, 16)
 # visible = (visible != 0).int()
@@ -24,7 +29,7 @@ print(idx)
 xyz_c = xyz_c.detach().numpy()
 visible = visible.detach().numpy()
 start_time = time.time()
-kd_tree = KDTree(xyz_c, visible, alpha=0.2)
+kd_tree = KDTree(xyz_c, visible, alpha=alpha)
 dist, idx2 = kd_tree.query(xyz_c, visible, k=8)
 dist = torch.from_numpy(dist)
 idx2 = torch.from_numpy(idx2).long()

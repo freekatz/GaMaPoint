@@ -520,22 +520,30 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
 {
     /* Calculate squared distance */
     float dist1 = 0, dim_dist;
-    int8_t i;
-    for (i = 0; i < no_dims; i++)
-    {
-        dim_dist = point2_coord[i] - point1_coord[i];
-        dist1 += dim_dist * dim_dist;
+    if (alpha >= 0) {
+        int8_t i;
+        for (i = 0; i < no_dims; i++)
+        {
+            dim_dist = point2_coord[i] - point1_coord[i];
+            dist1 += dim_dist * dim_dist;
+        }
     }
-//    float dist2 = 0;
-//    int8_t j;
-//    for (j = 0; j < code_dims; j++)
-//    {
-//        dist2 += abs(code2[j] - code1[j]);
-//    }
-//    dist2 = dist2 / code_dims;
-    float dist2 = 1 - cosine_similarity_float(code1, code2, code_dims);
+    float dist2 = 0;
+    if (alpha != 0) {
+        int8_t j;
+        for (j = 0; j < code_dims; j++)
+        {
+            dist2 += code2[j] * code1[j];
+        }
+        dist2 = dist2 / code_dims;
+    }
+//    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
     float dist = 0;
-    dist = dist1 + alpha * dist2;
+    if (alpha >= 0) {
+        dist = dist1 + alpha * dist2;
+    } else {
+        dist = dist1
+    }
     return dist;
 }
 
@@ -1189,22 +1197,30 @@ double calc_dist_double(double *point1_coord, float *code1, double *point2_coord
 {
     /* Calculate squared distance */
     double dist1 = 0, dim_dist;
-    int8_t i;
-    for (i = 0; i < no_dims; i++)
-    {
-        dim_dist = point2_coord[i] - point1_coord[i];
-        dist1 += dim_dist * dim_dist;
+    if (alpha >= 0) {
+        int8_t i;
+        for (i = 0; i < no_dims; i++)
+        {
+            dim_dist = point2_coord[i] - point1_coord[i];
+            dist1 += dim_dist * dim_dist;
+        }
     }
-//    float dist2 = 0;
-//    int8_t j;
-//    for (j = 0; j < code_dims; j++)
-//    {
-//        dist2 += abs(code2[j] - code1[j]);
-//    }
-//    dist2 = dist2 / code_dims;
-    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
+    double dist2 = 0;
+    if (alpha != 0) {
+        int8_t j;
+        for (j = 0; j < code_dims; j++)
+        {
+            dist2 += code2[j] * code1[j];
+        }
+        dist2 = dist2 / code_dims;
+    }
+//    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
     double dist = 0;
-    dist = dist1 + alpha * dist2;
+    if (alpha >= 0) {
+        dist = dist1 + alpha * dist2;
+    } else {
+        dist = dist1
+    }
     return dist;
 }
 

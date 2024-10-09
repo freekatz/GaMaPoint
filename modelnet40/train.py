@@ -113,9 +113,9 @@ def main(cfg):
             warmup=False,
             num_points=cfg.modelnet40_cfg.num_points,
             k=cfg.modelnet40_cfg.k,
-            k_gs=cfg.modelnet40_cfg.k_gs,
             strides=cfg.modelnet40_cfg.strides,
             visible_sample_stride=cfg.modelnet40_cfg.visible_sample_stride,
+            alpha=cfg.modelnet40_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.modelnet40_cfg.gs_opts
         ),
@@ -134,9 +134,9 @@ def main(cfg):
             warmup=False,
             num_points=cfg.modelnet40_cfg.num_points,
             k=cfg.modelnet40_cfg.k,
-            k_gs=cfg.modelnet40_cfg.k_gs,
             strides=cfg.modelnet40_cfg.strides,
             visible_sample_stride=cfg.modelnet40_cfg.visible_sample_stride,
+            alpha=cfg.modelnet40_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.modelnet40_cfg.gs_opts
         ),
@@ -279,8 +279,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
-    parser.add_argument('--epochs', type=int, required=False, default=300)
-    parser.add_argument("--warmup_epochs", type=int, required=False, default=30)
+    parser.add_argument('--epochs', type=int, required=False, default=400)
+    parser.add_argument("--warmup_epochs", type=int, required=False, default=40)
     parser.add_argument("--lr", type=float, required=False, default=5e-4)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
