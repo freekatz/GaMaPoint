@@ -234,6 +234,8 @@ cdef class KDTree:
         cdef double *query_code_double_data
         cdef np.ndarray[np.uint8_t, ndim=1] query_mask
         cdef np.uint8_t *query_mask_data
+        cdef float alpha_float
+        cdef double alpha_double
 
         if mask is not None and mask.size != self.n:
             raise ValueError('Mask must have the same size as data points')
@@ -259,11 +261,11 @@ cdef class KDTree:
         if query_code.dtype == np.float32 and self.code.dtype == np.float32:
             query_code_float = np.ascontiguousarray(query_code.ravel(), dtype=np.float32)
             query_code_float_data = <float *> query_code_float.data
-            cdef float alpha_float = alpha
+            alpha_float = alpha
         else:
             query_code_double = np.ascontiguousarray(query_code.ravel(), dtype=np.float64)
             query_code_double_data = <double *> query_code_double.data
-            cdef double alpha_double = alpha
+            alpha_double = alpha
 
         # Setup distance_upper_bound
         cdef float dub_float
