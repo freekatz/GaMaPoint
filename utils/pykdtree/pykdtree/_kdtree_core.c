@@ -542,7 +542,7 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
     if (alpha >= 0) {
         dist = dist1 + alpha * dist2;
     } else {
-        dist = dist1
+        dist = dist1;
     }
     return dist;
 }
@@ -1219,7 +1219,7 @@ double calc_dist_double(double *point1_coord, float *code1, double *point2_coord
     if (alpha >= 0) {
         dist = dist1 + alpha * dist2;
     } else {
-        dist = dist1
+        dist = dist1;
     }
     return dist;
 }
