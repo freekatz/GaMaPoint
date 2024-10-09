@@ -1378,9 +1378,9 @@ Params:
     closest_idx : index of closest data point found (return)
     closest_dist : distance to closest point (return)
 ************************************************/
-void search_tree_double(Tree_float *tree, double *pa, double *code, double *point_coords, double *query_code,
+void search_tree_double(Tree_double *tree, double *pa, double *code, double *point_coords, double *query_code,
                        uint32_t num_points, uint32_t k, float alpha, int8_t code_dims, double distance_upper_bound,
-                       double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists)
+                       double eps, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists)
 {
     double min_dist;
     double eps_fac = 1 / ((1 + eps) * (1 + eps));
