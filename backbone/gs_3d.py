@@ -515,7 +515,7 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=len(gs_list))
 
     p_all = []
-    p_gs_all = []
+    # p_gs_all = []
     f_all = []
     y_all = []
     idx_ds_all = []
@@ -528,7 +528,7 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     for i in range(len(gs_list)):
         gs = gs_list[i]
         p_all.append(gs.gs_points.p)
-        p_gs_all.append(gs.gs_points.p_gs)
+        # p_gs_all.append(gs.gs_points.p_gs)
         f_all.append(gs.gs_points.f)
         y_all.append(gs.gs_points.y)
 
@@ -553,7 +553,7 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
         pts_per_layer = [pt + idx.shape[0] for (pt, idx) in zip(pts_per_layer, idx_group)]
 
     p = torch.cat(p_all, dim=0)
-    p_gs = torch.cat(p_gs_all, dim=0)
+    # p_gs = torch.cat(p_gs_all, dim=0)
     f = torch.cat(f_all, dim=0)
     y = torch.cat(y_all, dim=0)
     idx_ds = [torch.cat(idx, dim=0) for idx in zip(*idx_ds_all)]
@@ -561,7 +561,7 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     idx_group = [torch.cat(idx, dim=0) for idx in zip(*idx_group_all)]
     idx_gs_group = [torch.cat(idx, dim=0) for idx in zip(*idx_gs_group_all)]
     new_gs.gs_points.__update_attr__('p', p)
-    new_gs.gs_points.__update_attr__('p_gs', p_gs)
+    # new_gs.gs_points.__update_attr__('p_gs', p_gs)
     new_gs.gs_points.__update_attr__('f', f)
     new_gs.gs_points.__update_attr__('y', y)
     new_gs.gs_points.__update_attr__('idx_ds', idx_ds)  # layer_idx: [1, 2, 3]
