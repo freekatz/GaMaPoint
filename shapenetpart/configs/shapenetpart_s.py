@@ -18,7 +18,9 @@ class ShapeNetPartConfig(EasyConfig):
         gs_opts.n_cameras = 8
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.2
+        self.alpha = gs_opts.n_cameras * 2 / self.voxel_max
+        for s in self.strides:
+            self.alpha *= s
 
 
 class ModelConfig(EasyConfig):
