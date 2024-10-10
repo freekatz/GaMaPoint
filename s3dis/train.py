@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.gama_point import SegSemHead, Stage
+from backbone.model import SegSemHead, Stage
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -127,12 +127,12 @@ def main(cfg):
             loop=cfg.batch_size,
             train=True,
             warmup=True,
-            voxel_max=cfg.s3dis_warmup_cfg.voxel_max,
-            k=cfg.s3dis_warmup_cfg.k,
-            grid_size=cfg.s3dis_warmup_cfg.grid_size,
-            alpha=cfg.s3dis_warmup_cfg.alpha,
+            voxel_max=cfg.model_cfg.warmup_cfg.voxel_max,
+            k=cfg.model_cfg.warmup_cfg.k,
+            grid_size=cfg.model_cfg.warmup_cfg.grid_size,
+            alpha=cfg.model_cfg.warmup_cfg.alpha,
             batch_size=1,
-            gs_opts=cfg.s3dis_warmup_cfg.gs_opts
+            gs_opts=cfg.model_cfg.warmup_cfg.gs_opts
         ),
         batch_size=1,
         collate_fn=s3dis_collate_fn,
@@ -146,12 +146,12 @@ def main(cfg):
             loop=cfg.train_loop,
             train=True,
             warmup=False,
-            voxel_max=cfg.s3dis_cfg.voxel_max,
-            k=cfg.s3dis_cfg.k,
-            grid_size=cfg.s3dis_cfg.grid_size,
-            alpha=cfg.s3dis_cfg.alpha,
+            voxel_max=cfg.model_cfg.train_cfg.voxel_max,
+            k=cfg.model_cfg.train_cfg.k,
+            grid_size=cfg.model_cfg.train_cfg.grid_size,
+            alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
-            gs_opts=cfg.s3dis_cfg.gs_opts
+            gs_opts=cfg.model_cfg.train_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
         collate_fn=s3dis_collate_fn,
@@ -168,12 +168,12 @@ def main(cfg):
             loop=cfg.val_loop,
             train=False,
             warmup=False,
-            voxel_max=cfg.s3dis_cfg.voxel_max,
-            k=cfg.s3dis_cfg.k,
-            grid_size=cfg.s3dis_cfg.grid_size,
-            alpha=cfg.s3dis_cfg.alpha,
+            voxel_max=cfg.model_cfg.train_cfg.voxel_max,
+            k=cfg.model_cfg.train_cfg.k,
+            grid_size=cfg.model_cfg.train_cfg.grid_size,
+            alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=1,
-            gs_opts=cfg.s3dis_cfg.gs_opts
+            gs_opts=cfg.model_cfg.train_cfg.gs_opts
         ),
         batch_size=1,
         collate_fn=s3dis_collate_fn,
@@ -183,12 +183,12 @@ def main(cfg):
     )
 
     stage = Stage(
-        **cfg.gama_cfg.stage_cfg,
+        **cfg.model_cfg.stage_cfg,
     ).to('cuda')
     model = SegSemHead(
         stage=stage,
-        num_classes=cfg.gama_cfg.num_classes,
-        bn_momentum=cfg.gama_cfg.bn_momentum,
+        num_classes=cfg.model_cfg.num_classes,
+        bn_momentum=cfg.model_cfg.bn_momentum,
     ).to('cuda')
     model_size, trainable_model_size = cal_model_params(model)
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
@@ -337,13 +337,11 @@ if __name__ == '__main__':
     cfg = EasyConfig()
     cfg.load_args(args)
 
-    s3dis_cfg, s3dis_warmup_cfg, gama_cfg = model_configs[cfg.model_size]
-    cfg.s3dis_cfg = s3dis_cfg
-    cfg.s3dis_warmup_cfg = s3dis_warmup_cfg
-    cfg.gama_cfg = gama_cfg
-    cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
+    model_cfg = model_configs[cfg.model_size]
+    cfg.model_cfg = model_cfg
+    cfg.model_cfg.stage_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
-        cfg.gama_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
+        cfg.model_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''

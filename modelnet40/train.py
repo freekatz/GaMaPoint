@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.gama_point import ClsHead, Stage
+from backbone.model import ClsHead, Stage
 from modelnet40.configs import model_configs
 from modelnet40.dataset import ModelNet40, modelnet40_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -112,13 +112,13 @@ def main(cfg):
             dataset_dir=cfg.dataset,
             train=True,
             warmup=False,
-            num_points=cfg.modelnet40_cfg.num_points,
-            k=cfg.modelnet40_cfg.k,
-            strides=cfg.modelnet40_cfg.strides,
-            visible_sample_stride=cfg.modelnet40_cfg.visible_sample_stride,
-            alpha=cfg.modelnet40_cfg.alpha,
+            num_points=cfg.model_cfg.train_cfg.num_points,
+            k=cfg.model_cfg.train_cfg.k,
+            strides=cfg.model_cfg.train_cfg.strides,
+            visible_sample_stride=cfg.model_cfg.train_cfg.visible_sample_stride,
+            alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
-            gs_opts=cfg.modelnet40_cfg.gs_opts
+            gs_opts=cfg.model_cfg.train_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
         collate_fn=modelnet40_collate_fn,
@@ -133,13 +133,13 @@ def main(cfg):
             dataset_dir=cfg.dataset,
             train=False,
             warmup=False,
-            num_points=cfg.modelnet40_cfg.num_points,
-            k=cfg.modelnet40_cfg.k,
-            strides=cfg.modelnet40_cfg.strides,
-            visible_sample_stride=cfg.modelnet40_cfg.visible_sample_stride,
-            alpha=cfg.modelnet40_cfg.alpha,
+            num_points=cfg.model_cfg.train_cfg.num_points,
+            k=cfg.model_cfg.train_cfg.k,
+            strides=cfg.model_cfg.train_cfg.strides,
+            visible_sample_stride=cfg.model_cfg.train_cfg.visible_sample_stride,
+            alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
-            gs_opts=cfg.modelnet40_cfg.gs_opts
+            gs_opts=cfg.model_cfg.train_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
         collate_fn=modelnet40_collate_fn,
@@ -150,13 +150,13 @@ def main(cfg):
     )
 
     stage = Stage(
-        **cfg.gama_cfg.stage_cfg,
+        **cfg.model_cfg.stage_cfg,
         task_type='cls',
     ).to('cuda')
     model = ClsHead(
         stage=stage,
-        num_classes=cfg.gama_cfg.num_classes,
-        bn_momentum=cfg.gama_cfg.bn_momentum,
+        num_classes=cfg.model_cfg.num_classes,
+        bn_momentum=cfg.model_cfg.bn_momentum,
     ).to('cuda')
     model_size, trainable_model_size = cal_model_params(model)
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
@@ -298,13 +298,11 @@ if __name__ == '__main__':
     cfg = EasyConfig()
     cfg.load_args(args)
 
-    modelnet40_cfg, modelnet40_warmup_cfg, gama_cfg = model_configs[cfg.model_size]
-    cfg.modelnet40_cfg = modelnet40_cfg
-    cfg.modelnet40_warmup_cfg = modelnet40_warmup_cfg
-    cfg.gama_cfg = gama_cfg
-    cfg.gama_cfg.stage_cfg.use_cp = cfg.use_cp
+    model_cfg = model_configs[cfg.model_size]
+    cfg.model_cfg = model_cfg
+    cfg.model_cfg.stage_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
-        cfg.gama_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.gama_cfg.bn_momentum) ** 0.5
+        cfg.model_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''

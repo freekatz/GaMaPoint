@@ -19,6 +19,7 @@ class Stage(nn.Module):
                  mamba_blocks=[1, 1, 1, 1],
                  res_blocks=[4, 4, 8, 4],
                  mlp_ratio=2.,
+                 beta=0.,
                  bn_momentum=0.02,
                  drop_paths=None,
                  head_drops=None,
@@ -60,6 +61,14 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
             use_cp=use_cp,
         )
+        self.sa_gs = SetAbstraction(
+            layer_index=layer_index,
+            in_channels=in_channels,
+            channel_list=channel_list,
+            bn_momentum=bn_momentum,
+            use_cp=use_cp,
+        )
+        self.beta = nn.Parameter(torch.tensor([beta], dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -127,6 +136,10 @@ class Stage(nn.Module):
         # set abstraction: group and abstract the local points set
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
+        gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
+        f_local_gs = self.sa_gs(p, f, gs_group_idx)
+        beta = self.beta.sigmoid()
+        f_local = f_local * (1-beta) + f_local_gs * beta
         # invert residual connections: local feature aggregation and propagation
         pts = gs.gs_points.pts_list[self.layer_index].tolist()
         f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
