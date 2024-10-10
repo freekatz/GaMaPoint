@@ -50,7 +50,7 @@ class ModelConfig(EasyConfig):
         stage_cfg.channel_list = [64, 128, 256, 512]
         stage_cfg.head_channels = 256
         stage_cfg.mamba_blocks = [1, 1, 1, 1]
-        stage_cfg.res_blocks = [3, 3, 6, 3]
+        stage_cfg.res_blocks = [4, 4, 8, 4]
         stage_cfg.mlp_ratio = 2.
         stage_cfg.beta = self.train_cfg.alpha
         stage_cfg.bn_momentum = self.bn_momentum
