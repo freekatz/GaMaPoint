@@ -19,7 +19,6 @@ class Stage(nn.Module):
                  mamba_blocks=[1, 1, 1, 1],
                  res_blocks=[4, 4, 8, 4],
                  mlp_ratio=2.,
-                 beta=0.,
                  bn_momentum=0.02,
                  drop_paths=None,
                  head_drops=None,
