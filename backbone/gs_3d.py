@@ -436,7 +436,7 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).float()
 
-    # estimating the maximum distance in euclidean space as the scaler
+    # estimating a distance in Euclidean space as the scaler
     ps, _ = fps_sample(full_p.unsqueeze(0), 2, random_start_point=True)
     ps = ps.squeeze(0)
     p0, p1 = ps[0], ps[1]
