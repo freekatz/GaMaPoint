@@ -18,7 +18,7 @@ class S3disConfig(EasyConfig):
         gs_opts.n_cameras = 16
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = gs_opts.n_cameras * 2 / self.voxel_max * 4 ** len(self.grid_size)
+        self.alpha = 0.2
 
 
 class S3disWarmupConfig(EasyConfig):
@@ -32,7 +32,7 @@ class S3disWarmupConfig(EasyConfig):
         gs_opts.n_cameras = 16
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = gs_opts.n_cameras * 2 / self.voxel_max * 4 ** len(self.grid_size)
+        self.alpha = 0.2
 
 
 class ModelConfig(EasyConfig):

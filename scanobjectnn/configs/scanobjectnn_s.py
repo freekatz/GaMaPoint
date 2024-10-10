@@ -19,9 +19,7 @@ class ScanObjectNNConfig(EasyConfig):
         gs_opts.n_cameras = 8
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        alpha = self.gs_opts.n_cameras * 2 / self.num_points
-        for s in self.strides:
-            alpha *= s
+        self.alpha = 0.2
 
 
 class ModelConfig(EasyConfig):
