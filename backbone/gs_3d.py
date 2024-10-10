@@ -438,7 +438,7 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
     p_pow = (full_p - full_p.min(0)[0]).pow(2).sum(dim=-1)
     scale_max = p_pow.max(0)[0]
     scale_min = p_pow.min(0)[0]
-    scaled_alpha = alpha * math.sqrt((scale_max - scale_min))
+    scaler = math.sqrt((scale_max - scale_min))
 
     full_p = full_p.contiguous()
     full_visible = full_visible.contiguous()
@@ -473,14 +473,14 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
         # group
         k = ks[i]
         kdt = KDTree(p.numpy(), visible.numpy())
-        _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=0)
+        _, idx = kdt.query(p.numpy(), visible.numpy(), k=k)
         idx_group.append(torch.from_numpy(idx).long())
-        _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=scaled_alpha)
+        _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
         idx_gs_group.append(torch.from_numpy(idx_gs).long())
 
         # up sample
         if i > 0 and up_sample:
-            _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1, alpha=0.)
+            _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1)
             idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)
