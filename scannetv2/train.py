@@ -311,7 +311,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
     parser.add_argument('--train_loop', type=int, required=False, default=6)
     parser.add_argument('--val_loop', type=int, required=False, default=1)
-    parser.add_argument('--batch_size', type=int, required=False, default=4)
+    parser.add_argument('--batch_size', type=int, required=False, default=8)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
