@@ -548,7 +548,7 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
 //    } else {
 //        dist2 = dist2 * scaler * alpha;
 //    }
-    dist2 = dist2 * scaler * alpha
+    dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
 
@@ -1238,7 +1238,7 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
 //    } else {
 //        dist2 = dist2 * scaler * alpha;
 //    }
-    dist2 = dist2 * scaler * alpha
+    dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
 
