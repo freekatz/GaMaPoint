@@ -226,7 +226,7 @@ class ScanNetV2(Dataset):
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', lbl)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
+        gs.projects(xyz, cam_seed=idx, cam_batch=64)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None,
                                       up_sample=True, visible_sample_stride=self.visible_sample_stride,
                                       alpha=self.alpha)
@@ -266,7 +266,7 @@ class ScanNetV2(Dataset):
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', lbl)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
+        gs.projects(xyz, cam_seed=idx, cam_batch=64)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None,
                                       up_sample=True, visible_sample_stride=self.visible_sample_stride,
                                       alpha=self.alpha)
