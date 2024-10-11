@@ -27,6 +27,8 @@ Anne M. Archibald and libANN by David M. Mount and Sunil Arya.
 #include <stdlib.h>
 #include <stdint.h>
 #include <float.h>
+#include <omp.h>
+#include <math.h>
 
 #define PA(i,d)			(pa[no_dims * pidx[i] + d])
 #define CODEA(i,d)			(code[code_dims * pidx[i] + d])
@@ -521,23 +523,33 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
 
     // alpha != 0
     float dist2 = 0;
+    uint8_t visible_count1 = 0;
+    uint8_t visible_count2 = 0;
     if (alpha != 0) {
         int8_t j;
-        for (j = 0; j < code_dims; j++)
         {
-            if (code2[j] == code1[j] && code1[j] != 0) {
-                dist2 += 1;
+            if (code1[j] != 0) {
+                visible_count1 += 1;
             }
+            if (code2[j] != 0) {
+                visible_count2 += 1;
+            }
+            dist2 += abs(code2[j] - code1[j]);
         }
-        dist2 = 1.0 - dist2 / code_dims;
     }
-    // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
+    if (visible_count2 == 0) {
+        dist2 = 1.0;
+    } else {
+        dist2 = dist2 / code_dims;
+    }
     if (alpha < 0) {
         return dist2;
     }
+    if (visible_count1 == 0) {
+        return dist1;
+    }
 
-    // alpha > 0
     dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
@@ -1201,26 +1213,37 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
 
     // alpha != 0
     double dist2 = 0;
+    uint8_t visible_count1 = 0;
+    uint8_t visible_count2 = 0;
     if (alpha != 0) {
         int8_t j;
-        for (j = 0; j < code_dims; j++)
         {
-            if (code2[j] == code1[j] && code1[j] != 0) {
-                dist2 += 1;
+            if (code1[j] != 0) {
+                visible_count1 += 1;
             }
+            if (code2[j] != 0) {
+                visible_count2 += 1;
+            }
+            dist2 += abs(code2[j] - code1[j]);
         }
-        dist2 = 1.0 - dist2 / code_dims;
     }
-    // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
+    if (visible_count2 == 0) {
+        dist2 = 1.0;
+    } else {
+        dist2 = dist2 / code_dims;
+    }
     if (alpha < 0) {
         return dist2;
     }
+    if (visible_count1 == 0) {
+        return dist1;
+    }
 
-    // alpha > 0
     dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
+
 
 /************************************************
 Get squared distance from point to cube in specified dimension
