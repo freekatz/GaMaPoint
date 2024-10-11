@@ -19,6 +19,7 @@ class Stage(nn.Module):
                  mamba_blocks=[1, 1, 1, 1],
                  res_blocks=[4, 4, 8, 4],
                  mlp_ratio=2.,
+                 beta=0.,
                  bn_momentum=0.02,
                  drop_paths=None,
                  head_drops=None,
@@ -68,6 +69,7 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
             drop_path=drop_paths[layer_index],
         )
+        self.beta = nn.Parameter(torch.tensor([beta], dtype=torch.float32) * 100)
 
         mamba_config.n_layer = mamba_blocks[layer_index]
         self.pm = PointMambaLayer(
@@ -123,16 +125,23 @@ class Stage(nn.Module):
             idx = gs.gs_points.idx_ds[self.layer_index - 1]
             p = p[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
-            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
+            pre_gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index - 1]
+            pre_group_idx_all = torch.cat([pre_group_idx, pre_gs_group_idx], dim=1)
+            f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx_all.unsqueeze(0)).squeeze(0)[idx]
 
         # set abstraction: group and abstract the local points set
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
+        gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
+        f_local_gs = self.sa_gs(p, f, gs_group_idx)
+        beta = self.beta.sigmoid()
+        f_local = f_local * (1 - beta) + f_local_gs * beta
 
         # invert residual connections: local feature aggregation and propagation
+        group_all = torch.cat([group_idx, gs_group_idx], dim=1)
         pts = gs.gs_points.pts_list[self.layer_index].tolist()
-        f_local = self.res_mlp(f_local.unsqueeze(0), group_idx.unsqueeze(0), pts) if not self.use_cp \
-            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_idx.unsqueeze(0), pts)
+        f_local = self.res_mlp(f_local.unsqueeze(0), group_all.unsqueeze(0), pts) if not self.use_cp \
+            else checkpoint(self.res_mlp.forward, f_local.unsqueeze(0), group_all.unsqueeze(0), pts)
         f_local = f_local.squeeze(0)
 
         # point mamba: extract the global feature from center points of local
@@ -149,9 +158,9 @@ class Stage(nn.Module):
 
         # regularization
         if self.training:
-            N, K = group_idx.shape
+            N, K = group_all.shape
             rand_group = torch.randint(0, K, (N, 1), device=p.device)
-            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
+            rand_group_idx = torch.gather(group_all, 1, rand_group).squeeze(1)
             rand_p_group = p[rand_group_idx] - p
             rand_p_group.mul_(self.diff_std)
             rand_f_group = f[rand_group_idx] - f

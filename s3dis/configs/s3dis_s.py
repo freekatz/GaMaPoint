@@ -52,6 +52,7 @@ class ModelConfig(EasyConfig):
         stage_cfg.mamba_blocks = [1, 1, 1, 1]
         stage_cfg.res_blocks = [4, 4, 8, 4]
         stage_cfg.mlp_ratio = 2.
+        stage_cfg.beta = self.train_cfg.alpha
         stage_cfg.bn_momentum = self.bn_momentum
         drop_rates = torch.linspace(0., drop_path, sum(stage_cfg.res_blocks)).split(stage_cfg.res_blocks)
         stage_cfg.drop_paths = [d.tolist() for d in drop_rates]
