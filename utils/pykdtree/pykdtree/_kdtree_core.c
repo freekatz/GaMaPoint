@@ -538,16 +538,13 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
         }
     }
 
-    if (visible_count2 == 0) {
+    if (visible_count2 == 0 || visible_count1 == 0) {
         dist2 = 1.0;
     } else {
         dist2 = dist2 / code_dims;
     }
     if (alpha < 0) {
         return dist2;
-    }
-    if (visible_count1 == 0) {
-        return dist1;
     }
 
     dist2 = dist2 * scaler * alpha;
@@ -1228,16 +1225,13 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
         }
     }
 
-    if (visible_count2 == 0) {
+    if (visible_count2 == 0 || visible_count1 == 0) {
         dist2 = 1.0;
     } else {
         dist2 = dist2 / code_dims;
     }
     if (alpha < 0) {
         return dist2;
-    }
-    if (visible_count1 == 0) {
-        return dist1;
     }
 
     dist2 = dist2 * scaler * alpha;
