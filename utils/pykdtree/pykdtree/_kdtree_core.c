@@ -521,16 +521,23 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
     }
 
     float dist2 = 0;
+    float v1 = 0;
+    float v2 = 0;
     if (alpha != 0) {
         int8_t j;
         for (j = 0; j < code_dims; j++)
         {
-            dist2 += code2[j] * code1[j];
+            v1 += code1[j];
+            v2 += code2[j];
+            dist2 += abs(code2[j] - code1[j]);
         }
-        dist2 = 1.0 - dist2 / code_dims;
+        dist2 = dist2 / code_dims;
     }
     // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
+    if (v1 == 0 || v2 == 0) {
+        dist2 = 1.0;
+    }
     if (alpha < 0) {
         return dist2;
     }
@@ -539,6 +546,7 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
     dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
+
 
 /************************************************
 Get squared distance from point to cube in specified dimension
@@ -1199,16 +1207,23 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
     }
 
     double dist2 = 0;
+    double v1 = 0;
+    double v2 = 0;
     if (alpha != 0) {
         int8_t j;
         for (j = 0; j < code_dims; j++)
         {
-            dist2 += code2[j] * code1[j];
+            v1 += code1[j];
+            v2 += code2[j];
+            dist2 += abs(code2[j] - code1[j]);
         }
-        dist2 = 1.0 - dist2 / code_dims;
+        dist2 = dist2 / code_dims;
     }
     // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
+    if (v1 == 0 || v2 == 0) {
+        dist2 = 1.0;
+    }
     if (alpha < 0) {
         return dist2;
     }
