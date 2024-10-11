@@ -12,7 +12,7 @@ class ShapeNetPartConfig(EasyConfig):
         super().__init__()
         self.name = 'ShapeNetPartConfig'
         self.k = [32, 32, 32, 32]
-        self.strides = [1, 4, 2, 2]
+        self.strides = [1, 4, 3, 3]
         self.voxel_max = 2048
         gs_opts = GaussianOptions.default()
         gs_opts.n_cameras = 16
