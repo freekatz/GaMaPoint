@@ -516,20 +516,33 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
         }
     }
     float dist2 = 0;
+    uint8_t all_zero1 = 0;
+    uint8_t all_zero2 = 0;
     if (alpha != 0) {
         int8_t j;
         for (j = 0; j < code_dims; j++)
         {
+            if (all_zero1 == 0 && code1[j] > 0) {
+                all_zero1 = 1;
+            }
+            if (all_zero2 == 0 && code2[j] > 0) {
+                all_zero2 = 1;
+            }
             dist2 += abs(code2[j] - code1[j]);
         }
         dist2 = dist2 / code_dims;
     }
-//    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
+//    float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
     float dist = 0;
-    if (alpha >= 0) {
-        dist = dist1 * (1-alpha) + dist2 * scaler * alpha;
+
+    if (all_zero1 & all_zero2 == 0) {
+        dist = dist1;
     } else {
-        dist = dist2;
+        if (alpha >= 0) {
+            dist = dist1 * (1-alpha) + dist2 * scaler * alpha;
+        } else {
+            dist = dist2;
+        }
     }
     return dist;
 }
@@ -1188,21 +1201,35 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
         }
     }
     double dist2 = 0;
+    uint8_t all_zero1 = 0;
+    uint8_t all_zero2 = 0;
     if (alpha != 0) {
         int8_t j;
         for (j = 0; j < code_dims; j++)
         {
+            if (all_zero1 == 0 && code1[j] > 0) {
+                all_zero1 = 1;
+            }
+            if (all_zero2 == 0 && code2[j] > 0) {
+                all_zero2 = 1;
+            }
             dist2 += abs(code2[j] - code1[j]);
         }
         dist2 = dist2 / code_dims;
     }
 //    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
     double dist = 0;
-    if (alpha >= 0) {
-        dist = dist1 * (1-alpha) + dist2 * scaler * alpha;
+
+    if (all_zero1 & all_zero2 == 0) {
+        dist = dist1;
     } else {
-        dist = dist2;
+        if (alpha >= 0) {
+            dist = dist1 * (1-alpha) + dist2 * scaler * alpha;
+        } else {
+            dist = dist2;
+        }
     }
+    return dist;
 }
 
 /************************************************
