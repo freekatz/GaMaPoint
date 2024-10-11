@@ -254,7 +254,7 @@ def main(cfg):
                 logging.info(f'@E{epoch} new best: cls miou {best_cls_miou:.4f} => {val_cls_miou:.4f}')
                 is_best_cls = True
                 best_cls_miou = val_cls_miou
-            else:
+            if not is_best_ins or not is_best_cls:
                 logging.info(f'@E{epoch} cur best: ins miou {best_ins_miou:.4f}, cls miou {best_cls_miou:.4f}')
         if is_best_ins or is_best_cls:
             train_info = {

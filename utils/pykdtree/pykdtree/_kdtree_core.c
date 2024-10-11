@@ -534,20 +534,14 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
     }
     // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
-//    if (visible_count1 == 0 || alpha == 0) {
-//        return dist1;
-//    }
+    if (visible_count1 == 0 || alpha == 0) {
+        return dist1;
+    }
     if (alpha < 0) {
         return dist2;
     }
 
-//    // alpha > 0
-//    if (visible_count2 == 0) {
-//        // set alpha as 1.0
-//        dist2 = dist2 * scaler;
-//    } else {
-//        dist2 = dist2 * scaler * alpha;
-//    }
+    // alpha > 0
     dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
@@ -1224,20 +1218,14 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
     }
     // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
-//    if (visible_count1 == 0 || alpha == 0) {
-//        return dist1;
-//    }
+    if (visible_count1 == 0 || alpha == 0) {
+        return dist1;
+    }
     if (alpha < 0) {
         return dist2;
     }
 
-//    // alpha > 0
-//    if (visible_count2 == 0) {
-//        // set alpha as 1.0
-//        dist2 = dist2 * scaler;
-//    } else {
-//        dist2 = dist2 * scaler * alpha;
-//    }
+    // alpha > 0
     dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
