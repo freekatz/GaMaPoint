@@ -527,6 +527,7 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
     uint8_t visible_count2 = 0;
     if (alpha != 0) {
         int8_t j;
+        for (j = 0; j < code_dims; j++)
         {
             if (code1[j] != 0) {
                 visible_count1 += 1;
@@ -1214,6 +1215,7 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
     uint8_t visible_count2 = 0;
     if (alpha != 0) {
         int8_t j;
+        for (j = 0; j < code_dims; j++)
         {
             if (code1[j] != 0) {
                 visible_count1 += 1;
