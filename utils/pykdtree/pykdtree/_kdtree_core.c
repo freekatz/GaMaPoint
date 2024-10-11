@@ -516,17 +516,17 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
         }
     }
     float dist2 = 0;
-    uint8_t all_zero1 = 0;
-    uint8_t all_zero2 = 0;
+    uint8_t visible_count1 = 0;
+    uint8_t visible_count2 = 0;
     if (alpha != 0) {
         int8_t j;
         for (j = 0; j < code_dims; j++)
         {
-            if (all_zero1 == 0 && code1[j] > 0) {
-                all_zero1 = 1;
+            if (code1[j] != 0) {
+                visible_count1 += 1;
             }
-            if (all_zero2 == 0 && code2[j] > 0) {
-                all_zero2 = 1;
+            if (code2[j] != 0) {
+                visible_count2 += 1;
             }
             dist2 += abs(code2[j] - code1[j]);
         }
@@ -534,22 +534,19 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
     }
 //    float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
-    if (all_zero1 == 0) {
+    if (alpha < 0) {
+        return dist2;
+    }
+    if (visible_count1 == 0) {
         return dist1;
     }
-    if (all_zero2 == 0) {
+    if (visible_count2 == 0) {
+        // set alpha as 1.0
         dist2 = dist2 * scaler;
     } else {
         dist2 = dist2 * scaler * alpha;
     }
-
-    float dist = 0;
-    if (alpha >= 0) {
-        dist = dist1 + dist2;
-    } else {
-        dist = dist2;
-    }
-    return dist;
+    return dist1 + dist2;
 }
 
 /************************************************
@@ -1206,35 +1203,37 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
         }
     }
     double dist2 = 0;
-    uint8_t all_zero1 = 0;
-    uint8_t all_zero2 = 0;
+    uint8_t visible_count1 = 0;
+    uint8_t visible_count2 = 0;
     if (alpha != 0) {
         int8_t j;
         for (j = 0; j < code_dims; j++)
         {
-            if (all_zero1 == 0 && code1[j] > 0) {
-                all_zero1 = 1;
+            if (code1[j] != 0) {
+                visible_count1 += 1;
             }
-            if (all_zero2 == 0 && code2[j] > 0) {
-                all_zero2 = 1;
+            if (code2[j] != 0) {
+                visible_count2 += 1;
             }
             dist2 += abs(code2[j] - code1[j]);
         }
         dist2 = dist2 / code_dims;
     }
-//    double dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
-    double dist = 0;
+//    float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
-    if (all_zero1 & all_zero2 == 0) {
-        dist = dist1;
-    } else {
-        if (alpha >= 0) {
-            dist = dist1 * (1-alpha) + dist2 * scaler * alpha;
-        } else {
-            dist = dist2;
-        }
+    if (alpha < 0) {
+        return dist2;
     }
-    return dist;
+    if (visible_count1 == 0) {
+        return dist1;
+    }
+    if (visible_count2 == 0) {
+        // set alpha as 1.0
+        dist2 = dist2 * scaler;
+    } else {
+        dist2 = dist2 * scaler * alpha;
+    }
+    return dist1 + dist2;
 }
 
 /************************************************
