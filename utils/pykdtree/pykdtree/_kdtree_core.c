@@ -509,12 +509,14 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
         alpha = 1.0;
     }
     float dist1 = 0, dim_dist;
+    float dist2 = 0;
     if (alpha >= 0) {
         int8_t i;
         for (i = 0; i < no_dims; i++)
         {
             dim_dist = point2_coord[i] - point1_coord[i];
             dist1 += dim_dist * dim_dist;
+            dist2 += code2[i] * code1[i];
         }
     }
     if (alpha == 0) {
@@ -522,28 +524,12 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
     }
 
     // alpha != 0
-    float dist2 = 0;
-    uint8_t visible_count1 = 0;
-    uint8_t visible_count2 = 0;
-    if (alpha != 0) {
-        int8_t j;
-        for (j = 0; j < code_dims; j++)
-        {
-            if (code1[j] != 0) {
-                visible_count1 += 1;
-            }
-            if (code2[j] != 0) {
-                visible_count2 += 1;
-            }
-            dist2 += abs(code2[j] - code1[j]);
-        }
+    int8_t j;
+    for (j = no_dims; j < code_dims; j++)
+    {
+        dist2 += code2[j] * code1[j];
     }
-
-    if (visible_count2 == 0 || visible_count1 == 0) {
-        dist2 = 1.0;
-    } else {
-        dist2 = dist2 / code_dims;
-    }
+    dist2 = 1.0 - dist2 / code_dims;
     if (alpha < 0) {
         return dist2;
     }
@@ -1197,12 +1183,14 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
         alpha = 1.0;
     }
     double dist1 = 0, dim_dist;
+    double dist2 = 0;
     if (alpha >= 0) {
         int8_t i;
         for (i = 0; i < no_dims; i++)
         {
             dim_dist = point2_coord[i] - point1_coord[i];
             dist1 += dim_dist * dim_dist;
+            dist2 += code2[i] * code1[i];
         }
     }
     if (alpha == 0) {
@@ -1210,28 +1198,12 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
     }
 
     // alpha != 0
-    double dist2 = 0;
-    uint8_t visible_count1 = 0;
-    uint8_t visible_count2 = 0;
-    if (alpha != 0) {
-        int8_t j;
-        for (j = 0; j < code_dims; j++)
-        {
-            if (code1[j] != 0) {
-                visible_count1 += 1;
-            }
-            if (code2[j] != 0) {
-                visible_count2 += 1;
-            }
-            dist2 += abs(code2[j] - code1[j]);
-        }
+    int8_t j;
+    for (j = no_dims; j < code_dims; j++)
+    {
+        dist2 += code2[j] * code1[j];
     }
-
-    if (visible_count2 == 0 || visible_count1 == 0) {
-        dist2 = 1.0;
-    } else {
-        dist2 = dist2 / code_dims;
-    }
+    dist2 = 1.0 - dist2 / code_dims;
     if (alpha < 0) {
         return dist2;
     }
@@ -1239,7 +1211,6 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
     dist2 = dist2 * scaler * alpha;
     return dist1 + dist2;
 }
-
 
 /************************************************
 Get squared distance from point to cube in specified dimension
