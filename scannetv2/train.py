@@ -31,7 +31,7 @@ def read_gs(train_cfg, gs_list):
         gs_list[i].gs_points.to_cuda(non_blocking=True)
         gs_list[i].projects(gs_list[i].gs_points.p, cam_seed=i, cam_batch=16)
         gs_list[i].gs_points = make_gs_points(gs_list[i].gs_points, train_cfg.k, train_cfg.grid_size, None,
-                                      up_sample=True, visible_sample_stride=train_cfg.visible_sample_stride,
+                                      up_sample=True, visible_sample_stride=0,
                                       alpha=train_cfg.alpha)
 
     new_gs = merge_gs_list(gs_list)
@@ -59,6 +59,7 @@ def warmup(cfg, model: nn.Module, warmup_loader):
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
     for idx, gs_list in pbar:
         gs = read_gs(cfg.model_cfg.train_cfg, gs_list)
+        gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         with autocast():
             pred, diff = model(gs)
@@ -79,6 +80,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
         gs = read_gs(cfg.model_cfg.train_cfg, gs_list)
+        gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         mask = target != 20
         with autocast():
@@ -112,6 +114,7 @@ def validate(cfg, model, val_loader, epoch):
     loss_meter = AverageMeter()
     for idx, gs_list in pbar:
         gs = read_gs(cfg.model_cfg.train_cfg, gs_list)
+        gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         mask = target != cfg.ignore_index
         with autocast():
