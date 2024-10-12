@@ -12,7 +12,7 @@ class ShapeNetPartConfig(EasyConfig):
         super().__init__()
         self.name = 'ShapeNetPartConfig'
         self.k = [20, 20, 20, 20]
-        self.use_gs = True
+        self.use_gs = False
         self.k_gs = [5, 5, 5, 5]
         self.n_samples = [2048, 512, 192, 64]
         self.voxel_max = 2048

@@ -12,7 +12,7 @@ class S3disConfig(EasyConfig):
         super().__init__()
         self.name = 'S3disConfig'
         self.k = [24, 24, 24, 24]
-        self.use_gs = True
+        self.use_gs = False
         self.k_gs = [6, 6, 6, 6]
         self.grid_size = [0.08, 0.16, 0.32]
         self.voxel_max = 30000
@@ -28,7 +28,7 @@ class S3disWarmupConfig(EasyConfig):
         super().__init__()
         self.name = 'S3disWarmupConfig'
         self.k = [24, 24, 24, 24]
-        self.use_gs = True
+        self.use_gs = False
         self.k_gs = [6, 6, 6, 6]
         self.grid_size = [0.08, 0.16, 0.32]
         self.voxel_max = 30000

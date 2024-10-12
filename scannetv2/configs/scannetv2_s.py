@@ -12,7 +12,7 @@ class ScanNetV2Config(EasyConfig):
         super().__init__()
         self.name = 'ScanNetV2Config'
         self.k = [24, 24, 24, 24, 24]
-        self.use_gs = True
+        self.use_gs = False
         self.k_gs = [6, 6, 6, 6, 6]
         self.grid_size = [0.04, 0.08, 0.16, 0.32]
         self.voxel_max = 80000
@@ -28,7 +28,7 @@ class ScanNetV2WarmupConfig(EasyConfig):
         super().__init__()
         self.name = 'ScanNetV2WarmupConfig'
         self.k = [24, 24, 24, 24, 24]
-        self.use_gs = True
+        self.use_gs = False
         self.k_gs = [6, 6, 6, 6, 6]
         self.grid_size = [0.04, 0.08, 0.16, 0.32]
         self.voxel_max = 80000

@@ -12,7 +12,7 @@ class ModelNet40Config(EasyConfig):
         super().__init__()
         self.name = 'ModelNet40Config'
         self.k = [20, 20, 20]
-        self.use_gs = True
+        self.use_gs = False
         self.k_gs = [5, 5, 5]
         self.n_samples = [1024, 256, 64]
         self.visible_sample_stride = 0.
