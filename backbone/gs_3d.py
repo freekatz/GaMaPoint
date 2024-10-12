@@ -429,9 +429,9 @@ class NaiveGaussian3D:
         return cov2d
 
 
-def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, visible_sample_stride=0., alpha=0.) -> GaussianPoints:
-    assert (grid_size is not None and strides is not None) is False
-    assert (grid_size is None and strides is None) is False
+def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_sample=True, visible_sample_stride=0., alpha=0., use_gs=False) -> GaussianPoints:
+    assert (grid_size is not None and n_samples is not None) is False
+    assert (grid_size is None and n_samples is None) is False
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).float()
@@ -465,8 +465,7 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
                     _, ds_idx = visible_sample(p.unsqueeze(0), gs_points.visible.unsqueeze(0), int(p.shape[0] // visible_sample_stride))
                     ds_idx = ds_idx.squeeze(0)
                 else:
-                    stride = strides[i-1]
-                    _, ds_idx = fps_sample(p.unsqueeze(0), p.shape[0]//stride)
+                    _, ds_idx = fps_sample(p.unsqueeze(0), n_samples[i-1])
                     ds_idx = ds_idx.squeeze(0)
             p = p[ds_idx]
             visible = visible[ds_idx]
