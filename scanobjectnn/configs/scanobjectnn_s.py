@@ -12,7 +12,7 @@ class ScanObjectNNConfig(EasyConfig):
         super().__init__()
         self.name = 'ScanObjectNNConfig'
         self.k = [24, 24, 24]
-        self.use_gs = False
+        self.use_gs = True
         self.k_gs = [6, 6, 6]
         self.n_samples = [1024, 256, 64]
         self.visible_sample_stride = 0.
