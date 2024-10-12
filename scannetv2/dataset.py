@@ -226,10 +226,6 @@ class ScanNetV2(Dataset):
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', lbl)
-        gs.projects(xyz, cam_seed=idx, cam_batch=16)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None,
-                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
         return gs
 
     def get_test_item(self, idx):
@@ -266,15 +262,11 @@ class ScanNetV2(Dataset):
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', feature)
         gs.gs_points.__update_attr__('y', lbl)
-        gs.projects(xyz, cam_seed=idx, cam_batch=16)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.grid_size, None,
-                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
         return gs
 
 
 def scannetv2_collate_fn(batch):
     gs_list = list(batch)
-    new_gs = merge_gs_list(gs_list)
-    return new_gs
+
+    return gs_list
 

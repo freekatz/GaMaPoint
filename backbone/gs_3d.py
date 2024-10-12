@@ -475,7 +475,7 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
 
         # group
         k = ks[i]
-        _p, _v = p.numpy(), visible.numpy()
+        _p, _v = p.detach().cpu().numpy(), visible.detach().cpu().numpy()
         kdt = KDTree(_p, _v)
         _, idx = kdt.query(_p, _v, k=k, alpha=alpha, scaler=scaler)
         # _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=-1)
@@ -484,7 +484,7 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
 
         # up sample
         if i > 0 and up_sample:
-            _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1)
+            _, us_idx = kdt.query(full_p.detach().cpu().numpy(), full_visible.detach().cpu().numpy(), k=1)
             idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)

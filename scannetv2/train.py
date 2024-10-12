@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from backbone import make_gs_points, merge_gs_list
 from backbone.model import SegSemHead, Stage
 from scannetv2.configs import model_configs
 from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
@@ -24,6 +25,17 @@ from utils.logger import setup_logger_dist, format_dict, format_list
 from utils.metrics import Timer, Metric, AverageMeter
 from utils.random import set_random_seed
 
+
+def read_gs(train_cfg, gs_list):
+    for i in range(len(gs_list)):
+        gs_list[i].gs_points.to_cuda(non_blocking=True)
+        gs_list[i].projects(gs_list[i].gs_points.p, cam_seed=i, cam_batch=16)
+        gs_list[i].gs_points = make_gs_points(gs_list[i].gs_points, train_cfg.k, train_cfg.grid_size, None,
+                                      up_sample=True, visible_sample_stride=train_cfg.visible_sample_stride,
+                                      alpha=train_cfg.alpha)
+
+    new_gs = merge_gs_list(gs_list)
+    return new_gs
 
 def prepare_exp(cfg):
     exp_root = 'exp'
@@ -45,8 +57,8 @@ def prepare_exp(cfg):
 def warmup(cfg, model: nn.Module, warmup_loader):
     model.train()
     pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
-    for idx, gs in pbar:
-        gs.gs_points.to_cuda(non_blocking=True)
+    for idx, gs_list in pbar:
+        gs = read_gs(cfg.model_cfg.train_cfg, gs_list)
         target = gs.gs_points.y
         with autocast():
             pred, diff = model(gs)
@@ -61,12 +73,12 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     loss_meter = AverageMeter()
     diff_meter = AverageMeter()
     steps_per_epoch = len(train_loader)
-    for idx, gs in pbar:
+    for idx, gs_list in pbar:
         lam = scheduler_steps/(epoch*steps_per_epoch)
         lam = 3e-3 ** lam * 0.2
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
-        gs.gs_points.to_cuda(non_blocking=True)
+        gs = read_gs(cfg.model_cfg.train_cfg, gs_list)
         target = gs.gs_points.y
         mask = target != 20
         with autocast():
@@ -98,8 +110,8 @@ def validate(cfg, model, val_loader, epoch):
     pbar = tqdm(enumerate(val_loader), total=val_loader.__len__(), desc='Val')
     m = Metric(cfg.num_classes)
     loss_meter = AverageMeter()
-    for idx, gs in pbar:
-        gs.gs_points.to_cuda(non_blocking=True)
+    for idx, gs_list in pbar:
+        gs = read_gs(cfg.model_cfg.train_cfg, gs_list)
         target = gs.gs_points.y
         mask = target != cfg.ignore_index
         with autocast():
