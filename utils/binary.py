@@ -25,10 +25,10 @@ def bin2dec_split(b, max_bits=64):
 
 
 if __name__ == '__main__':
-    b = (torch.randn(10, 9) > 0).to(torch.uint8)
+    b = (torch.ones(10, 64) > 0).to(torch.int64)
     print(b)
     print(b.shape)
-    i = bin2dec_split(b, 4)
+    i = bin2dec_split(b, 64)
     print(i)
     print(i.shape)
-
+    print(i[0])

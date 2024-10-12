@@ -438,8 +438,8 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     assert (grid_size is None and n_samples is None) is False
     n_layers = len(ks)
     full_p = gs_points.p
-    full_visible = gs_points.visible.squeeze(1).to(torch.uint8)
-    full_v = bin2dec_split(full_visible, max_bits=64)  # N x M//64
+    full_visible = gs_points.visible.squeeze(1).to(torch.long)
+    full_v = bin2dec_split(full_visible, max_bits=48)
 
     if not use_gs:
         # estimating a distance in Euclidean space as the scaler
@@ -481,7 +481,7 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
         _v = v.numpy()
         kdt = KDTree(_p, _v)
         if use_gs:
-            _, idx = kdt.query(_p, _v, k=k, alpha=0)
+            _, idx = kdt.query(_p, _v, full_visible.shape[-1], k=k, alpha=0)
             idx_group.append(torch.from_numpy(idx).long())
 
             k_gs = ks_gs[i]
