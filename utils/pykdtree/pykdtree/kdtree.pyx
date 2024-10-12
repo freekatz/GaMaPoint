@@ -147,7 +147,7 @@ cdef class KDTree:
             with nogil:
                 self._kdtree_double = construct_tree_double(self._data_pts_data_double, self.ndim, self.n, self.leafsize)
 
-    def query(KDTree self, np.ndarray query_pts not None, np.ndarray query_code not None, uint32_t code_length not None,
+    def query(KDTree self, np.ndarray query_pts not None, np.ndarray query_code not None, uint32_t code_length,
               alpha=0., scaler=1., k=1, eps=0, distance_upper_bound=None, sqr_dists=False, mask=None):
         """Query the kd-tree for nearest neighbors
 
