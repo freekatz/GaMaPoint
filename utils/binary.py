@@ -11,7 +11,7 @@ def bin2dec(b, bits):
     return torch.sum(mask * b, -1)
 
 
-def bin2dec_split(b, max_bits=64):
+def bin2dec_split(b, max_bits=32):
     b = torch.split(b, max_bits, dim=-1)
     masks = []
     for _b in b:

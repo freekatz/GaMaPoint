@@ -439,14 +439,14 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).to(torch.uint8)
-    full_v = bin2dec_split(full_visible, max_bits=64)  # N x M//64
+    full_v = bin2dec_split(full_visible, max_bits=32)  # N x M//64
 
     if not use_gs:
         # estimating a distance in Euclidean space as the scaler
         ps, _ = fps_sample(full_p.unsqueeze(0), 2, random_start_point=True)
         ps = ps.squeeze(0)
         p0, p1 = ps[0], ps[1]
-        scaler = math.sqrt((p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2)
+        scaler = (p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2
 
     p = full_p
     v = full_v
