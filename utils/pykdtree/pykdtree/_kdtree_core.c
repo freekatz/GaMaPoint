@@ -797,7 +797,7 @@ void search_tree_float(Tree_float *tree, float *pa, uint8_t *code, float *point_
         /* The low chunk size is important to avoid L2 cache trashing
            for spatial coherent query datasets
         */
-        #pragma omp for private(i, j) schedule(static, 20) nowait
+        #pragma omp for private(i, j) schedule(static, 100) nowait
         for (i = 0; i < local_num_points; i++)
         {
             for (j = 0; j < k; j++)
@@ -1462,7 +1462,7 @@ void search_tree_double(Tree_double *tree, double *pa, uint8_t *code, double *po
         /* The low chunk size is important to avoid L2 cache trashing
            for spatial coherent query datasets
         */
-        #pragma omp for private(i, j) schedule(static, 20) nowait
+        #pragma omp for private(i, j) schedule(static, 100) nowait
         for (i = 0; i < local_num_points; i++)
         {
             for (j = 0; j < k; j++)
