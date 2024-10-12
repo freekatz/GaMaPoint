@@ -128,28 +128,6 @@ void search_tree_double(Tree_double *tree, double *pa, uint8_t *code, double *po
                        double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists);
 
 
-
-uint64_t calc_ham_dist(const uint8_t* p, const uint8_t* q, const int32_t size) {
-    uint64_t res = 0;
-    int8_t v1 = 0;
-    int8_t v2 = 0;
-    for (uint64_t i = 0; i < size; ++i) {
-      if (*(p+i) != 0 && v1 != 0) {
-        v1 = 1;
-      }
-      if (*(q+i) != 0 && v2 != 0) {
-        v2 = 1;
-      }
-      uint64_t r = (*(p + i)) ^ (*(q + i));
-      res += __builtin_popcountll(r);
-    }
-    if (v1 == 0 || v2 == 0) {
-        res = size;
-    }
-    return res;
-}
-
-
 /************************************************
 Insert point into priority queue
 Params:
@@ -533,7 +511,13 @@ float calc_dist_float(float *point1_coord, uint8_t *code1, float *point2_coord, 
         return dist1;
     }
 
-    float dist2 = calc_ham_dist(code1, code2, code_dims) / code_dims;
+    float dist2 = 0;
+    int8_t j;
+    for (j = 0; j < code_dims; j++)
+    {
+        dist2 = code2[i] * code1[i];
+    }
+    dist2 = dist2 / code_dims;
     if (alpha < 0) {
         return dist2;
     }
@@ -1201,7 +1185,13 @@ double calc_dist_double(double *point1_coord, uint8_t *code1, double *point2_coo
         return dist1;
     }
 
-    double dist2 = calc_ham_dist(code1, code2, code_dims) / code_dims;
+    double dist2 = 0;
+    int8_t j;
+    for (j = 0; j < code_dims; j++)
+    {
+        dist2 = code2[i] * code1[i];
+    }
+    dist2 = dist2 / code_dims;
     if (alpha < 0) {
         return dist2;
     }
