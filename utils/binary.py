@@ -12,17 +12,15 @@ def bin2dec(b, bits):
 
 
 def bin2dec_split(b, max_bits=64):
-    bits = b.shape[-1]
-    assert bits % max_bits == 0
     b = torch.split(b, max_bits, dim=-1)
     masks = []
     for _b in b:
-        masks.append(bin2dec(_b, max_bits))
+        masks.append(bin2dec(_b, _b.shape[-1]))
     return torch.stack(masks, dim=-1)
 
 
 if __name__ == '__main__':
-    b = (torch.randn(10, 8) > 0).to(torch.uint8)
+    b = (torch.randn(10, 9) > 0).to(torch.uint8)
     print(b)
     print(b.shape)
     i = bin2dec_split(b, 4)
