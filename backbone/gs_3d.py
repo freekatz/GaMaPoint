@@ -480,7 +480,9 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
         if use_gs:
             _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=0)
             idx_group.append(torch.from_numpy(idx).long())
-            _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=-1)
+
+            k_gs = ks_gs[i]
+            _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k_gs, alpha=-1)
             idx_gs_group.append(torch.from_numpy(idx_gs).long())
         else:
             _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
