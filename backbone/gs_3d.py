@@ -573,7 +573,7 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     new_gs.gs_points.__update_attr__('idx_ds', idx_ds)  # layer_idx: [1, 2, 3]
     new_gs.gs_points.__update_attr__('idx_us', idx_us)  # layer_idx: [2, 1, 0]
     new_gs.gs_points.__update_attr__('idx_group', idx_group)  # layer_idx: [0, 1, 2, 3]
-    # new_gs.gs_points.__update_attr__('idx_gs_group', idx_gs_group)  # layer_idx: [0, 1, 2, 3]
+    new_gs.gs_points.__update_attr__('idx_gs_group', idx_gs_group)  # layer_idx: [0, 1, 2, 3]
     pts_list = torch.tensor(pts_all, dtype=torch.int64)
     pts_list = pts_list.view(-1, n_layers).transpose(0, 1).contiguous()  # batch_size * layer_idx: [0, 1, 2, 3]
     new_gs.gs_points.__update_attr__('pts_list', pts_list)
