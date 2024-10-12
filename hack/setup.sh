@@ -27,6 +27,7 @@ pip install --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_pa
 pip install -r $HACK_DIR/requirements.txt
 
 # setup kdtree cuda extensions
+sudo apt-get install libomp-dev
 cd $PWD/backbone/ops/pykdtree
 pip install .
 cd $PWD
