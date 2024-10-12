@@ -17,7 +17,7 @@
 
 import numpy as np
 cimport numpy as np
-from libc.stdint cimport uint32_t, int8_t, uint8_t, int32_t
+from libc.stdint cimport uint32_t, int8_t, uint8_t, int32_t, uint64_t
 cimport cython
 
 np.import_array()
@@ -56,14 +56,14 @@ cdef struct tree_double:
     node_double *root
 
 cdef extern tree_float * construct_tree_float(float *pa, int8_t no_dims, uint32_t n, uint32_t bsp) nogil
-cdef extern void search_tree_float(tree_float *kdtree, float *pa, uint8_t *code, float *point_coords, uint8_t *query_code,
+cdef extern void search_tree_float(tree_float *kdtree, float *pa, uint64_t *code, float *point_coords, uint64_t *query_code,
                                    uint32_t num_points, uint32_t k, float alpha, float scaler, int32_t code_dims, float distance_upper_bound,
                                    float eps_fac, uint8_t *mask, uint32_t *closest_idxs,
                                    float *closest_dists) nogil
 cdef extern void delete_tree_float(tree_float *kdtree)
 
 cdef extern tree_double * construct_tree_double(double *pa, int8_t no_dims, uint32_t n, uint32_t bsp) nogil
-cdef extern void search_tree_double(tree_double *kdtree, double *pa, uint8_t *code, double *point_coords, uint8_t *query_code,
+cdef extern void search_tree_double(tree_double *kdtree, double *pa, uint64_t *code, double *point_coords, uint64_t *query_code,
                                     uint32_t num_points, uint32_t k, float alpha, float scaler, int32_t code_dims, double distance_upper_bound,
                                     double eps_fac, uint8_t *mask, uint32_t *closest_idxs, double *closest_dists) nogil
 cdef extern void delete_tree_double(tree_double *kdtree)
@@ -88,7 +88,7 @@ cdef class KDTree:
 
     cdef float *_data_pts_data_float
     cdef double *_data_pts_data_double
-    cdef uint8_t *_code_data
+    cdef uint64_t *_code_data
     cdef readonly uint32_t n
     cdef readonly int8_t ndim
     cdef readonly uint32_t leafsize
@@ -120,11 +120,11 @@ cdef class KDTree:
             self._data_pts_data_double = <double *> data_array_double.data
             self.data_pts = data_array_double
 
-        cdef np.ndarray[uint8_t, ndim=1] code_uint8
+        cdef np.ndarray[uint64_t, ndim=1] code_uint64
 
-        code_uint8 = np.ascontiguousarray(code.ravel(), dtype=np.uint8)
-        self._code_data = <uint8_t *> code_uint8.data
-        self.code = code_uint8
+        code_uint64 = np.ascontiguousarray(code.ravel(), dtype=np.uint64)
+        self._code_data = <uint64_t *> code_uint64.data
+        self.code = code_uint64
 
         # scipy interface compatibility
         self.data = self.data_pts
@@ -241,10 +241,10 @@ cdef class KDTree:
             query_array_data_double = <double *> query_array_double.data
 
 
-        cdef np.ndarray[uint8_t, ndim=1] query_code_uint8
+        cdef np.ndarray[uint64_t, ndim=1] query_code_uint64
 
-        query_code_uint8 = np.ascontiguousarray(query_code.ravel(), dtype=np.uint8)
-        query_code_data = <uint8_t *> query_code_uint8.data
+        query_code_uint64 = np.ascontiguousarray(query_code.ravel(), dtype=np.uint64)
+        query_code_data = <uint64_t *> query_code_uint64.data
 
         alpha_float = <float> alpha
         scaler_float = <float> scaler

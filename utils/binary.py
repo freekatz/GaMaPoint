@@ -11,12 +11,21 @@ def bin2dec(b, bits):
     return torch.sum(mask * b, -1)
 
 
+def bin2dec_split(b, max_bits=64):
+    bits = b.shape[-1]
+    assert bits % max_bits == 0
+    b = torch.split(b, max_bits, dim=-1)
+    masks = []
+    for _b in b:
+        masks.append(bin2dec(_b, max_bits))
+    return torch.stack(masks, dim=-1)
+
+
 if __name__ == '__main__':
-    bin1 = torch.tensor([[1, 0, 0, 1], [1, 0, 0, 1]])
-    bin2 = torch.tensor([[0, 0, 1, 1], [0, 0, 1, 1]])
-    i1 = bin2dec(bin1, 4)
-    i2 = bin2dec(bin2, 4)
-    i = i1 & i2
-    bin = dec2bin(i, 4)
-    print(i, bin)
-    print(i.shape, bin.shape)
+    b = (torch.randn(10, 8) > 0).to(torch.uint8)
+    print(b)
+    print(b.shape)
+    i = bin2dec_split(b, 4)
+    print(i)
+    print(i.shape)
+

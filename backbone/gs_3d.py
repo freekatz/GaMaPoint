@@ -6,12 +6,12 @@ import torch
 from einops import repeat
 from torch import nn
 
-from utils.binary import bin2dec
+from utils.binary import bin2dec_split
 from utils.point_utils import points_centroid, points_scaler
 from utils.camera import OrbitCamera
 from utils.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
 from pykdtree.kdtree import KDTree
-from utils.cutils import grid_subsampling, KDTree as KDTree_cuda
+from utils.cutils import grid_subsampling
 from utils.subsample import create_sampler, fps_sample, visible_sample
 
 
@@ -439,7 +439,7 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).to(torch.uint8)
-    full_v = bin2dec(full_visible, full_visible.shape[-1]).unsqueeze(0)
+    full_v = bin2dec_split(full_visible, max_bits=64)  # N x M//64
 
     if not use_gs:
         # estimating a distance in Euclidean space as the scaler
