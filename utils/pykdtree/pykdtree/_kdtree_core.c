@@ -1410,7 +1410,7 @@ void search_splitnode_double(Node_double *root, double *pa, uint32_t *pidx, uint
 	  if (dist_left < closest_dist[k - 1] * eps_fac)
         {
             /* Search left subtree if minimum distance is below limit*/
-            search_splitnode_double((Node_double *)root->left_child, pa, pidx, code, no_dims, point_coord, code_dims, query_code, dist_left, k, alpha, scaler, distance_upper_bound, eps_fac, mask, closest_idx, closest_dist);
+            search_splitnode_double((Node_double *)root->left_child, pa, pidx, code, no_dims, point_coord, code_dims, code_length, query_code, dist_left, k, alpha, scaler, distance_upper_bound, eps_fac, mask, closest_idx, closest_dist);
         }
     }
 }
