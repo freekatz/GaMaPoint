@@ -12,6 +12,7 @@ class ShapeNetPartConfig(EasyConfig):
         super().__init__()
         self.name = 'ShapeNetPartConfig'
         self.k = [20, 20, 20, 20]
+        self.use_gs = False
         self.k_gs = [5, 5, 5, 5]
         self.n_samples = [2048, 512, 192, 64]
         self.voxel_max = 2048
@@ -40,6 +41,7 @@ class ModelConfig(EasyConfig):
         stage_cfg.res_blocks = [4, 4, 4, 4]
         stage_cfg.mlp_ratio = 2.
         stage_cfg.beta = self.train_cfg.alpha
+        stage_cfg.use_gs = self.train_cfg.use_gs
         stage_cfg.bn_momentum = self.bn_momentum
         drop_rates = torch.linspace(0., drop_path, sum(stage_cfg.res_blocks)).split(stage_cfg.res_blocks)
         stage_cfg.drop_paths = [d.tolist() for d in drop_rates]

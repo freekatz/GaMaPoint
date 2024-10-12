@@ -136,6 +136,7 @@ def main(cfg):
             warmup=False,
             num_points=cfg.model_cfg.train_cfg.num_points,
             k=cfg.model_cfg.train_cfg.k,
+            use_gs=cfg.model_cfg.train_cfg.use_gs,
             k_gs=cfg.model_cfg.train_cfg.k_gs,
             n_samples=cfg.model_cfg.train_cfg.n_samples,
             visible_sample_stride=cfg.model_cfg.train_cfg.visible_sample_stride,

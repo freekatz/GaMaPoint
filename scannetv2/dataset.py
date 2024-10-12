@@ -126,6 +126,7 @@ class ScanNetV2(Dataset):
                  warmup=False,
                  voxel_max=64000,
                  k=[24, 24, 24, 24, 24],
+                 use_gs=False,
                  k_gs=[6, 6, 6, 6, 6],
                  grid_size=[0.04, 0.08, 0.16, 0.32],
                  visible_sample_stride=0.,
@@ -141,6 +142,7 @@ class ScanNetV2(Dataset):
         self.warmup = warmup
         self.voxel_max = voxel_max
         self.k = k
+        self.use_gs = use_gs
         self.k_gs = k_gs
         self.grid_size = grid_size
         self.visible_sample_stride = visible_sample_stride
@@ -231,7 +233,7 @@ class ScanNetV2(Dataset):
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
                                       up_sample=True, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
+                                      alpha=self.alpha, use_gs=self.use_gs)
         return gs
 
     def get_test_item(self, idx):
@@ -271,7 +273,7 @@ class ScanNetV2(Dataset):
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, self.grid_size, None,
                                       up_sample=True, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
+                                      alpha=self.alpha, use_gs=self.use_gs)
         return gs
 
 

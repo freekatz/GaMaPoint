@@ -16,6 +16,7 @@ class ModelNet40(Dataset):
                  warmup=False,
                  num_points=1024,
                  k=[20, 20, 20],
+                 use_gs=False,
                  k_gs=[5, 5, 5],
                  n_samples=[1024, 256, 64],
                  visible_sample_stride=0.,
@@ -30,6 +31,7 @@ class ModelNet40(Dataset):
         self.warmup = warmup
         self.num_points = num_points
         self.k = k
+        self.use_gs = use_gs
         self.k_gs = k_gs
         self.n_samples = n_samples
         self.visible_sample_stride = visible_sample_stride
@@ -72,7 +74,7 @@ class ModelNet40(Dataset):
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, None, self.n_samples,
                                       up_sample=False, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
+                                      alpha=self.alpha, use_gs=self.use_gs)
         # colors = make_gs_features(gs)
         # feature = torch.cat([feature, colors.unsqueeze(-1)], dim=-1)
         gs.gs_points.__update_attr__('f', feature)
