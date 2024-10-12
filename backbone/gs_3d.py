@@ -6,6 +6,7 @@ import torch
 from einops import repeat
 from torch import nn
 
+from utils.binary import bin2dec
 from utils.point_utils import points_centroid, points_scaler
 from utils.camera import OrbitCamera
 from utils.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
@@ -475,9 +476,8 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
         # group
         k = ks[i]
         k_gs = ks_gs[i]
-        _vc = visible.sum(dim=-1, keepdims=True).to(torch.uint8)
         _p = p.numpy()
-        _v = torch.cat([visible, _vc], dim=-1).numpy()
+        _v = bin2dec(visible, visible.shape[-1]).unsqueeze(0).numpy()
         kdt = KDTree(_p, _v)
         # _, idx = kdt.query(_p, _v, k=k, alpha=alpha, scaler=scaler)
         _, idx = kdt.query(_p, _v, k=k, alpha=0)
