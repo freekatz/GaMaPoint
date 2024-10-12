@@ -437,7 +437,6 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     assert (grid_size is not None and n_samples is not None) is False
     assert (grid_size is None and n_samples is None) is False
 
-
     if not use_gs:
         # estimating a distance in Euclidean space as the scaler
         ps, _ = fps_sample(gs_points.p.unsqueeze(0), 2, random_start_point=True)
@@ -445,7 +444,7 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
         p0, p1 = ps[0], ps[1]
         scaler = (p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2
     full_p = gs_points.p.contiguous()
-    full_visible = gs_points.visible.squeeze(1).to(torch.long)
+    full_visible = gs_points.visible.squeeze(1).to(torch.int64)
     full_v = bin2dec_split(full_visible, max_bits=48).contiguous()
 
 
