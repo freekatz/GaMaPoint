@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass, field
 
+import numpy as np
 import torch
 from einops import repeat
 from torch import nn
@@ -434,7 +435,7 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
     assert (grid_size is None and strides is None) is False
     n_layers = len(ks)
     full_p = gs_points.p
-    full_visible = gs_points.visible.squeeze(1).float()
+    full_visible = gs_points.visible.squeeze(1).to(torch.uint8)
 
     # estimating a distance in Euclidean space as the scaler
     ps, _ = fps_sample(full_p.unsqueeze(0), 2, random_start_point=True)
@@ -474,8 +475,9 @@ def make_gs_points(gs_points, ks, grid_size=None, strides=None, up_sample=True, 
 
         # group
         k = ks[i]
-        kdt = KDTree(p.numpy(), visible.numpy())
-        _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
+        _p, _v = p.numpy(), visible.numpy()
+        kdt = KDTree(_p, _v)
+        _, idx = kdt.query(_p, _v, k=k, alpha=alpha, scaler=scaler)
         # _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=-1)
         idx_group.append(torch.from_numpy(idx).long())
         # idx_gs_group.append(torch.from_numpy(idx_gs).long())
