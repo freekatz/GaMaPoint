@@ -1,3 +1,5 @@
+import logging
+
 import torch
 
 
@@ -11,7 +13,9 @@ def bin2dec(b, bits):
     return torch.sum(mask * b, -1)
 
 
-def bin2dec_split(b, max_bits=32):
+def bin2dec_split(b, max_bits=64):
+    if max_bits > 64:
+        logging.warning("max_bits too big, using 64 bits")
     b = torch.split(b, max_bits, dim=-1)
     masks = []
     for _b in b:

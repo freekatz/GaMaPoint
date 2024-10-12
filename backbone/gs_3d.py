@@ -439,7 +439,7 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).to(torch.uint8)
-    full_v = bin2dec_split(full_visible, max_bits=32)  # N x M//64
+    full_v = bin2dec_split(full_visible, max_bits=64)  # N x M//64
 
     if not use_gs:
         # estimating a distance in Euclidean space as the scaler
