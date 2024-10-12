@@ -515,7 +515,7 @@ float calc_dist_float(float *point1_coord, uint8_t *code1, float *point2_coord, 
     int8_t j;
     for (j = 0; j < code_dims; j++)
     {
-        dist2 += code2[j] & code1[j];
+        dist2 += __builtin_popcount(code2[j] & code1[j]);
     }
     dist2 = 1.0 - dist2 / code_dims;
     if (alpha < 0) {
@@ -1188,7 +1188,7 @@ double calc_dist_double(double *point1_coord, uint8_t *code1, double *point2_coo
     int8_t j;
     for (j = 0; j < code_dims; j++)
     {
-        dist2 += code2[j] & code1[j];
+        dist2 += __builtin_popcount(code2[j] & code1[j]);
     }
     dist2 = 1.0 - dist2 / code_dims;
     if (alpha < 0) {
