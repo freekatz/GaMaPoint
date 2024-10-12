@@ -432,13 +432,15 @@ class NaiveGaussian3D:
 
 
 def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_sample=True, visible_sample_stride=0., alpha=0., use_gs=False) -> GaussianPoints:
+    global scaler
+
     assert (grid_size is not None and n_samples is not None) is False
     assert (grid_size is None and n_samples is None) is False
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).to(torch.uint8)
 
-    if use_gs:
+    if not use_gs:
         # estimating a distance in Euclidean space as the scaler
         ps, _ = fps_sample(full_p.unsqueeze(0), 2, random_start_point=True)
         ps = ps.squeeze(0)
@@ -476,16 +478,20 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
 
         # group
         k = ks[i]
-        k_gs = ks_gs[i]
         _p = p.numpy()
         _v = bin2dec(visible, visible.shape[-1]).unsqueeze(0).numpy()
         kdt = KDTree(_p, _v)
-        # _, idx = kdt.query(_p, _v, k=k, alpha=alpha, scaler=scaler)
-        _, idx = kdt.query(_p, _v, k=k, alpha=0)
-        # _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k_gs, alpha=-1)
 
-        idx_group.append(torch.from_numpy(idx).long())
-        # idx_gs_group.append(torch.from_numpy(idx_gs).long())
+        if use_gs:
+            k_gs = ks_gs[i]
+
+            _, idx = kdt.query(_p, _v, k=k, alpha=0)
+            idx_group.append(torch.from_numpy(idx).long())
+            _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k_gs, alpha=-1)
+            idx_gs_group.append(torch.from_numpy(idx_gs).long())
+        else:
+            _, idx = kdt.query(_p, _v, k=k, alpha=alpha, scaler=scaler)
+            idx_group.append(torch.from_numpy(idx).long())
 
         # up sample
         if i > 0 and up_sample:
