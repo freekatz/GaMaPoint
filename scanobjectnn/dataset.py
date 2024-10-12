@@ -18,7 +18,8 @@ class ScanObjectNN(Dataset):
                  warmup=False,
                  num_points=1024,
                  k=[24, 24, 24],
-                 strides=[1, 4, 4],
+                 k_gs=[6, 6, 6],
+                 n_samples=[1024, 256, 64],
                  visible_sample_stride=0.,
                  alpha=0.,
                  batch_size=32,
@@ -31,7 +32,8 @@ class ScanObjectNN(Dataset):
         self.warmup = warmup
         self.num_points = num_points
         self.k = k
-        self.strides = strides
+        self.k_gs = k_gs
+        self.n_samples = n_samples
         self.visible_sample_stride = visible_sample_stride
         self.alpha = alpha
         self.batch_size = batch_size
@@ -73,7 +75,7 @@ class ScanObjectNN(Dataset):
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('y', label)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.strides,
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, None, self.n_samples,
                                       up_sample=False, visible_sample_stride=self.visible_sample_stride,
                                       alpha=self.alpha)
         # colors = make_gs_features(gs)

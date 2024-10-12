@@ -76,8 +76,9 @@ class ShapeNetPartNormal(Dataset):
                  train=True,
                  warmup=False,
                  voxel_max=2048,
-                 k=[16, 16, 16, 16],
-                 strides=[1, 4, 4],
+                 k=[20, 20, 20, 20],
+                 k_gs= [5, 5, 5, 5],
+                 n_samples=[2048, 512, 192, 64],
                  visible_sample_stride=0.,
                  alpha=0.,
                  batch_size=8,
@@ -89,7 +90,8 @@ class ShapeNetPartNormal(Dataset):
         self.warmup = warmup
         self.voxel_max = voxel_max
         self.k = k
-        self.strides = strides
+        self.k_gs = k_gs
+        self.n_samples = n_samples
         self.visible_sample_stride = visible_sample_stride
         self.alpha = alpha
         self.batch_size = batch_size
@@ -218,7 +220,7 @@ class ShapeNetPartNormal(Dataset):
         gs.gs_points.__update_attr__('f', norm)
         gs.gs_points.__update_attr__('y', seg)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.strides,
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs, None, self.n_samples,
                                       up_sample=True, visible_sample_stride=self.visible_sample_stride,
                                       alpha=self.alpha)
         return gs, shape
@@ -239,7 +241,7 @@ class ShapeNetPartNormal(Dataset):
         gs.gs_points.__update_attr__('f', norm)
         gs.gs_points.__update_attr__('y', seg)
         gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.strides,
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, self.k_gs,None, self.n_samples,
                                       up_sample=True, visible_sample_stride=self.visible_sample_stride,
                                       alpha=self.alpha)
         return gs, shape

@@ -113,6 +113,7 @@ def validate(cfg, model, val_loader, epoch, **kwargs):
     cls_mious = [round(cm, 2) for cm in cls_mious.tolist()]
     return ins_miou, cls_miou, cls_mious
 
+
 def main(cfg):
     torch.cuda.set_device(0)
     set_random_seed(cfg.seed, deterministic=True)
@@ -127,7 +128,8 @@ def main(cfg):
             warmup=False,
             voxel_max=cfg.model_cfg.train_cfg.voxel_max,
             k=cfg.model_cfg.train_cfg.k,
-            strides=cfg.model_cfg.train_cfg.strides,
+            k_gs=cfg.model_cfg.train_cfg.k_gs,
+            n_samples=cfg.model_cfg.train_cfg.n_samples,
             alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.model_cfg.train_cfg.gs_opts
@@ -141,7 +143,8 @@ def main(cfg):
             warmup=False,
             voxel_max=cfg.model_cfg.train_cfg.voxel_max,
             k=cfg.model_cfg.train_cfg.k,
-            strides=cfg.model_cfg.train_cfg.strides,
+            k_gs=cfg.model_cfg.train_cfg.k_gs,
+            n_samples=cfg.model_cfg.train_cfg.n_samples,
             alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.model_cfg.train_cfg.gs_opts
@@ -162,7 +165,8 @@ def main(cfg):
             warmup=False,
             voxel_max=cfg.model_cfg.train_cfg.voxel_max,
             k=cfg.model_cfg.train_cfg.k,
-            strides=cfg.model_cfg.train_cfg.strides,
+            k_gs=cfg.model_cfg.train_cfg.k_gs,
+            n_samples=cfg.model_cfg.train_cfg.n_samples,
             alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.model_cfg.train_cfg.gs_opts

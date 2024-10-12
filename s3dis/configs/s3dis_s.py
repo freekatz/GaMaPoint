@@ -12,6 +12,7 @@ class S3disConfig(EasyConfig):
         super().__init__()
         self.name = 'S3disConfig'
         self.k = [24, 24, 24, 24]
+        self.k_gs = [6, 6, 6, 6]
         self.grid_size = [0.08, 0.16, 0.32]
         self.voxel_max = 30000
         gs_opts = GaussianOptions.default()
@@ -26,6 +27,7 @@ class S3disWarmupConfig(EasyConfig):
         super().__init__()
         self.name = 'S3disWarmupConfig'
         self.k = [24, 24, 24, 24]
+        self.k_gs = [6, 6, 6, 6]
         self.grid_size = [0.08, 0.16, 0.32]
         self.voxel_max = 30000
         gs_opts = GaussianOptions.default()
@@ -52,6 +54,7 @@ class ModelConfig(EasyConfig):
         stage_cfg.mamba_blocks = [1, 1, 1, 1]
         stage_cfg.res_blocks = [4, 4, 8, 4]
         stage_cfg.mlp_ratio = 2.
+        stage_cfg.beta = self.train_cfg.alpha
         stage_cfg.bn_momentum = self.bn_momentum
         drop_rates = torch.linspace(0., drop_path, sum(stage_cfg.res_blocks)).split(stage_cfg.res_blocks)
         stage_cfg.drop_paths = [d.tolist() for d in drop_rates]
