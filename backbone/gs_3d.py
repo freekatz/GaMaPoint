@@ -480,26 +480,24 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
         _p = p.numpy()
         _v = v.numpy()
         kdt = KDTree(_p, _v)
-        kdt_cu = None
         if use_gs:
-            kdt_cu = KDTree_cuda(p)
-            idx_group.append(kdt_cu.knn(p, k, False)[0])
+            _, idx = kdt.query(_p, _v, k=k, alpha=0)
+            idx_group.append(torch.from_numpy(idx).long())
 
             k_gs = ks_gs[i]
             _, idx_gs = kdt.query(_p, _v, k=k_gs, alpha=-1)
             idx_gs_group.append(torch.from_numpy(idx_gs).long())
         else:
-            kdt = KDTree(_p, _v)
             _, idx = kdt.query(_p, _v, k=k, alpha=alpha, scaler=scaler)
             idx_group.append(torch.from_numpy(idx).long())
 
         # up sample
         if i > 0 and up_sample:
             if use_gs:
-                idx_us.append(kdt_cu.knn(full_p, 1, False)[0])
+                _, us_idx = kdt.query(full_p.numpy(), full_v.numpy(), k=1, alpha=0)
             else:
                 _, us_idx = kdt.query(full_p.numpy(), full_v.numpy(), k=1, alpha=alpha, scaler=scaler)
-                idx_us.append(torch.from_numpy(us_idx).long())
+            idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)
     gs_points.__update_attr__('idx_us', idx_us)
