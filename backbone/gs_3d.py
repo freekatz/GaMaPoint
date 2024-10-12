@@ -10,8 +10,8 @@ from utils.binary import bin2dec_split
 from utils.point_utils import points_centroid, points_scaler
 from utils.camera import OrbitCamera
 from utils.gaussian_splatting_batch import project_points, compute_cov3d, ewa_project
-from pykdtree.kdtree import KDTree
-from utils.cutils import grid_subsampling
+from pykdtree.kdtree import KDTree as KDTree4D
+from utils.cutils import grid_subsampling, KDTree
 from utils.subsample import create_sampler, fps_sample, visible_sample
 
 
@@ -437,7 +437,7 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     assert (grid_size is not None and n_samples is not None) is False
     assert (grid_size is None and n_samples is None) is False
 
-    if not use_gs:
+    if use_gs:
         # estimating a distance in Euclidean space as the scaler
         ps, _ = fps_sample(gs_points.p.unsqueeze(0), 2, random_start_point=True)
         ps = ps.squeeze(0)
@@ -446,7 +446,6 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     full_p = gs_points.p.contiguous()
     full_visible = gs_points.visible.squeeze(1).to(torch.int64)
     full_v = bin2dec_split(full_visible, max_bits=48).contiguous()
-
 
     p = full_p
     v = full_v
@@ -477,27 +476,17 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
 
         # group
         k = ks[i]
-        _p = p.numpy()
-        _v = v.numpy()
-        kdt = KDTree(_p, _v)
+        kdt = KDTree(p)
+        idx_group.append(kdt.knn(p, k, False)[0].long())
         if use_gs:
-            _, idx = kdt.query(_p, _v, full_visible.shape[-1], k=k, alpha=0)
-            idx_group.append(torch.from_numpy(idx).long())
-
             k_gs = ks_gs[i]
-            _, idx_gs = kdt.query(_p, _v, full_visible.shape[-1], k=k_gs, alpha=-1)
+            kdt_gs = KDTree4D(p.numpy(),  v.numpy())
+            _, idx_gs = kdt_gs.query(p.numpy(),  v.numpy(), full_visible.shape[-1], k=k_gs, alpha=-1, scaler=scaler)
             idx_gs_group.append(torch.from_numpy(idx_gs).long())
-        else:
-            _, idx = kdt.query(_p, _v, full_visible.shape[-1], k=k, alpha=alpha, scaler=scaler)
-            idx_group.append(torch.from_numpy(idx).long())
 
         # up sample
         if i > 0 and up_sample:
-            if use_gs:
-                _, us_idx = kdt.query(full_p.numpy(), full_v.numpy(), full_visible.shape[-1], k=1, alpha=0)
-            else:
-                _, us_idx = kdt.query(full_p.numpy(), full_v.numpy(), full_visible.shape[-1], k=1, alpha=alpha, scaler=scaler)
-            idx_us.append(torch.from_numpy(us_idx).long())
+            idx_us.append(kdt.knn(full_p, 1, False)[0].squeeze(-1).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)
     gs_points.__update_attr__('idx_us', idx_us)
