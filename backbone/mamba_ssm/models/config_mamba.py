@@ -14,7 +14,7 @@ class MambaConfig(dict):
     rms_norm: bool = True
     residual_in_fp32: bool = True
     scan_method: str = ''  # ["random", "random2", "bidi"]
-    use_mask: bool = True
+    use_mask: bool = False
 
     @classmethod
     def default(cls):
@@ -24,5 +24,5 @@ class MambaConfig(dict):
                 rms_norm=True,
                 residual_in_fp32=True,
                 scan_method='',
-                use_mask=True,
+                use_mask=False,
             )

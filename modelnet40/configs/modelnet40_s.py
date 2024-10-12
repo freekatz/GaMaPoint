@@ -20,7 +20,7 @@ class ModelNet40Config(EasyConfig):
         gs_opts.n_cameras = 12
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = gs_opts.n_cameras * 2 / self.n_samples[-1]
+        self.alpha = min(1.0, gs_opts.n_cameras * 2 / self.n_samples[-1])
 
 
 class ModelConfig(EasyConfig):
