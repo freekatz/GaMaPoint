@@ -530,9 +530,8 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
             }
             dist2 += code2[j] * code1[j];
         }
-        dist2 = 1.0 - dist2 / code_dims;
+        dist2 = 3 - dist2 / code_dims;  // max(depths) = √3 ≈ 1.732
     }
-    // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
     if (visible_count1 == 0 || alpha == 0) {
         return dist1;
@@ -1214,9 +1213,8 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
             }
             dist2 += code2[j] * code1[j];
         }
-        dist2 = 1.0 - dist2 / code_dims;
+        dist2 = 3 - dist2 / code_dims;  // max(depths) = √3 ≈ 1.732
     }
-    // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
     if (visible_count1 == 0 || alpha == 0) {
         return dist1;
