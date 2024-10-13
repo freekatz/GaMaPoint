@@ -16,7 +16,7 @@ if __name__ == '__main__':
     presample_path = './dataset_link/shapenetpart_presample.pt'
     xyz, norm, shape, seg = torch.load(presample_path)
     idx_all = torch.nonzero((shape == 10).int())
-    idx = idx_all[10]
+    idx = idx_all[24]
     p = xyz[idx]
     s = shape[idx]
     print(s)
@@ -36,15 +36,20 @@ if __name__ == '__main__':
     p0, p1 = ps[0], ps[1]
     scaler = (p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2
     visible = gs.gs_points.visible.squeeze(1).float()
-    v = bin2dec_split(visible, max_bits=32)  # N x M//64
+    # v = bin2dec_split(visible, max_bits=32)  # N x M//64
 
     kdt_1 = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy())
-    _, group_idx_1 = kdt_1.query(p.detach().cpu().numpy(), v.detach().cpu().numpy(), k=132, alpha=0.)
+    _, group_idx_1 = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=132, alpha=0.)
     group_idx_1 = torch.from_numpy(group_idx_1)
 
-    _, group_idx_2 = kdt_1.query(p.detach().cpu().numpy(), v.detach().cpu().numpy(), k=132, alpha=alpha, scaler=scaler)
+    _, group_idx_2 = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=132, alpha=alpha, scaler=scaler)
     group_idx_2 = torch.from_numpy(group_idx_2)
+
+    _, group_idx_3 = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=132, alpha=-1)
+    group_idx_3 = torch.from_numpy(group_idx_3)
 
     # vis_knn(p, 10, group_idx_1)
     vis_knn2(p, 156, group_idx_1, group_idx_2, point_size=24)
     # vis_knn3(p, 10, group_idx_1, group_idx_2)
+
+    vis_knn2(p, 156, group_idx_1, group_idx_3, point_size=24)

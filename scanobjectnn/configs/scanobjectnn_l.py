@@ -11,17 +11,17 @@ class ScanObjectNNConfig(EasyConfig):
     def __init__(self):
         super().__init__()
         self.name = 'ScanObjectNNConfig'
-        self.k = [24, 24, 24, 24]
+        self.k = [32, 32, 32]
         self.use_gs = False
-        self.k_gs = [6, 6, 6, 6]
-        self.n_samples = [1024, 512, 256, 64]
+        self.k_gs = [8, 8, 8]
+        self.n_samples = [1024, 256, 64]
         self.visible_sample_stride = 0.
         self.num_points = 1024
         gs_opts = GaussianOptions.default()
-        gs_opts.n_cameras = 8
+        gs_opts.n_cameras = 12
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.25
+        self.alpha = 0.1
 
 
 class ModelConfig(EasyConfig):
@@ -35,10 +35,10 @@ class ModelConfig(EasyConfig):
         stage_cfg = EasyConfig()
         stage_cfg.name = 'StageConfig'
         stage_cfg.in_channels = 1
-        stage_cfg.channel_list = [64, 128, 256, 512]
+        stage_cfg.channel_list = [96, 256, 512]
         stage_cfg.head_channels = 2048
-        stage_cfg.mamba_blocks = [1, 1, 1, 1]
-        stage_cfg.res_blocks = [4, 4, 8, 4]
+        stage_cfg.mamba_blocks = [1, 1, 1]
+        stage_cfg.res_blocks = [4, 8, 4]
         stage_cfg.mlp_ratio = 2.
         stage_cfg.beta = self.train_cfg.alpha
         stage_cfg.use_gs = self.train_cfg.use_gs
@@ -48,5 +48,5 @@ class ModelConfig(EasyConfig):
         stage_cfg.mamba_cfg = MambaConfig.default()
         stage_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
         stage_cfg.diff_factor = 40.
-        stage_cfg.diff_std = [2.4, 4.8, 7.2, 9.6]
+        stage_cfg.diff_std = [2.2, 4.4, 8.8]
         self.stage_cfg = stage_cfg

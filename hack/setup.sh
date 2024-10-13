@@ -14,7 +14,7 @@ conda activate mtxai
 
 # install pybind
 sudo apt update
-sudo apt-get install python3-pybind11
+sudo apt-get -y install python3-pybind11
 
 # setup python packages
 pip install --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/Triton-Nightly/pypi/simple/ triton-nightly
@@ -27,18 +27,18 @@ pip install --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_pa
 pip install -r $HACK_DIR/requirements.txt
 
 # setup kdtree cuda extensions
-sudo apt-get install libomp-dev
+sudo apt-get -y install libomp-dev
 cd $PWD/backbone/ops/pykdtree
 pip install .
 cd $PWD
 
 
-# install eigen (if setup pykdtree failed)
-sudo apt-get install libeigen3-dev
+# install eigen (optional, if setup pykdtree failed)
+sudo apt-get -y install libeigen3-dev
 sudo ln -s /usr/include/eigen3/Eigen /usr/include/Eigen
 
-# setup openmp (if setup pykdtree failed)
-sudo apt-get install cmake autoconf automake libtool flex
+# setup openmp (optional, if setup pykdtree failed)
+sudo apt-get -y install cmake autoconf automake libtool flex
 autoreconf -f -i
 mkdir $PWD/tmp
 cd $PWD/tmp

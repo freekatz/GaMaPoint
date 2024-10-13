@@ -18,10 +18,10 @@ class ModelNet40Config(EasyConfig):
         self.visible_sample_stride = 0.
         self.num_points = 1024
         gs_opts = GaussianOptions.default()
-        gs_opts.n_cameras = 8
+        gs_opts.n_cameras = 12
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.25
+        self.alpha = 0.1
 
 
 class ModelConfig(EasyConfig):
