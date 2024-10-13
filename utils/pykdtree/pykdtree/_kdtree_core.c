@@ -530,7 +530,7 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
             }
             dist2 += code2[j] * code1[j];
         }
-        dist2 = 3 - dist2 / code_dims;  // max(depths) = √3 ≈ 1.732
+        dist2 = 1.0 - dist2 / code_dims / 3;  // max(depths) = √3 ≈ 1.731
     }
 
     if (visible_count1 == 0 || alpha == 0) {
@@ -1213,7 +1213,7 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
             }
             dist2 += code2[j] * code1[j];
         }
-        dist2 = 3 - dist2 / code_dims;  // max(depths) = √3 ≈ 1.732
+        dist2 = 1.0 - dist2 / code_dims / 3;  // max(depths) = √3 ≈ 1.731
     }
 
     if (visible_count1 == 0 || alpha == 0) {
