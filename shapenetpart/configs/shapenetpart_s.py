@@ -17,10 +17,10 @@ class ShapeNetPartConfig(EasyConfig):
         self.n_samples = [2048, 512, 192, 64]
         self.voxel_max = 2048
         gs_opts = GaussianOptions.default()
-        gs_opts.n_cameras = 32
+        gs_opts.n_cameras = 64
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.1
+        self.alpha = 0.25
 
 
 class ModelConfig(EasyConfig):
