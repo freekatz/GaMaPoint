@@ -11,16 +11,16 @@ class ShapeNetPartConfig(EasyConfig):
     def __init__(self):
         super().__init__()
         self.name = 'ShapeNetPartConfig'
-        self.k = [20, 20, 20, 20]
+        self.k = [32, 32, 32, 32]
         self.use_gs = False
-        self.k_gs = [5, 5, 5, 5]
+        self.k_gs = [8, 8, 8, 8]
         self.n_samples = [2048, 512, 192, 64]
         self.voxel_max = 2048
         gs_opts = GaussianOptions.default()
-        gs_opts.n_cameras = 64
+        gs_opts.n_cameras = 32
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.25
+        self.alpha = 0.1
 
 
 class ModelConfig(EasyConfig):
@@ -36,7 +36,7 @@ class ModelConfig(EasyConfig):
         stage_cfg.name = 'StageConfig'
         stage_cfg.in_channels = 4
         stage_cfg.channel_list = [96, 192, 320, 512]
-        stage_cfg.head_channels = 320
+        stage_cfg.head_channels = 512
         stage_cfg.mamba_blocks = [1, 1, 1, 1]
         stage_cfg.res_blocks = [4, 4, 4, 4]
         stage_cfg.mlp_ratio = 2.
