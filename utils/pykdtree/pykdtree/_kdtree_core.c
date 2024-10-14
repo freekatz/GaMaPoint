@@ -496,7 +496,7 @@ float vector_length_float(float A[], int n) { float result = 0; for (int i = 0; 
 float cosine_similarity_float(float A[], float B[], int n) { return dot_product_float(A, B, n) / (vector_length_float(A, n) * vector_length_float(B, n)); }
 
 float calc_cosine_float(float c1p1, float c1p2, float p1p2) {
-    if ( p1p2 == 0 || (c1p1 == c1p2 + p1p2) || (c1p2 == c1p1 + p1p2) ||  ) {
+    if ( p1p2 == 0 || (c1p1 == c1p2 + p1p2) || (c1p2 == c1p1 + p1p2) ) {
         return 1.0;
     }
     if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) <= c1p1) {
@@ -1198,7 +1198,7 @@ double vector_length_double(double A[], int n) { double result = 0; for (int i =
 double cosine_similarity_double(double A[], double B[], int n) { return dot_product_double(A, B, n) / (vector_length_double(A, n) * vector_length_double(B, n)); }
 
 double calc_cosine_double(double c1p1, double c1p2, double p1p2) {
-    if ( p1p2 == 0 || (c1p1 == c1p2 + p1p2) || (c1p2 == c1p1 + p1p2) ||  ) {
+    if ( p1p2 == 0 || (c1p1 == c1p2 + p1p2) || (c1p2 == c1p1 + p1p2) ) {
         return 1.0;
     }
     if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) <= c1p1) {
