@@ -21,7 +21,7 @@ class ModelNet40Config(EasyConfig):
         gs_opts.n_cameras = 8
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.1
+        self.alpha = 0.25
 
 
 class ModelConfig(EasyConfig):
