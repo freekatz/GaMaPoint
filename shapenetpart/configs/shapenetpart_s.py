@@ -36,7 +36,7 @@ class ModelConfig(EasyConfig):
         stage_cfg.name = 'StageConfig'
         stage_cfg.in_channels = 4
         stage_cfg.channel_list = [96, 192, 320, 512]
-        stage_cfg.head_channels = 512
+        stage_cfg.head_channels = 320
         stage_cfg.mamba_blocks = [1, 1, 1, 1]
         stage_cfg.res_blocks = [4, 4, 4, 4]
         stage_cfg.mlp_ratio = 2.

@@ -11,9 +11,9 @@ class ModelNet40Config(EasyConfig):
     def __init__(self):
         super().__init__()
         self.name = 'ModelNet40Config'
-        self.k = [20, 20, 20]
+        self.k = [32, 32, 32]
         self.use_gs = False
-        self.k_gs = [5, 5, 5]
+        self.k_gs = [8, 8, 8]
         self.n_samples = [1024, 256, 64]
         self.visible_sample_stride = 0.
         self.num_points = 1024
@@ -21,7 +21,7 @@ class ModelNet40Config(EasyConfig):
         gs_opts.n_cameras = 12
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.1
+        self.alpha = 0.375
 
 
 class ModelConfig(EasyConfig):

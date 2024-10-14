@@ -206,8 +206,8 @@ class ShapeNetPartNormal(Dataset):
         jitter = torch.empty_like(xyz).normal_(std=0.001)
         xyz += jitter
 
-        xyz -= xyz.min(dim=0)[0]
-        height = xyz[:, 2:] / 10
+        # xyz -= xyz.min(dim=0)[0]
+        height = xyz[:, 2:] * 4
         height -= height.min(dim=0, keepdim=True)[0]
         if self.train:
             height += torch.empty((1, 1), device=xyz.device).uniform_(-0.1, 0.1) * 4
@@ -233,7 +233,7 @@ class ShapeNetPartNormal(Dataset):
         shape = self.shape[idx]
         seg = self.seg[idx]
 
-        xyz -= xyz.min(dim=0)[0]
+        # xyz -= xyz.min(dim=0)[0]
         height = xyz[:, 2:] / 10
         height -= height.min(dim=0, keepdim=True)[0]
         norm = torch.cat([norm, height], dim=-1)
