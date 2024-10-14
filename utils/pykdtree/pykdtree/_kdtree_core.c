@@ -27,6 +27,7 @@ Anne M. Archibald and libANN by David M. Mount and Sunil Arya.
 #include <stdlib.h>
 #include <stdint.h>
 #include <float.h>
+#include <math.h>
 
 #define PA(i,d)			(pa[no_dims * pidx[i] + d])
 #define CODEA(i,d)			(code[code_dims * pidx[i] + d])
@@ -494,36 +495,6 @@ float vector_length_float(float A[], int n) { float result = 0; for (int i = 0; 
 
 float cosine_similarity_float(float A[], float B[], int n) { return dot_product_float(A, B, n) / (vector_length_float(A, n) * vector_length_float(B, n)); }
 
-float* calc_cosine_all_float(float c1p1, float c1p2, float p1p2) {
-    float arr[3];
-    float *x = &arr[0];
-    if (p1p2 == 0) {
-        arr[0] = 1.0;
-        arr[1] = 1.0;
-        arr[2] = 1.0;
-        return x;
-    }
-    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) > c1p1) {
-        arr[0] = -1.0;
-        arr[1] = -1.0;
-        arr[2] = -1.0;
-        return x;
-    }
-    float a = c1p1 * c1p1;
-    float b = c1p2 * c1p2;
-    float c = p1p2 * p1p2;
-    float ab = c1p1 * c1p2;
-    float ac = c1p1 * p1p2;
-    float bc = c1p2 * p1p2;
-    float cos_a = (b+c-a)/(2*bc);
-    float cos_b = (a+c-b)/(2*ac);
-    float cos_c = (a+b-c)/(2*ab);
-    arr[0] = cos_a;
-    arr[1] = cos_b;
-    arr[2] = cos_c;
-    return x;
-}
-
 float calc_cosine_float(float c1p1, float c1p2, float p1p2) {
     if (p1p2 == 0) {
         return 1.0;
@@ -536,6 +507,9 @@ float calc_cosine_float(float c1p1, float c1p2, float p1p2) {
     float c = p1p2 * p1p2;
     float ab = c1p1 * c1p2;
     float cos_c = (a+b-c)/(2*ab);
+    if (isinf(cos_c) || isfinite(cos_c)) {
+        cos_c = -1.0;
+    }
     return cos_c;
 }
 
@@ -1222,36 +1196,6 @@ double vector_length_double(double A[], int n) { double result = 0; for (int i =
 
 double cosine_similarity_double(double A[], double B[], int n) { return dot_product_double(A, B, n) / (vector_length_double(A, n) * vector_length_double(B, n)); }
 
-double* calc_cosine_all_double(double c1p1, double c1p2, double p1p2) {
-    double arr[3];
-    double *x = &arr[0];
-    if (p1p2 == 0) {
-        arr[0] = 1.0;
-        arr[1] = 1.0;
-        arr[2] = 1.0;
-        return x;
-    }
-    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) > c1p1) {
-        arr[0] = -1.0;
-        arr[1] = -1.0;
-        arr[2] = -1.0;
-        return x;
-    }
-    double a = c1p1 * c1p1;
-    double b = c1p2 * c1p2;
-    double c = p1p2 * p1p2;
-    double ab = c1p1 * c1p2;
-    double ac = c1p1 * p1p2;
-    double bc = c1p2 * p1p2;
-    double cos_a = (b+c-a)/(2*bc);
-    double cos_b = (a+c-b)/(2*ac);
-    double cos_c = (a+b-c)/(2*ab);
-    arr[0] = cos_a;
-    arr[1] = cos_b;
-    arr[2] = cos_c;
-    return x;
-}
-
 double calc_cosine_double(double c1p1, double c1p2, double p1p2) {
     if (p1p2 == 0) {
         return 1.0;
@@ -1264,6 +1208,9 @@ double calc_cosine_double(double c1p1, double c1p2, double p1p2) {
     double c = p1p2 * p1p2;
     double ab = c1p1 * c1p2;
     double cos_c = (a+b-c)/(2*ab);
+    if (isinf(cos_c) || isfinite(cos_c)) {
+        cos_c = -1.0;
+    }
     return cos_c;
 }
 
