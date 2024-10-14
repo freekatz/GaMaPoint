@@ -499,7 +499,7 @@ float calc_cosine_float(float c1p1, float c1p2, float p1p2) {
     if (p1p2 == 0) {
         return 1.0;
     }
-    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) > c1p1) {
+    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) <= c1p1) {
         return -1.0;
     }
     float a = c1p1 * c1p1;
@@ -507,9 +507,6 @@ float calc_cosine_float(float c1p1, float c1p2, float p1p2) {
     float c = p1p2 * p1p2;
     float ab = c1p1 * c1p2;
     float cos_c = (a+b-c)/(2*ab);
-    if (isinf(cos_c) || isfinite(cos_c)) {
-        cos_c = -1.0;
-    }
     return cos_c;
 }
 
@@ -1200,7 +1197,7 @@ double calc_cosine_double(double c1p1, double c1p2, double p1p2) {
     if (p1p2 == 0) {
         return 1.0;
     }
-    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) > c1p1) {
+    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) <= c1p1) {
         return -1.0;
     }
     double a = c1p1 * c1p1;
@@ -1208,9 +1205,6 @@ double calc_cosine_double(double c1p1, double c1p2, double p1p2) {
     double c = p1p2 * p1p2;
     double ab = c1p1 * c1p2;
     double cos_c = (a+b-c)/(2*ab);
-    if (isinf(cos_c) || isfinite(cos_c)) {
-        cos_c = -1.0;
-    }
     return cos_c;
 }
 
