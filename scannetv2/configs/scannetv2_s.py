@@ -20,7 +20,7 @@ class ScanNetV2Config(EasyConfig):
         gs_opts.n_cameras = 64
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.25
+        self.alpha = 0.1
 
 
 class ScanNetV2WarmupConfig(EasyConfig):
@@ -36,7 +36,7 @@ class ScanNetV2WarmupConfig(EasyConfig):
         gs_opts.n_cameras = 64
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
-        self.alpha = 0.25
+        self.alpha = 0.1
 
 
 class ModelConfig(EasyConfig):
