@@ -496,7 +496,7 @@ float cosine_similarity_float(float A[], float B[], int n) { return dot_product_
 
 float* calc_cosine_all_float(float c1p1, float c1p2, float p1p2) {
     float arr[3];
-    float *x = &a[0];
+    float *x = &arr[0];
     if (p1p2 == 0) {
         arr[0] = 1.0;
         arr[1] = 1.0;
@@ -1224,7 +1224,7 @@ double cosine_similarity_double(double A[], double B[], int n) { return dot_prod
 
 double* calc_cosine_all_double(double c1p1, double c1p2, double p1p2) {
     double arr[3];
-    double *x = &a[0];
+    double *x = &arr[0];
     if (p1p2 == 0) {
         arr[0] = 1.0;
         arr[1] = 1.0;
