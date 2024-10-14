@@ -496,7 +496,7 @@ float vector_length_float(float A[], int n) { float result = 0; for (int i = 0; 
 float cosine_similarity_float(float A[], float B[], int n) { return dot_product_float(A, B, n) / (vector_length_float(A, n) * vector_length_float(B, n)); }
 
 float calc_cosine_float(float c1p1, float c1p2, float p1p2) {
-    if (p1p2 == 0) {
+    if ( (c1p1 == p1p2 || c1p2 == p1p2) && (c1p1 == 0 || c1p2 == 0) ) {
         return 1.0;
     }
     if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) <= c1p1) {
@@ -531,6 +531,10 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
             dist1 += dim_dist * dim_dist;
         }
     }
+    if (alpha == 0) {
+        return dist1;
+    }
+
     float dist2 = 0;
     uint8_t visible_count1 = 0;
     uint8_t visible_count2 = 0;
@@ -544,12 +548,12 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
             if (code2[j] != 0) {
                 visible_count2 += 1;
             }
-            dist2 += (1-calc_cosine_float(code2[j], code1[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
+            dist2 += (1+calc_cosine_float(code2[j], code1[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
         }
-        dist2 = 1.0 - dist2 / code_dims;
+        dist2 = 1 - dist2 / code_dims;
     }
 
-    if (visible_count1 == 0 || alpha == 0) {
+    if (visible_count1 == 0) {
         return dist1;
     }
     if (alpha < 0) {
@@ -1229,6 +1233,10 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
             dist1 += dim_dist * dim_dist;
         }
     }
+    if (alpha == 0) {
+        return dist1;
+    }
+
     double dist2 = 0;
     uint8_t visible_count1 = 0;
     uint8_t visible_count2 = 0;
@@ -1242,12 +1250,12 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
             if (code2[j] != 0) {
                 visible_count2 += 1;
             }
-             dist2 += (1-calc_cosine_double(code2[j], code1[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
+            dist2 += (1+calc_cosine_float(code2[j], code1[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
         }
-        dist2 = 1.0 - dist2 / code_dims;
+        dist2 = 1 - dist2 / code_dims;
     }
 
-    if (visible_count1 == 0 || alpha == 0) {
+    if (visible_count1 == 0) {
         return dist1;
     }
     if (alpha < 0) {
