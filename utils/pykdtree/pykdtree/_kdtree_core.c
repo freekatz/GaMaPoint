@@ -573,7 +573,7 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
             if (code2[j] != 0) {
                 visible_count2 += 1;
             }
-            dist2 += (1-calc_cosine_float(code2[j], code1[j], dist1)[2]) / 2;  // [-1, 1] -> [0, 1]
+            dist2 += (1-calc_cosine_float(code2[j], code1[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
         }
         dist2 = 1.0 - dist2 / code_dims;
     }
@@ -1301,7 +1301,7 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
             if (code2[j] != 0) {
                 visible_count2 += 1;
             }
-             dist2 += (1-calc_cosine_double(code2[j], code1[j], dist1)[2]) / 2;  // [-1, 1] -> [0, 1]
+             dist2 += (1-calc_cosine_double(code2[j], code1[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
         }
         dist2 = 1.0 - dist2 / code_dims;
     }
