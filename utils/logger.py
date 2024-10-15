@@ -215,7 +215,6 @@ if __name__ == '__main__':
     s2 = format_dict({
         'loss': torch.tensor(0.89323),
         'lr': 0.000001,
-        'diff': torch.tensor(1.24523),
         'time_cost': '12441s'
     })
     print(f'ious:\n{s}'

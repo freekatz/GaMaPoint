@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.model import SegPartHead, Stage
+from backbone.model import SegPartHead, Backbone
 from shapenetpart.configs import model_configs
 from shapenetpart.dataset import ShapeNetPartNormal, shapenetpart_collate_fn, get_ins_mious
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -47,34 +47,28 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
     model.train()
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
     loss_meter = AverageMeter()
-    diff_meter = AverageMeter()
-    steps_per_epoch = len(train_loader)
     for idx, gs in pbar:
-        lam = scheduler_steps / (epoch * steps_per_epoch)
-        lam = 3e-3 ** lam * 0.25
         scheduler.step(scheduler_steps)
         scheduler_steps += 1
         gs.gs_points.to_cuda(non_blocking=True)
         shape = gs.gs_points.__get_attr__('shape')
         target = gs.gs_points.y
         with autocast():
-            pred, diff = model(gs, shape)
+            pred = model(gs, shape)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
-            scaler.scale(loss + diff * lam).backward()
+            scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = loss + diff * lam
+            loss = loss
             loss.backward()
             optimizer.step()
         loss_meter.update(loss.item())
-        diff_meter.update(diff.item())
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
-                             + f"Loss {loss_meter.avg:.4f} "
-                             + f"Diff {diff_meter.avg:.4f}")
-    return loss_meter.avg, diff_meter.avg, scheduler_steps
+                             + f"Loss {loss_meter.avg:.4f}")
+    return loss_meter.avg, scheduler_steps
 
 
 def validate(cfg, model, val_loader, epoch, **kwargs):
@@ -182,12 +176,12 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
 
-    stage = Stage(
-        **cfg.model_cfg.stage_cfg,
+    backbone = Backbone(
+        **cfg.model_cfg.backbone_cfg,
         task_type='segpart',
     ).to('cuda')
     model = SegPartHead(
-        stage=stage,
+        backbone=backbone,
         num_classes=cfg.model_cfg.num_classes,
         shape_classes=cfg.shape_classes,
         bn_momentum=cfg.model_cfg.bn_momentum,
@@ -235,7 +229,7 @@ def main(cfg):
 
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_diff, scheduler_steps = train(
+        train_loss, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
@@ -243,7 +237,7 @@ def main(cfg):
         timer_meter.update(time_cost)
         logging.info(
             f'@E{epoch} train:    '
-            + f'loss={train_loss:.4f} diff={train_diff:.4f} lr={lr:.6f}')
+            + f'loss={train_loss:.4f} lr={lr:.6f}')
 
         is_best_ins, is_best_cls = False, False
         if epoch % cfg.val_freq == 0:
@@ -266,7 +260,6 @@ def main(cfg):
         if is_best_ins or is_best_cls:
             train_info = {
                 'loss': train_loss,
-                'diff': train_diff,
                 'lr': f"{lr:.6f}",
                 'time_cost': f"{time_cost:.2f}s",
                 'time_cost_avg': f"{timer_meter.avg:.2f}s",
@@ -298,7 +291,6 @@ def main(cfg):
             writer.add_scalar('val_ins_miou', val_ins_miou, epoch)
             writer.add_scalar('val_cls_miou', val_cls_miou, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
-            writer.add_scalar('train_diff', train_diff, epoch)
             writer.add_scalar('lr', lr, epoch)
             writer.add_scalar('time_cost_avg', timer_meter.avg, epoch)
             writer.add_scalar('time_cost', time_cost, epoch)
@@ -341,9 +333,9 @@ if __name__ == '__main__':
 
     model_cfg = model_configs[cfg.model_size]
     cfg.model_cfg = model_cfg
-    cfg.model_cfg.stage_cfg.use_cp = cfg.use_cp
+    cfg.model_cfg.backbone_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
-        cfg.model_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
+        cfg.model_cfg.backbone_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
     cfg.presample_path = os.path.join(cfg.dataset, cfg.presample)
 
     if cfg.mode == 'finetune':

@@ -10,7 +10,7 @@ from backbone.mamba_ssm.models import MambaConfig
 from utils.model_utils import checkpoint
 
 
-class Stage(nn.Module):
+class Backbone(nn.Module):
     def __init__(self,
                  layer_index=0,
                  in_channels=4,
@@ -28,7 +28,6 @@ class Stage(nn.Module):
                  use_gs=False,
                  use_cp=False,
                  diff_factor=40.,
-                 diff_std=[1.6, 3.2, 6.4, 12.8],
                  task_type='segsem',
                  **kwargs
                  ):
@@ -63,15 +62,6 @@ class Stage(nn.Module):
             bn_momentum=bn_momentum,
             use_cp=use_cp,
         )
-        if use_gs:
-            self.sa_gs = SetAbstraction(
-                layer_index=layer_index,
-                in_channels=in_channels,
-                channel_list=channel_list,
-                bn_momentum=bn_momentum,
-                use_cp=use_cp,
-            )
-            self.beta = nn.Parameter(torch.tensor([beta], dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -98,16 +88,8 @@ class Stage(nn.Module):
             nn.init.constant_(self.post_proj[0].weight, (channel_list[0] / self.out_channels) ** 0.5)
             self.head_drop = DropPath(head_drops[layer_index])
 
-        self.diff_std = 1 / diff_std[layer_index]
-        self.diff_head = nn.Sequential(
-            nn.Linear(self.out_channels, 32, bias=False),
-            nn.BatchNorm1d(32, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(32, 3, bias=False),
-        )
-
         if not is_tail:
-            self.sub_stage = Stage(
+            self.sub = Backbone(
                 layer_index=layer_index + 1,
                 in_channels=in_channels,
                 channel_list=channel_list,
@@ -120,10 +102,9 @@ class Stage(nn.Module):
                 head_drops=head_drops,
                 mamba_config=mamba_config,
                 hybrid_args=hybrid_args,
-                task_type=task_type,
                 use_cp=use_cp,
                 diff_factor=diff_factor,
-                diff_std=diff_std,
+                task_type=task_type,
             )
 
     def forward(self, p, f, gs: NaiveGaussian3D):
@@ -140,11 +121,6 @@ class Stage(nn.Module):
         # set abstraction: group and abstract the local points set
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
-        if self.use_gs:
-            gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-            f_local_gs = self.sa_gs(p, f, gs_group_idx)
-            beta = self.beta.sigmoid()
-            f_local = f_local * (1-beta) + f_local_gs * beta
 
         # invert residual connections: local feature aggregation and propagation
         pts = gs.gs_points.pts_list[self.layer_index].tolist()
@@ -158,27 +134,15 @@ class Stage(nn.Module):
         # fuse local and global feature
         f = f_global + f_local
 
-        # 2. netx stage
+        # 2. netx backbone
         if not self.is_tail:
-            f_sub, d_sub = self.sub_stage(p, f, gs)
+            f_sub = self.sub(p, f, gs)
         else:
-            f_sub = d_sub = None
-
-        # regularization
-        if self.training:
-            N, K = group_idx.shape
-            rand_group = torch.randint(0, K, (N, 1), device=p.device)
-            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
-            rand_p_group = p[rand_group_idx] - p
-            rand_p_group.mul_(self.diff_std)
-            rand_f_group = f[rand_group_idx] - f
-            rand_f_group = self.diff_head(rand_f_group)
-            diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
-            d_sub = d_sub + diff if d_sub is not None else diff
+            f_sub = None
 
         # 3. decode
-        # up sample
         if self.task_type != 'cls':
+            # up sample
             f = self.post_proj(f)
             if not self.is_head:
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
@@ -188,23 +152,23 @@ class Stage(nn.Module):
             f = f_sub + f if f_sub is not None else f
         else:
             f = f_sub if f_sub is not None else f
-        return f, d_sub
+        return f
 
 
 class SegSemHead(nn.Module):
     def __init__(self,
-                 stage: Stage,
+                 backbone: Backbone,
                  num_classes=13,
                  bn_momentum=0.02,
                  **kwargs
                  ):
         super().__init__()
-        self.stage = stage
+        self.backbone = backbone
 
         self.head = nn.Sequential(
-            nn.BatchNorm1d(stage.head_channels, momentum=bn_momentum),
+            nn.BatchNorm1d(backbone.head_channels, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(stage.head_channels, num_classes),
+            nn.Linear(backbone.head_channels, num_classes),
         )
 
         self.apply(self.__init_weights)
@@ -219,33 +183,31 @@ class SegSemHead(nn.Module):
         p = gs.gs_points.p
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, f, gs)
-        if self.training:
-            return self.head(f), diff
+        f = self.backbone(p, f, gs)
         return self.head(f)
 
 
 class SegPartHead(nn.Module):
     def __init__(self,
-                 stage: Stage,
+                 backbone: Backbone,
                  num_classes=50,
                  shape_classes=16,
                  bn_momentum=0.1,
                  **kwargs
                  ):
         super().__init__()
-        self.stage = stage
+        self.backbone = backbone
         self.shape_classes = shape_classes
 
         self.proj = nn.Sequential(
             nn.Linear(shape_classes, 64, bias=False),
             nn.BatchNorm1d(64, momentum=bn_momentum),
-            nn.Linear(64, stage.head_channels, bias=False)
+            nn.Linear(64, backbone.head_channels, bias=False)
         )
         self.head = nn.Sequential(
-            nn.BatchNorm1d(stage.head_channels, momentum=bn_momentum),
+            nn.BatchNorm1d(backbone.head_channels, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(stage.head_channels, num_classes),
+            nn.Linear(backbone.head_channels, num_classes),
         )
 
         self.apply(self.__init_weights)
@@ -260,36 +222,34 @@ class SegPartHead(nn.Module):
         p = gs.gs_points.p
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, f, gs)
+        f = self.backbone(p, f, gs)
         shape = nn.functional.one_hot(shape, self.shape_classes).float()
         shape = self.proj(shape)
         shape = repeat(shape, 'b c -> b n c', n=f.shape[0]//gs.batch_size)
         shape = rearrange(shape, 'b n c -> (b n) c')
         f = f + shape
-        if self.training:
-            return self.head(f), diff
         return self.head(f)
 
 
 class ClsHead(nn.Module):
     def __init__(self,
-                 stage: Stage,
+                 backbone: Backbone,
                  num_classes=13,
                  bn_momentum=0.1,
                  **kwargs
                  ):
         super().__init__()
-        self.stage = stage
+        self.backbone = backbone
         self.num_classes = num_classes
 
         self.proj = nn.Sequential(
-            nn.BatchNorm1d(stage.channel_list[-1], momentum=bn_momentum),
-            nn.Linear(stage.channel_list[-1], stage.head_channels),
+            nn.BatchNorm1d(backbone.channel_list[-1], momentum=bn_momentum),
+            nn.Linear(backbone.channel_list[-1], backbone.head_channels),
             nn.GELU(),
         )
 
         self.head = nn.Sequential(
-            nn.Linear(stage.head_channels * 2, 512, bias=False),
+            nn.Linear(backbone.head_channels * 2, 512, bias=False),
             nn.BatchNorm1d(512, momentum=bn_momentum),
             nn.GELU(),
             nn.Linear(512, 256, bias=False),
@@ -311,14 +271,12 @@ class ClsHead(nn.Module):
         p = gs.gs_points.p
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, f, gs)
+        f = self.backbone(p, f, gs)
         f = self.proj(f)
-        f = f.view(gs.batch_size, -1, self.stage.head_channels)
+        f = f.view(gs.batch_size, -1, self.backbone.head_channels)
         f = torch.cat([f[:, 0], f[:, 1:].max(1)[0] + f[:, 1:].mean(1)[0]], dim=-1)
         f = f.squeeze(1)
         f = self.head(f)
         f = f.view(-1, self.num_classes)
-        if self.training:
-            return f, diff
         return f
 
