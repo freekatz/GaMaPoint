@@ -130,6 +130,7 @@ class Backbone(nn.Module):
     def build_loss_fn(self):
 
         def loss_fn(p, f, group_idx, d_sub):
+            # use group feature to predict position
             if not self.training:
                 return None
             N, K = group_idx.shape
