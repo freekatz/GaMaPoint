@@ -115,10 +115,11 @@ class Backbone(nn.Module):
                 head_drops=head_drops,
                 mamba_config=mamba_config,
                 hybrid_args=hybrid_args,
-                task_type=task_type,
+                gs_opts=gs_opts,
                 use_cp=use_cp,
                 diff_factor=diff_factor,
                 diff_std=diff_std,
+                task_type=task_type,
             )
 
     def diff_loss(self, p, f, group_idx, d_sub):
