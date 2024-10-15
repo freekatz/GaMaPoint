@@ -24,6 +24,7 @@ class Backbone(nn.Module):
                  head_drops=None,
                  mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False},
+                 gs_opts=None,
                  use_cp=False,
                  diff_factor=40.,
                  diff_std=None,
@@ -33,6 +34,7 @@ class Backbone(nn.Module):
         super().__init__()
         self.task_type = task_type.lower()
         assert self.task_type in ['segsem', 'segpart', 'cls']
+        assert gs_opts is not None
         self.use_cp = use_cp
         self.layer_index = layer_index
         is_head = self.layer_index == 0
@@ -76,6 +78,7 @@ class Backbone(nn.Module):
             config=mamba_config,
             hybrid_args=hybrid_args,
             bn_momentum=bn_momentum,
+            gs_opts=gs_opts,
         )
 
         if self.task_type != 'cls':
@@ -134,7 +137,7 @@ class Backbone(nn.Module):
             diff = diff + d_sub
         return diff
 
-    def forward(self, p, f, gs: NaiveGaussian3D):
+    def forward(self, p, f, f_gs, gs: NaiveGaussian3D):
         # 1. encode
         # down sample
         if self.is_head:
@@ -142,6 +145,7 @@ class Backbone(nn.Module):
         if not self.is_head:
             idx = gs.gs_points.idx_ds[self.layer_index - 1]
             p = p[idx]
+            f_gs = f_gs[idx]
             pre_group_idx = gs.gs_points.idx_group[self.layer_index - 1]
             f = self.skip_proj(f)[idx] + self.la(f.unsqueeze(0), pre_group_idx.unsqueeze(0)).squeeze(0)[idx]
 
@@ -156,14 +160,14 @@ class Backbone(nn.Module):
         f_local = f_local.squeeze(0)
 
         # point mamba: extract the global feature from center points of local
-        f_global = self.pm(p, f_local, gs)
+        f_global = self.pm(f_local, f_gs, gs)
 
         # fuse local and global feature
         f = f_global + f_local
 
         # 2. netx layer
         if not self.is_tail:
-            f_sub, diff = self.sub(p, f, gs)
+            f_sub, diff = self.sub(p, f, f_gs, gs)
         else:
             f_sub = diff = None
 
@@ -211,8 +215,9 @@ class SegSemHead(nn.Module):
     def forward(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
         f = gs.gs_points.f
+        f_gs = gs.gs_points.f_gs
 
-        f, diff = self.backbone(p, f, gs)
+        f, diff = self.backbone(p, f, f_gs, gs)
         if self.training:
             return self.head(f), diff
         return self.head(f)
@@ -252,8 +257,9 @@ class SegPartHead(nn.Module):
     def forward(self, gs: NaiveGaussian3D, shape):
         p = gs.gs_points.p
         f = gs.gs_points.f
+        f_gs = gs.gs_points.f_gs
 
-        f, diff = self.backbone(p, f, gs)
+        f, diff = self.backbone(p, f, f_gs, gs)
         shape = nn.functional.one_hot(shape, self.shape_classes).float()
         shape = self.proj(shape)
         shape = repeat(shape, 'b c -> b n c', n=f.shape[0]//gs.batch_size)
@@ -303,8 +309,9 @@ class ClsHead(nn.Module):
     def forward(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
         f = gs.gs_points.f
+        f_gs = gs.gs_points.f_gs
 
-        f, diff = self.backbone(p, f, gs)
+        f, diff = self.backbone(p, f, f_gs, gs)
         f = self.proj(f)
         f = f.view(gs.batch_size, -1, self.backbone.head_channels)
         f = torch.cat([f[:, 0], f[:, 1:].max(1)[0] + f[:, 1:].mean(1)[0]], dim=-1)

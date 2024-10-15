@@ -44,6 +44,7 @@ class ModelConfig(EasyConfig):
         backbone_cfg.head_drops = torch.linspace(0., 0.15, len(backbone_cfg.res_blocks)).tolist()
         backbone_cfg.mamba_cfg = MambaConfig.default()
         backbone_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
+        backbone_cfg.gs_opts = self.train_cfg.gs_opts
         backbone_cfg.diff_factor = 40.
         # backbone_cfg.diff_std = [0.75, 1.5, 2.5, 4.7]
         backbone_cfg.diff_std = None

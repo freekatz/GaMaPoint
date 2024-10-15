@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from timm.models.layers import DropPath
 
-from backbone.gs_3d import NaiveGaussian3D
+from backbone.gs_3d import NaiveGaussian3D, GaussianOptions
 from backbone.mamba_ssm.custom.order import Order
 from backbone.mamba_ssm.models import MambaConfig, MixerModel
 from utils.cutils import knn_edge_maxpooling
@@ -259,22 +259,31 @@ class PointMambaLayer(nn.Module):
                  config: MambaConfig,
                  hybrid_args: dict,
                  bn_momentum: float,
+                 gs_opts: GaussianOptions,
                  **kwargs,
                  ):
         super().__init__()
         self.layer_index = layer_index
         self.config = config
 
+        self.pos_embed = nn.Parameter(torch.randn([gs_opts.n_cameras * 2, channels], dtype=torch.float32))
+        self.mlp = Mlp(
+            in_channels=gs_opts.n_cameras * 2,
+            hidden_channels=gs_opts.n_cameras * 2 * 2,
+            bn_momentum=bn_momentum,
+            init_weight=0.1,
+        )
         self.mixer = create_mixer(config, channels, hybrid_args)
         self.bn = nn.BatchNorm1d(channels, momentum=bn_momentum)
 
-    def forward(self, p, f, gs: NaiveGaussian3D):
+    def forward(self, f, f_gs, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
-
-        order = None
+        depths = f_gs[:, 2:3, :].squeeze(1)
+        f_depths = self.mlp(depths.unsqueeze(0)).squeeze(0)
+        pos_embed = f_depths @ self.pos_embed
+        f = f + pos_embed
         f = f.unsqueeze(0)
         B, N, C = f.shape
-        mask = None
-        f = f + self.mixer(input_ids=f, mask=mask, gs=gs, order=order)
+        f = f + self.mixer(input_ids=f, mask=None, gs=gs, order=None)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
         return f.squeeze(0)

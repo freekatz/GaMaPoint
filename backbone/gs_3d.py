@@ -81,45 +81,6 @@ class GaussianPoints(object):
                         item[i] = item[i].cuda(non_blocking=non_blocking)
             self.__update_attr__(key, item)
 
-    def apply_index(self, index):
-        assert len(index.shape) == 1
-        N = index.shape[0]
-        keys = self.keys()
-        for key in keys:
-            item = self.__get_attr__(key)
-            if isinstance(self.__get_attr__(key), torch.Tensor):
-                if item.shape[0] >= N:
-                    item = item[index]
-            self.__update_attr__(key, item)
-
-    def down_sampling(self, key, layer_idx, need_idx=False):
-        item = self.__get_attr__(key)
-        ds_idx = self.idx_ds[layer_idx]
-        if need_idx:
-            return item[ds_idx], ds_idx
-        return item[ds_idx]
-
-    def up_sampling(self, key, layer_idx, need_idx=False):
-        item = self.__get_attr__(key)
-        us_idx = self.idx_us[-layer_idx - 1]
-        if need_idx:
-            return item[us_idx], us_idx
-        return item[us_idx]
-
-    def grouping(self, key, layer_idx, need_idx=False):
-        item = self.__get_attr__(key)
-        group_idx = self.idx_group[layer_idx]
-        if need_idx:
-            return item[group_idx], group_idx
-        return item[group_idx]
-
-    def gs_grouping(self, key, layer_idx, need_idx=False):
-        item = self.__get_attr__(key)
-        gs_group_idx = self.idx_gs_group[layer_idx]
-        if need_idx:
-            return item[gs_group_idx], gs_group_idx
-        return item[gs_group_idx]
-
     @property
     def layer_idx(self):
         return self.__get_attr__('layer_idx')
@@ -135,10 +96,6 @@ class GaussianPoints(object):
     @property
     def idx_group(self):
         return self.__get_attr__('idx_group')
-
-    @property
-    def idx_gs_group(self):
-        return self.__get_attr__('idx_gs_group')
 
     @property
     def pts_list(self):
@@ -157,12 +114,14 @@ class GaussianPoints(object):
         return self.__get_attr__('y')
 
     @property
-    def p_gs(self):
-        return self.__get_attr__('p_gs')
-
-    @property
-    def f_gs(self):
-        return self.__get_attr__('f_gs')
+    def f_gs(self, layer_idx=None):
+        # [uv, depths, visible, camid], [N, 2+1+1+1, n_cameras*2]
+        item = self.__get_attr__('f_gs')
+        if layer_idx is not None:
+            ds_idx = self.idx_ds[layer_idx]
+            item = item[ds_idx]
+            self.__update_attr__('f_gs', item)
+        return item
 
     @property
     def cameras(self):
@@ -170,28 +129,40 @@ class GaussianPoints(object):
         return cameras
 
     @property
-    def uv(self):
-        if self.layer_idx is not None:
-            return self.down_sampling('uv', self.layer_idx, need_idx=False)
-        return self.__get_attr__('uv')
+    def uv(self, layer_idx=None):
+        item = self.__get_attr__('uv')
+        if layer_idx is not None:
+            ds_idx = self.idx_ds[layer_idx]
+            item = item[ds_idx]
+            self.__update_attr__('uv', item)
+        return item
 
     @property
-    def depths(self):
-        if self.layer_idx is not None:
-            return self.down_sampling('depths', self.layer_idx, need_idx=False)
-        return self.__get_attr__('depths')
+    def depths(self, layer_idx=None):
+        item = self.__get_attr__('depths')
+        if layer_idx is not None:
+            ds_idx = self.idx_ds[layer_idx]
+            item = item[ds_idx]
+            self.__update_attr__('depths', item)
+        return item
 
     @property
-    def visible(self):
-        if self.layer_idx is not None:
-            return self.down_sampling('visible', self.layer_idx, need_idx=False)
-        return self.__get_attr__('visible')
+    def visible(self, layer_idx=None):
+        item = self.__get_attr__('visible')
+        if layer_idx is not None:
+            ds_idx = self.idx_ds[layer_idx]
+            item = item[ds_idx]
+            self.__update_attr__('visible', item)
+        return item
 
     @property
-    def camid(self):
-        if self.layer_idx is not None:
-            return self.down_sampling('camid', self.layer_idx, need_idx=False)
-        return self.__get_attr__('camid')
+    def camid(self, layer_idx=None):
+        item = self.__get_attr__('camid')
+        if layer_idx is not None:
+            ds_idx = self.idx_ds[layer_idx]
+            item = item[ds_idx]
+            self.__update_attr__('camid', item)
+        return item
 
     @property
     def cam_intr(self):
@@ -373,16 +344,9 @@ class NaiveGaussian3D:
         self.gs_points.__update_attr__('camid', camid)
         self.gs_points.__update_attr__('cam_intr', cam_intr)
         self.gs_points.__update_attr__('cam_extr', cam_extr)
-        #
-        # # positions in gs space
-        # depths = points_scaler(depths.unsqueeze(0), scale=1.).squeeze(0)
-        # i = torch.arange(1, n_cameras*2+1)
-        # i = repeat(i, 'c -> n d c', n=camid.shape[0], d=1)
-        # uvc = torch.cat([uv.mul(depths), camid * visible * i], dim=1).squeeze(-1)  # [N, 3]
-        # p_gs = uvc.mean(dim=-1).squeeze(-1)  # [N, 3]
-        # p_gs = points_scaler(p_gs.unsqueeze(0), scale=1.0).squeeze(0)
-        # self.gs_points.__update_attr__('p_gs', p_gs)
-        # return p_gs
+        f_gs = torch.cat(([uv, depths, visible, camid]), dim=1)
+        self.gs_points.__update_attr__('f_gs', f_gs)
+        return f_gs
 
     @torch.no_grad()
     def cov3d(self, xyz_padded):
@@ -492,8 +456,8 @@ def make_gs_points(gs_points, ks, grid_size=None, n_samples=None, up_sample=True
 def make_gs_features(gs: NaiveGaussian3D):
     uv = gs.gs_points.uv
     depths = gs.gs_points.depths
-    gs_group_idx = gs.gs_points.idx_gs_group[0]
-    cov3d = gs.cov3d(gs.gs_points.p[gs_group_idx])
+    group_idx = gs.gs_points.idx_group[0]
+    cov3d = gs.cov3d(gs.gs_points.p[group_idx])
     cov2d = gs.cov2d(gs.gs_points.p, cov3d)
     # gs feature
     delta = torch.round((uv % 1) * 1e5) / 1e5  # [N, 2, n_cameras*2]
@@ -514,27 +478,25 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
     new_gs = NaiveGaussian3D(gs_list[0].opt, batch_size=len(gs_list))
 
     p_all = []
-    # p_gs_all = []
+    f_gs_all = []
     f_all = []
     y_all = []
     idx_ds_all = []
     idx_us_all = []
     idx_group_all = []
-    idx_gs_group_all = []
     pts_all = []
     n_layers = len(gs_list[0].gs_points.idx_group)
     pts_per_layer = [0] * n_layers
     for i in range(len(gs_list)):
         gs = gs_list[i]
         p_all.append(gs.gs_points.p)
-        # p_gs_all.append(gs.gs_points.p_gs)
+        f_gs_all.append(gs.gs_points.f_gs)
         f_all.append(gs.gs_points.f)
         y_all.append(gs.gs_points.y)
 
         idx_ds = gs.gs_points.idx_ds
         idx_us = gs.gs_points.idx_us
         idx_group = gs.gs_points.idx_group
-        idx_gs_group = gs.gs_points.idx_gs_group
         pts = []
         for layer_idx in range(n_layers):
             if layer_idx < len(idx_ds):
@@ -542,21 +504,18 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
                 if up_sample:
                     idx_us[layer_idx].add_(pts_per_layer[layer_idx + 1])
             idx_group[layer_idx].add_(pts_per_layer[layer_idx])
-            if len(idx_gs_group) > 0:
-                idx_gs_group[layer_idx].add_(pts_per_layer[layer_idx])
             pts.append(idx_group[layer_idx].shape[0])
         idx_ds_all.append(idx_ds)
         idx_us_all.append(idx_us)
         idx_group_all.append(idx_group)
-        idx_gs_group_all.append(idx_gs_group)
         pts_all.append(pts)
         pts_per_layer = [pt + idx.shape[0] for (pt, idx) in zip(pts_per_layer, idx_group)]
 
     p = torch.cat(p_all, dim=0)
     new_gs.gs_points.__update_attr__('p', p)
 
-    # p_gs = torch.cat(p_gs_all, dim=0)
-    # new_gs.gs_points.__update_attr__('p_gs', p_gs)
+    f_gs = torch.cat(f_gs_all, dim=0)
+    new_gs.gs_points.__update_attr__('f_gs', f_gs)
 
     f = torch.cat(f_all, dim=0)
     new_gs.gs_points.__update_attr__('f', f)
@@ -572,10 +531,6 @@ def merge_gs_list(gs_list, up_sample=True) -> NaiveGaussian3D:
 
     idx_group = [torch.cat(idx, dim=0) for idx in zip(*idx_group_all)]
     new_gs.gs_points.__update_attr__('idx_group', idx_group)  # layer_idx: [0, 1, 2, 3]
-
-    if len(idx_gs_group_all) > 0:
-        idx_gs_group = [torch.cat(idx, dim=0) for idx in zip(*idx_gs_group_all)]
-        new_gs.gs_points.__update_attr__('idx_gs_group', idx_gs_group)  # layer_idx: [0, 1, 2, 3]
 
     pts_list = torch.tensor(pts_all, dtype=torch.int64)
     pts_list = pts_list.view(-1, n_layers).transpose(0, 1).contiguous()  # batch_size * layer_idx: [0, 1, 2, 3]
