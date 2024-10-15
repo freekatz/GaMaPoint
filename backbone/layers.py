@@ -266,7 +266,7 @@ class PointMambaLayer(nn.Module):
         self.layer_index = layer_index
         self.config = config
 
-        self.pos_embed = nn.Parameter(torch.randn([gs_opts.n_cameras * 2, channels], dtype=torch.float32))
+        self.pos_embed = nn.Parameter(torch.randn([1, gs_opts.n_cameras * 2, channels], dtype=torch.float32))
         self.mlp = Mlp(
             in_channels=gs_opts.n_cameras * 2,
             hidden_channels=gs_opts.n_cameras * 2 * 2,
@@ -278,11 +278,10 @@ class PointMambaLayer(nn.Module):
 
     def forward(self, f, f_gs, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
-        depths = f_gs[:, 2:3, :].squeeze(1)
-        f_depths = self.mlp(depths.unsqueeze(0)).squeeze(0)
-        pos_embed = f_depths @ self.pos_embed
-        f = f + pos_embed
         f = f.unsqueeze(0)
+        visible = f_gs[:, 3:4, :].squeeze(1)
+        pos_embed = self.mlp(visible.unsqueeze(0)) @ self.pos_embed
+        f = f + pos_embed
         B, N, C = f.shape
         f = f + self.mixer(input_ids=f, mask=None, gs=gs, order=None)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
