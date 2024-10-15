@@ -278,9 +278,8 @@ class PointMambaLayer(nn.Module):
 
     def forward(self, f, f_gs, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
-        visible = f_gs[:, 2:3, :].squeeze(1)
-        f_visible = self.mlp(visible.unsqueeze(0)).squeeze(0)
-        pos_embed = f_visible @ self.pos_embed
+        f_gs = self.mlp(f_gs.unsqueeze(0)).squeeze(0)
+        pos_embed = f_gs @ self.pos_embed
         f = f + pos_embed
         f = f.unsqueeze(0)
         B, N, C = f.shape
