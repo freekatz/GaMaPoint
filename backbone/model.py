@@ -185,9 +185,10 @@ class Backbone(nn.Module):
             f_sub = diff = None
 
         # 3. decode
+        f_out = f
         # up sample
         if self.task_type != 'cls':
-            f_out = self.post_proj(f)
+            f_out = self.post_proj(f_out)
             if not self.is_head:
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
                 f_out = f_out[us_idx]
@@ -195,7 +196,7 @@ class Backbone(nn.Module):
             # residual connections
             f_out = f_sub + f_out if f_sub is not None else f_out
         else:
-            f_out = f_sub if f_sub is not None else f
+            f_out = f_sub if f_sub is not None else f_out
         return f_out, self.diff_loss(p, f, group_idx, diff)
 
 
