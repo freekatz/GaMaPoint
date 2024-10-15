@@ -19,7 +19,6 @@ class Backbone(nn.Module):
                  mamba_blocks=[1, 1, 1, 1],
                  res_blocks=[4, 4, 8, 4],
                  mlp_ratio=2.,
-                 beta=0.,
                  bn_momentum=0.02,
                  drop_paths=None,
                  head_drops=None,
@@ -27,7 +26,7 @@ class Backbone(nn.Module):
                  hybrid_args={'hybrid': False},
                  use_cp=False,
                  diff_factor=40.,
-                 diff_std=[1.6, 3.2, 6.4, 12.8],
+                 diff_std=None,
                  task_type='segsem',
                  **kwargs
                  ):
@@ -87,14 +86,18 @@ class Backbone(nn.Module):
             nn.init.constant_(self.post_proj[0].weight, (channel_list[0] / self.out_channels) ** 0.5)
             self.head_drop = DropPath(head_drops[layer_index])
 
-        self.diff_std = 1 / diff_std[layer_index]
-        self.diff_head = nn.Sequential(
-            nn.Linear(self.out_channels, 32, bias=False),
-            nn.BatchNorm1d(32, momentum=bn_momentum),
-            nn.GELU(),
-            nn.Linear(32, 3, bias=False),
-        )
-        self.diff_loss = self.build_loss_fn()
+        if diff_std is not None:
+            self.use_diff = True
+            self.diff_std = 1 / diff_std[layer_index]
+            self.diff_head = nn.Sequential(
+                nn.Linear(self.out_channels, 32, bias=False),
+                nn.BatchNorm1d(32, momentum=bn_momentum),
+                nn.GELU(),
+                nn.Linear(32, 3, bias=False),
+            )
+            self.diff_loss = self.build_loss_fn()
+        else:
+            self.use_diff = False
 
         if not is_tail:
             self.sub = Backbone(
@@ -122,6 +125,8 @@ class Backbone(nn.Module):
             # use group feature to predict position
             if not self.training:
                 return None
+            if not self.use_diff:
+                return 0.0
             N, K = group_idx.shape
             rand_group = torch.randint(0, K, (N, 1), device=p.device)
             rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
