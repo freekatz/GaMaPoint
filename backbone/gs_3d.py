@@ -435,7 +435,6 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).float()
-    full_depths = gs_points.depths.squeeze(1).float()
 
     scaler = 1.0
     if not use_gs:
@@ -447,8 +446,6 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
 
     full_p = full_p.contiguous()
     full_visible = full_visible.contiguous()
-    full_depths = full_depths.contiguous()
-    depths = full_depths
     visible = full_visible
     p = full_p
 
@@ -467,37 +464,36 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
                     ds_idx = grid_subsampling(p, gsize)
             else:
                 if visible_sample_stride > 0 and i == 1:
-                    _, ds_idx = visible_sample(p.unsqueeze(0), visible.unsqueeze(0), int(p.shape[0] // visible_sample_stride))
+                    _, ds_idx = visible_sample(p.unsqueeze(0), gs_points.visible.unsqueeze(0), int(p.shape[0] // visible_sample_stride))
                     ds_idx = ds_idx.squeeze(0)
                 else:
                     _, ds_idx = fps_sample(p.unsqueeze(0), n_samples[i-1])
                     ds_idx = ds_idx.squeeze(0)
             p = p[ds_idx]
             visible = visible[ds_idx]
-            depths = depths[ds_idx]
             idx_ds.append(ds_idx)
 
         # group
         k = ks[i]
-        kdt = KDTree(p.numpy(), depths.numpy())
+        kdt = KDTree(p.numpy(), visible.numpy())
 
         if use_gs:
-            _, idx = kdt.query(p.numpy(), depths.numpy(), k=k, alpha=0)
+            _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=0)
             idx_group.append(torch.from_numpy(idx).long())
 
             k_gs = ks_gs[i]
-            _, idx_gs = kdt.query(p.numpy(), depths.numpy(), k=k_gs, alpha=-1)
+            _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k_gs, alpha=-1)
             idx_gs_group.append(torch.from_numpy(idx_gs).long())
         else:
-            _, idx = kdt.query(p.numpy(), depths.numpy(), k=k, alpha=alpha, scaler=scaler)
+            _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
             idx_group.append(torch.from_numpy(idx).long())
 
         # up sample
         if i > 0 and up_sample:
             if use_gs:
-                _, us_idx = kdt.query(full_p.numpy(), full_depths.numpy(), k=1, alpha=0)
+                _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1, alpha=0)
             else:
-                _, us_idx = kdt.query(full_p.numpy(), full_depths.numpy(), k=1, alpha=alpha, scaler=scaler)
+                _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1, alpha=alpha, scaler=scaler)
             idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)

@@ -27,7 +27,6 @@ Anne M. Archibald and libANN by David M. Mount and Sunil Arya.
 #include <stdlib.h>
 #include <stdint.h>
 #include <float.h>
-#include <math.h>
 
 #define PA(i,d)			(pa[no_dims * pidx[i] + d])
 #define CODEA(i,d)			(code[code_dims * pidx[i] + d])
@@ -489,27 +488,6 @@ void print_tree_float(Node_float *root, int level)
         print_tree_float((Node_float *)root->right_child, level + 1);
 }
 
-float dot_product_float(float A[], float B[], int n) { float result = 0; for (int i = 0; i < n; i++) { result += A[i] * B[i]; } return result; }
-
-float vector_length_float(float A[], int n) { float result = 0; for (int i = 0; i < n; i++) { result += A[i] * A[i]; } return sqrt(result); }
-
-float cosine_similarity_float(float A[], float B[], int n) { return dot_product_float(A, B, n) / (vector_length_float(A, n) * vector_length_float(B, n)); }
-
-float calc_cosine_float(float c1p1, float c1p2, float p1p2) {
-    if ( p1p2 == 0 || (c1p1 == c1p2 + p1p2) || (c1p2 == c1p1 + p1p2) ) {
-        return 1.0;
-    }
-    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) <= c1p1) {
-        return -1.0;
-    }
-    float a = c1p1 * c1p1;
-    float b = c1p2 * c1p2;
-    float c = p1p2 * p1p2;
-    float ab = c1p1 * c1p2;
-    float cos_c = (a+b-c)/(2*ab);
-    return cos_c;
-}
-
 /************************************************
 Calculate squared cartesian distance between points
 Params:
@@ -548,9 +526,9 @@ float calc_dist_float(float *point1_coord, float *code1, float *point2_coord, fl
             if (code2[j] != 0) {
                 visible_count2 += 1;
             }
-            dist2 += (1+calc_cosine_float(code1[j], code2[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
+            dist2 += code2[j] * code1[j];
         }
-        dist2 = 1 - dist2 / code_dims;
+        dist2 = 1.0 - dist2 / code_dims;
     }
 
     if (visible_count1 == 0) {
@@ -1191,27 +1169,6 @@ void print_tree_double(Node_double *root, int level)
         print_tree_double((Node_double *)root->right_child, level + 1);
 }
 
-double dot_product_double(double A[], double B[], int n) { double result = 0; for (int i = 0; i < n; i++) { result += A[i] * B[i]; } return result; }
-
-double vector_length_double(double A[], int n) { double result = 0; for (int i = 0; i < n; i++) { result += A[i] * A[i]; } return sqrt(result); }
-
-double cosine_similarity_double(double A[], double B[], int n) { return dot_product_double(A, B, n) / (vector_length_double(A, n) * vector_length_double(B, n)); }
-
-double calc_cosine_double(double c1p1, double c1p2, double p1p2) {
-    if ( p1p2 == 0 || (c1p1 == c1p2 + p1p2) || (c1p2 == c1p1 + p1p2) ) {
-        return 1.0;
-    }
-    if ((c1p1 + c1p2) <= p1p2 || (c1p1 + p1p2) <= c1p2 || (c1p2 + p1p2) <= c1p1) {
-        return -1.0;
-    }
-    double a = c1p1 * c1p1;
-    double b = c1p2 * c1p2;
-    double c = p1p2 * p1p2;
-    double ab = c1p1 * c1p2;
-    double cos_c = (a+b-c)/(2*ab);
-    return cos_c;
-}
-
 /************************************************
 Calculate squared cartesian distance between points
 Params:
@@ -1250,10 +1207,11 @@ double calc_dist_double(double *point1_coord, double *code1, double *point2_coor
             if (code2[j] != 0) {
                 visible_count2 += 1;
             }
-            dist2 += (1+calc_cosine_float(code1[j], code2[j], dist1)) / 2;  // [-1, 1] -> [0, 1]
+            dist2 += code2[j] * code1[j];
         }
-        dist2 = 1 - dist2 / code_dims;
+        dist2 = 1.0 - dist2 / code_dims;
     }
+    // float dist2 = 1 - cosine_similarity_double(code1, code2, code_dims);
 
     if (visible_count1 == 0) {
         return dist1;
