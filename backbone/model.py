@@ -180,7 +180,7 @@ class Backbone(nn.Module):
             f_out = f_sub + f_out if f_sub is not None else f_out
         else:
             f_out = f_sub if f_sub is not None else f_out
-        diff = self.diff_loss(p, f, group_idx, diff) if self.use_diff else None
+        diff = self.diff_loss(p, f, group_idx, diff) if self.use_diff else 0.0
         return f_out, diff
 
 
