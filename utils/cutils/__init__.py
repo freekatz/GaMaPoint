@@ -2,9 +2,7 @@ from pathlib import Path
 import torch
 from torch.autograd import Function
 from torch.utils.cpp_extension import load
-from torch.nn import functional as F
 from torch.cuda.amp import custom_fwd, custom_bwd
-import os
 
 path = Path(__file__).parent
 build_dir = path / "build"
@@ -73,46 +71,6 @@ def grid_subsampling_test(xyz: torch.Tensor, grid_size: float, hash_size: float 
     storage = torch.empty((size * 4,), dtype=torch.int64)
     indices = cutils.grid_subsampling_test(xyz, grid_size, table, storage, pick)
     return indices
-
-
-class KDTree():
-    r"""
-    kdt = KDTree(xyz)
-    indices, squared_dists = kdt.knn(query_xyz, k=16, ordered=True)
-    indices: int32
-    dists: float
-
-    Setting ordered = False (default) can be 1.1-1.2x faster.
-    If there are not enough neighbors, the nearest point is used for padding.
-    Resources (reference to xyz, built tree) are freed when kdt goes out of life scope.
-    """
-
-    def __init__(self, xyz: torch.Tensor, max_leaf_size=20):
-        assert xyz.ndim == 2 and xyz.shape[1] == 3 and xyz.dtype == torch.float
-        if xyz.stride(0) != 3:
-            xyz = xyz.contiguous()
-        # reserve xyz for knn search
-        self.xyz = xyz
-        self.n = xyz.shape[0]
-        self.tree, self.pca = cutils.kdtree_build(xyz, max_leaf_size)
-
-    def __del__(self):
-        cutils.kdtree_free(self.tree, self.pca)
-
-    def knn(self, query: torch.Tensor, k=1, ordered=False):
-        assert query.ndim == 2 and query.shape[1] == 3 and query.dtype == torch.float
-        if query.stride(0) != 3:
-            query = query.contiguous()
-        queries = query.shape[0]
-        nbrs = min(self.n, k)
-        if self.n < k: ordered = True
-        indices = torch.empty((queries, nbrs), dtype=torch.int32)
-        dists = torch.empty((queries, nbrs), dtype=torch.float)
-        cutils.kdtree_knn(self.tree, query, indices, dists, ordered)
-        if self.n < k:
-            indices = torch.cat([indices, indices[:, :1].expand(-1, k - self.n)], dim=1)
-            dists = torch.cat([dists, dists[:, :1].expand(-1, k - self.n)], dim=1)
-        return indices, dists
 
 
 class KEMP(Function):

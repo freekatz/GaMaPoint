@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.model import SegSemHead, Stage
+from backbone.model import SegSemHead, Backbone
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -188,11 +188,11 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
 
-    stage = Stage(
-        **cfg.model_cfg.stage_cfg,
+    backbone = Backbone(
+        **cfg.model_cfg.backbone_cfg,
     ).to('cuda')
     model = SegSemHead(
-        stage=stage,
+        backbone=backbone,
         num_classes=cfg.model_cfg.num_classes,
         bn_momentum=cfg.model_cfg.bn_momentum,
     ).to('cuda')
@@ -345,9 +345,9 @@ if __name__ == '__main__':
 
     model_cfg = model_configs[cfg.model_size]
     cfg.model_cfg = model_cfg
-    cfg.model_cfg.stage_cfg.use_cp = cfg.use_cp
+    cfg.model_cfg.backbone_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
-        cfg.model_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
+        cfg.model_cfg.backbone_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
 
     if cfg.mode == 'finetune':
         assert cfg.ckpt != ''

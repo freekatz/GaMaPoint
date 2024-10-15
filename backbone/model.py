@@ -10,7 +10,7 @@ from backbone.mamba_ssm.models import MambaConfig
 from utils.model_utils import checkpoint
 
 
-class Stage(nn.Module):
+class Backbone(nn.Module):
     def __init__(self,
                  layer_index=0,
                  in_channels=4,
@@ -105,9 +105,10 @@ class Stage(nn.Module):
             nn.GELU(),
             nn.Linear(32, 3, bias=False),
         )
+        self.diff_loss = self.build_loss_fn()
 
         if not is_tail:
-            self.sub_stage = Stage(
+            self.sub = Backbone(
                 layer_index=layer_index + 1,
                 in_channels=in_channels,
                 channel_list=channel_list,
@@ -125,6 +126,25 @@ class Stage(nn.Module):
                 diff_factor=diff_factor,
                 diff_std=diff_std,
             )
+
+    def build_loss_fn(self):
+
+        def loss_fn(p, f, group_idx, d_sub):
+            if not self.training:
+                return None
+            N, K = group_idx.shape
+            rand_group = torch.randint(0, K, (N, 1), device=p.device)
+            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
+            rand_p_group = p[rand_group_idx] - p
+            rand_p_group.mul_(self.diff_std)
+            rand_f_group = f[rand_group_idx] - f
+            rand_f_group = self.diff_head(rand_f_group)
+            diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
+            if d_sub is not None:
+                diff = diff + d_sub
+            return diff
+
+        return loss_fn
 
     def forward(self, p, f, gs: NaiveGaussian3D):
         # 1. encode
@@ -158,53 +178,41 @@ class Stage(nn.Module):
         # fuse local and global feature
         f = f_global + f_local
 
-        # 2. netx stage
+        # 2. netx layer
         if not self.is_tail:
-            f_sub, d_sub = self.sub_stage(p, f, gs)
+            f_sub, diff = self.sub(p, f, gs)
         else:
-            f_sub = d_sub = None
-
-        # regularization
-        if self.training:
-            N, K = group_idx.shape
-            rand_group = torch.randint(0, K, (N, 1), device=p.device)
-            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
-            rand_p_group = p[rand_group_idx] - p
-            rand_p_group.mul_(self.diff_std)
-            rand_f_group = f[rand_group_idx] - f
-            rand_f_group = self.diff_head(rand_f_group)
-            diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
-            d_sub = d_sub + diff if d_sub is not None else diff
+            f_sub = diff = None
 
         # 3. decode
         # up sample
         if self.task_type != 'cls':
-            f = self.post_proj(f)
+            f_out = self.post_proj(f)
             if not self.is_head:
                 us_idx = gs.gs_points.idx_us[self.layer_index - 1]
-                f = f[us_idx]
-            f = self.head_drop(f)
+                f_out = f_out[us_idx]
+            f_out = self.head_drop(f_out)
             # residual connections
-            f = f_sub + f if f_sub is not None else f
+            f_out = f_sub + f_out if f_sub is not None else f_out
         else:
-            f = f_sub if f_sub is not None else f
-        return f, d_sub
+            f_out = f_sub if f_sub is not None else f
+        return f_out, self.diff_loss(p, f, group_idx, diff)
 
 
 class SegSemHead(nn.Module):
     def __init__(self,
-                 stage: Stage,
+                 backbone: Backbone,
                  num_classes=13,
                  bn_momentum=0.02,
                  **kwargs
                  ):
         super().__init__()
-        self.stage = stage
+        self.backbone = backbone
 
         self.head = nn.Sequential(
-            nn.BatchNorm1d(stage.head_channels, momentum=bn_momentum),
+            nn.BatchNorm1d(backbone.head_channels, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(stage.head_channels, num_classes),
+            nn.Linear(backbone.head_channels, num_classes),
         )
 
         self.apply(self.__init_weights)
@@ -219,7 +227,7 @@ class SegSemHead(nn.Module):
         p = gs.gs_points.p
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, f, gs)
+        f, diff = self.backbone(p, f, gs)
         if self.training:
             return self.head(f), diff
         return self.head(f)
@@ -227,25 +235,25 @@ class SegSemHead(nn.Module):
 
 class SegPartHead(nn.Module):
     def __init__(self,
-                 stage: Stage,
+                 backbone: Backbone,
                  num_classes=50,
                  shape_classes=16,
                  bn_momentum=0.1,
                  **kwargs
                  ):
         super().__init__()
-        self.stage = stage
+        self.backbone = backbone
         self.shape_classes = shape_classes
 
         self.proj = nn.Sequential(
             nn.Linear(shape_classes, 64, bias=False),
             nn.BatchNorm1d(64, momentum=bn_momentum),
-            nn.Linear(64, stage.head_channels, bias=False)
+            nn.Linear(64, backbone.head_channels, bias=False)
         )
         self.head = nn.Sequential(
-            nn.BatchNorm1d(stage.head_channels, momentum=bn_momentum),
+            nn.BatchNorm1d(backbone.head_channels, momentum=bn_momentum),
             nn.GELU(),
-            nn.Linear(stage.head_channels, num_classes),
+            nn.Linear(backbone.head_channels, num_classes),
         )
 
         self.apply(self.__init_weights)
@@ -260,7 +268,7 @@ class SegPartHead(nn.Module):
         p = gs.gs_points.p
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, f, gs)
+        f, diff = self.backbone(p, f, gs)
         shape = nn.functional.one_hot(shape, self.shape_classes).float()
         shape = self.proj(shape)
         shape = repeat(shape, 'b c -> b n c', n=f.shape[0]//gs.batch_size)
@@ -273,23 +281,23 @@ class SegPartHead(nn.Module):
 
 class ClsHead(nn.Module):
     def __init__(self,
-                 stage: Stage,
+                 backbone: Backbone,
                  num_classes=13,
                  bn_momentum=0.1,
                  **kwargs
                  ):
         super().__init__()
-        self.stage = stage
+        self.backbone = backbone
         self.num_classes = num_classes
 
         self.proj = nn.Sequential(
-            nn.BatchNorm1d(stage.channel_list[-1], momentum=bn_momentum),
-            nn.Linear(stage.channel_list[-1], stage.head_channels),
+            nn.BatchNorm1d(backbone.channel_list[-1], momentum=bn_momentum),
+            nn.Linear(backbone.channel_list[-1], backbone.head_channels),
             nn.GELU(),
         )
 
         self.head = nn.Sequential(
-            nn.Linear(stage.head_channels * 2, 512, bias=False),
+            nn.Linear(backbone.head_channels * 2, 512, bias=False),
             nn.BatchNorm1d(512, momentum=bn_momentum),
             nn.GELU(),
             nn.Linear(512, 256, bias=False),
@@ -311,9 +319,9 @@ class ClsHead(nn.Module):
         p = gs.gs_points.p
         f = gs.gs_points.f
 
-        f, diff = self.stage(p, f, gs)
+        f, diff = self.backbone(p, f, gs)
         f = self.proj(f)
-        f = f.view(gs.batch_size, -1, self.stage.head_channels)
+        f = f.view(gs.batch_size, -1, self.backbone.head_channels)
         f = torch.cat([f[:, 0], f[:, 1:].max(1)[0] + f[:, 1:].mean(1)[0]], dim=-1)
         f = f.squeeze(1)
         f = self.head(f)

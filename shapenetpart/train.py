@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.model import SegPartHead, Stage
+from backbone.model import SegPartHead, Backbone
 from shapenetpart.configs import model_configs
 from shapenetpart.dataset import ShapeNetPartNormal, shapenetpart_collate_fn, get_ins_mious
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -182,12 +182,12 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
 
-    stage = Stage(
-        **cfg.model_cfg.stage_cfg,
+    backbone = Backbone(
+        **cfg.model_cfg.backbone_cfg,
         task_type='segpart',
     ).to('cuda')
     model = SegPartHead(
-        stage=stage,
+        backbone=backbone,
         num_classes=cfg.model_cfg.num_classes,
         shape_classes=cfg.shape_classes,
         bn_momentum=cfg.model_cfg.bn_momentum,
@@ -341,9 +341,9 @@ if __name__ == '__main__':
 
     model_cfg = model_configs[cfg.model_size]
     cfg.model_cfg = model_cfg
-    cfg.model_cfg.stage_cfg.use_cp = cfg.use_cp
+    cfg.model_cfg.backbone_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
-        cfg.model_cfg.stage_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
+        cfg.model_cfg.backbone_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
     cfg.presample_path = os.path.join(cfg.dataset, cfg.presample)
 
     if cfg.mode == 'finetune':
