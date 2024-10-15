@@ -345,7 +345,7 @@ class NaiveGaussian3D:
         self.gs_points.__update_attr__('cam_intr', cam_intr)
         self.gs_points.__update_attr__('cam_extr', cam_extr)
         # f_gs = torch.cat(([uv, depths, visible, camid]), dim=1)
-        self.gs_points.__update_attr__('f_gs', visible.squeeze(1))
+        self.gs_points.__update_attr__('f_gs', visible.squeeze(1).float())
 
     @torch.no_grad()
     def cov3d(self, xyz_padded):
