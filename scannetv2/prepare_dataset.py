@@ -1,18 +1,18 @@
 import __init__
 
+import argparse
+from pathlib import Path
+
 import multiprocessing as mp
 import plyfile
 import torch
 import torch.nn.functional as F
-from config import raw_data_path as src, processed_data_path as dest
 
-print(f"Processed data will be saved in:\n{dest}")
-
-dest.mkdir(exist_ok=True)
 
 remapper = torch.zeros(256, dtype=torch.uint8) + 20
 for i, x in enumerate([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39]):
     remapper[x] = i
+
 
 def calc_normal(xyz, face):
     x0 = xyz[face[:, 0]]
@@ -25,9 +25,10 @@ def calc_normal(xyz, face):
     norm = F.normalize(norm, p=2, dim=1, eps=1e-8)
     return norm
 
-def process_scene(entry):
+
+def process_scene(o, entry):
     scene = entry.name
-    f0 = dest / f"{scene}.pt"
+    f0 = o / f"{scene}.pt"
     if f0.exists():
         print(f"skipping {scene}")
         return
@@ -49,8 +50,27 @@ def process_scene(entry):
     torch.save((xyz, col, norm, label), f0)
     print(f"finished {scene}")
 
-entries = [entry for entry in (src / "scans").iterdir() if entry.is_dir()]
-p = mp.Pool(processes=8)
-p.map(process_scene, entries)
-p.close()
-p.join()
+
+def prepare(i, o):
+    print(f"Processed data will be saved in:\n{o}")
+    o.mkdir(exist_ok=True)
+
+    entries = [entry for entry in (i / "scans").iterdir() if entry.is_dir()]
+    p = mp.Pool(processes=8)
+    p.map(process_scene, (o, entries))
+    p.close()
+    p.join()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', type=str, required=True)
+    parser.add_argument('-o', type=str, required=False, default='scannetv2')
+
+    args, opts = parser.parse_known_args()
+
+    i = Path(args.i)
+    o = i.parent / args.o
+
+    prepare(i, o)
+
