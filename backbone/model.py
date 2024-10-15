@@ -95,7 +95,6 @@ class Backbone(nn.Module):
                 nn.GELU(),
                 nn.Linear(32, 3, bias=False),
             )
-            self.diff_loss = self.build_loss_fn()
         else:
             self.use_diff = False
 
@@ -119,27 +118,21 @@ class Backbone(nn.Module):
                 diff_std=diff_std,
             )
 
-    def build_loss_fn(self):
-
-        def loss_fn(p, f, group_idx, d_sub):
-            # use group feature to predict position
-            if not self.training:
-                return None
-            if not self.use_diff:
-                return 0.0
-            N, K = group_idx.shape
-            rand_group = torch.randint(0, K, (N, 1), device=p.device)
-            rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
-            rand_p_group = p[rand_group_idx] - p
-            rand_p_group.mul_(self.diff_std)
-            rand_f_group = f[rand_group_idx] - f
-            rand_f_group = self.diff_head(rand_f_group)
-            diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
-            if d_sub is not None:
-                diff = diff + d_sub
-            return diff
-
-        return loss_fn
+    def diff_loss(self, p, f, group_idx, d_sub):
+        # use group feature to predict position
+        if not self.training:
+            return None
+        N, K = group_idx.shape
+        rand_group = torch.randint(0, K, (N, 1), device=p.device)
+        rand_group_idx = torch.gather(group_idx, 1, rand_group).squeeze(1)
+        rand_p_group = p[rand_group_idx] - p
+        rand_p_group.mul_(self.diff_std)
+        rand_f_group = f[rand_group_idx] - f
+        rand_f_group = self.diff_head(rand_f_group)
+        diff = nn.functional.mse_loss(rand_f_group, rand_p_group)
+        if d_sub is not None:
+            diff = diff + d_sub
+        return diff
 
     def forward(self, p, f, gs: NaiveGaussian3D):
         # 1. encode
@@ -187,7 +180,8 @@ class Backbone(nn.Module):
             f_out = f_sub + f_out if f_sub is not None else f_out
         else:
             f_out = f_sub if f_sub is not None else f_out
-        return f_out, self.diff_loss(p, f, group_idx, diff)
+        diff = self.diff_loss(p, f, group_idx, diff) if self.use_diff else None
+        return f_out, diff
 
 
 class SegSemHead(nn.Module):
