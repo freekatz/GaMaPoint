@@ -233,7 +233,7 @@ class MixerModel(nn.Module):
 
         for idx in range(self.n_layer):
             block1 = self.__get_layer_by_name(f'{idx}_block_1')
-            if pos is not None:
+            if pos_embed is not None:
                 hidden_states = hidden_states + pos_embed
             hidden_states1, residual1 = block1(
                 hidden_states, residual, inference_params=inference_params, mask=mask
