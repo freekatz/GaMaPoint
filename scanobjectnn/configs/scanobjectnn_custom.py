@@ -44,5 +44,6 @@ class ModelConfig(EasyConfig):
         backbone_cfg.mamba_cfg = MambaConfig.default()
         backbone_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
         backbone_cfg.diff_factor = 40.
-        backbone_cfg.diff_std = [2.2, 4.4, 8.8]
+        # backbone_cfg.diff_std = [2.2, 4.4, 8.8]
+        backbone_cfg.diff_std = None
         self.backbone_cfg = backbone_cfg
