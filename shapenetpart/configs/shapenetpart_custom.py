@@ -46,6 +46,6 @@ class ModelConfig(EasyConfig):
         backbone_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
         backbone_cfg.gs_opts = self.train_cfg.gs_opts
         backbone_cfg.diff_factor = 40.
-        # backbone_cfg.diff_std = [0.75, 1.5, 2.5, 4.7]
-        backbone_cfg.diff_std = None
+        backbone_cfg.diff_std = [0.75, 1.5, 2.5, 4.7]
+        # backbone_cfg.diff_std = None
         self.backbone_cfg = backbone_cfg
