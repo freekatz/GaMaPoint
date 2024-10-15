@@ -25,7 +25,6 @@ class Backbone(nn.Module):
                  head_drops=None,
                  mamba_config=MambaConfig().default(),
                  hybrid_args={'hybrid': False},
-                 use_gs=False,
                  use_cp=False,
                  diff_factor=40.,
                  diff_std=[1.6, 3.2, 6.4, 12.8],
@@ -45,7 +44,6 @@ class Backbone(nn.Module):
         self.channel_list = channel_list
         self.out_channels = channel_list[layer_index]
         self.head_channels = head_channels
-        self.use_gs = use_gs
         self.diff_factor = diff_factor
 
         if not is_head:
@@ -63,15 +61,6 @@ class Backbone(nn.Module):
             bn_momentum=bn_momentum,
             use_cp=use_cp,
         )
-        if use_gs:
-            self.sa_gs = SetAbstraction(
-                layer_index=layer_index,
-                in_channels=in_channels,
-                channel_list=channel_list,
-                bn_momentum=bn_momentum,
-                use_cp=use_cp,
-            )
-            self.beta = nn.Parameter(torch.tensor([beta], dtype=torch.float32) * 100)
 
         self.res_mlp = InvResMLP(
             channels=self.out_channels,
@@ -161,11 +150,6 @@ class Backbone(nn.Module):
         # set abstraction: group and abstract the local points set
         group_idx = gs.gs_points.idx_group[self.layer_index]
         f_local = self.sa(p, f, group_idx)
-        if self.use_gs:
-            gs_group_idx = gs.gs_points.idx_gs_group[self.layer_index]
-            f_local_gs = self.sa_gs(p, f, gs_group_idx)
-            beta = self.beta.sigmoid()
-            f_local = f_local * (1-beta) + f_local_gs * beta
 
         # invert residual connections: local feature aggregation and propagation
         pts = gs.gs_points.pts_list[self.layer_index].tolist()

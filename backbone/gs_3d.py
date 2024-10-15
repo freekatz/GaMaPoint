@@ -429,20 +429,18 @@ class NaiveGaussian3D:
         return cov2d
 
 
-def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_sample=True, visible_sample_stride=0., alpha=0., use_gs=False) -> GaussianPoints:
+def make_gs_points(gs_points, ks, grid_size=None, n_samples=None, up_sample=True, visible_sample_stride=0., alpha=0.) -> GaussianPoints:
     assert (grid_size is not None and n_samples is not None) is False
     assert (grid_size is None and n_samples is None) is False
     n_layers = len(ks)
     full_p = gs_points.p
     full_visible = gs_points.visible.squeeze(1).float()
 
-    scaler = 1.0
-    if not use_gs:
-        # estimating a distance in Euclidean space as the scaler
-        ps, _ = fps_sample(full_p.unsqueeze(0), 2, random_start_point=True)
-        ps = ps.squeeze(0)
-        p0, p1 = ps[0], ps[1]
-        scaler = math.sqrt((p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2)
+    # estimating a distance in Euclidean space as the scaler by random fps
+    ps, _ = fps_sample(full_p.unsqueeze(0), 2, random_start_point=True)
+    ps = ps.squeeze(0)
+    p0, p1 = ps[0], ps[1]
+    scaler = math.sqrt((p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2)
 
     full_p = full_p.contiguous()
     full_visible = full_visible.contiguous()
@@ -476,24 +474,12 @@ def make_gs_points(gs_points, ks, ks_gs, grid_size=None, n_samples=None, up_samp
         # group
         k = ks[i]
         kdt = KDTree(p.numpy(), visible.numpy())
-
-        if use_gs:
-            _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=0)
-            idx_group.append(torch.from_numpy(idx).long())
-
-            k_gs = ks_gs[i]
-            _, idx_gs = kdt.query(p.numpy(), visible.numpy(), k=k_gs, alpha=-1)
-            idx_gs_group.append(torch.from_numpy(idx_gs).long())
-        else:
-            _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
-            idx_group.append(torch.from_numpy(idx).long())
+        _, idx = kdt.query(p.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
+        idx_group.append(torch.from_numpy(idx).long())
 
         # up sample
         if i > 0 and up_sample:
-            if use_gs:
-                _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1, alpha=0)
-            else:
-                _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1, alpha=alpha, scaler=scaler)
+            _, us_idx = kdt.query(full_p.numpy(), full_visible.numpy(), k=1, alpha=alpha, scaler=scaler)
             idx_us.append(torch.from_numpy(us_idx).long())
 
     gs_points.__update_attr__('idx_ds', idx_ds)

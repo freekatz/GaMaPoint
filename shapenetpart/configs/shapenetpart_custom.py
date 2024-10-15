@@ -12,8 +12,6 @@ class ShapeNetPartConfig(EasyConfig):
         super().__init__()
         self.name = 'ShapeNetPartConfig'
         self.k = [32, 32, 32, 32]
-        self.use_gs = False
-        self.k_gs = [8, 8, 8, 8]
         self.n_samples = [2048, 1024, 512, 256]
         self.voxel_max = 2048
         gs_opts = GaussianOptions.default()
@@ -40,8 +38,6 @@ class ModelConfig(EasyConfig):
         backbone_cfg.mamba_blocks = [1, 1, 1, 1]
         backbone_cfg.res_blocks = [4, 4, 4, 4]
         backbone_cfg.mlp_ratio = 2.
-        backbone_cfg.beta = self.train_cfg.alpha
-        backbone_cfg.use_gs = self.train_cfg.use_gs
         backbone_cfg.bn_momentum = self.bn_momentum
         drop_rates = torch.linspace(0., drop_path, sum(backbone_cfg.res_blocks)).split(backbone_cfg.res_blocks)
         backbone_cfg.drop_paths = [d.tolist() for d in drop_rates]
