@@ -69,8 +69,8 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             optimizer.step()
 
         m.update(pred, target)
-        loss_meter.update(loss.item())
-        diff_meter.update(diff.item())
+        loss_meter.update(loss)
+        diff_meter.update(diff)
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
                              + f"Diff {diff_meter.avg:.4f} "
@@ -91,7 +91,7 @@ def validate(cfg, model, val_loader, epoch):
             pred = model(gs)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         m.update(pred, target)
-        loss_meter.update(loss.item())
+        loss_meter.update(loss)
         pbar.set_description(f"Val Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
                              + f"mACC {m.calc_macc():.4f}")

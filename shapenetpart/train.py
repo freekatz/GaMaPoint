@@ -69,8 +69,8 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss = loss + diff * lam
             loss.backward()
             optimizer.step()
-        loss_meter.update(loss.item())
-        diff_meter.update(diff.item())
+        loss_meter.update(loss)
+        diff_meter.update(diff)
         pbar.set_description(f"Train Epoch [{epoch}/{cfg.epochs}] "
                              + f"Loss {loss_meter.avg:.4f} "
                              + f"Diff {diff_meter.avg:.4f}")
