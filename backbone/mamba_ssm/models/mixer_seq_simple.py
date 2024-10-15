@@ -225,7 +225,7 @@ class MixerModel(nn.Module):
     def __get_layer_by_name(self, layer_shortname):
         return self.layers.get_submodule(self.layers_name[layer_shortname])
 
-    def forward(self, input_ids, inference_params=None,
+    def forward(self, input_ids, pos_embed=None, inference_params=None,
                 mask: StructuredMask = None, gs: NaiveGaussian3D = None,
                 order: Order = None, **mixer_kwargs):
         hidden_states = input_ids
@@ -233,6 +233,8 @@ class MixerModel(nn.Module):
 
         for idx in range(self.n_layer):
             block1 = self.__get_layer_by_name(f'{idx}_block_1')
+            if pos is not None:
+                hidden_states = hidden_states + pos_embed
             hidden_states1, residual1 = block1(
                 hidden_states, residual, inference_params=inference_params, mask=mask
             )

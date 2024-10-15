@@ -280,9 +280,9 @@ class PointMambaLayer(nn.Module):
         assert len(f.shape) == 2
         f_gs = self.mlp(f_gs.unsqueeze(0)).squeeze(0)
         pos_embed = f_gs @ self.pos_embed
-        f = f + pos_embed
+        pos_embed = pos_embed.unsqueeze(0)
         f = f.unsqueeze(0)
         B, N, C = f.shape
-        f = f + self.mixer(input_ids=f, mask=None, gs=gs, order=None)
+        f = f + self.mixer(input_ids=f, pos_embed=pos_embed, mask=None, gs=gs, order=None)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)
         return f.squeeze(0)
