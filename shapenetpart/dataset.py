@@ -321,6 +321,10 @@ if __name__ == '__main__':
         xyz = xyz.float().unsqueeze(0)
         idx = pointnet2_utils.furthest_point_sample(xyz, 2048).long()
         xyz = torch.gather(xyz, 1, idx.unsqueeze(-1).expand(-1, -1, 3))
+        xyz = xyz.cpu()
+        idx = idx.cpu()
+        normal = normal.cpu()
+        seg = seg.cpu()
         xyzs.append(xyz)
         shapes.append(shape)
         seg = seg.long()[idx.squeeze()]
