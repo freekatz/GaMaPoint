@@ -311,7 +311,7 @@ if __name__ == '__main__':
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
     parser.add_argument('--presample', type=str, required=False, default='shapenetpart_presample.pt')
-    parser.add_argument('--batch_size', type=int, required=False, default=32)
+    parser.add_argument('--batch_size', type=int, required=False, default=24)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
