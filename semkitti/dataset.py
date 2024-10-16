@@ -140,16 +140,7 @@ class SemKitti(Dataset):
         assert len(self.data_paths) > 0
 
         if train and warmup:
-            max_n = 0
-            selected_data = self.data_paths[0]
-            for (pc_path, label_path) in self.data_paths:
-                scan = load_scan_kitti(pc_path)
-                n = scan.shape[0]
-                if n > max_n:
-                    max_n = n
-                    selected_data = [pc_path, label_path]
-            # use selected data with max n to warmup model
-            self.data_paths = [selected_data]
+            self.data_paths = self.data_paths[:8]
 
         self.cache = {}
         self.cache_size = 20000

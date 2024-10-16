@@ -314,15 +314,15 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
-    parser.add_argument('--batch_size', type=int, required=False, default=8)
+    parser.add_argument('--batch_size', type=int, required=False, default=4)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
-    parser.add_argument('--epochs', type=int, required=False, default=100)
-    parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
-    parser.add_argument("--lr", type=float, required=False, default=1e-3)
+    parser.add_argument('--epochs', type=int, required=False, default=50)
+    parser.add_argument("--warmup_epochs", type=int, required=False, default=5)
+    parser.add_argument("--lr", type=float, required=False, default=5e-4)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
-    parser.add_argument("--decay", type=float, required=False, default=0.05)
+    parser.add_argument("--decay", type=float, required=False, default=0.005)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')
 
