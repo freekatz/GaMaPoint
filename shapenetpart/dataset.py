@@ -338,3 +338,4 @@ if __name__ == '__main__':
     normals = torch.cat(normals)
     print(xyzs.shape, normals.shape, shapes.shape, segs.shape)
     torch.save((xyzs, normals, shapes, segs), presample_path)
+    print(presample_path)
