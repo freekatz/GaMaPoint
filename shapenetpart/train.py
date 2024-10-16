@@ -16,7 +16,8 @@ from tqdm import tqdm
 
 from backbone.models import SegPartHead, Backbone
 from shapenetpart.configs import model_configs
-from shapenetpart.dataset import ShapeNetPartNormal, shapenetpart_collate_fn, get_ins_mious
+from shapenetpart.dataset import ShapeNetPartNormal, shapenetpart_collate_fn, get_ins_mious, presampling, \
+    ShapeNetPartNormalTest
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
 from utils.logger import setup_logger_dist, format_dict, format_list
@@ -121,23 +122,8 @@ def main(cfg):
     torch.backends.cudnn.enabled = True
 
     logging.info(f'Config:\n{cfg.__str__()}')
-    presample_ds = ShapeNetPartNormal(
+    train_ds = ShapeNetPartNormal(
             dataset_dir=cfg.dataset,
-            presample_path=cfg.presample_path,
-            train=False,
-            warmup=False,
-            voxel_max=cfg.model_cfg.train_cfg.voxel_max,
-            k=cfg.model_cfg.train_cfg.k,
-            n_samples=cfg.model_cfg.train_cfg.n_samples,
-            alpha=cfg.model_cfg.train_cfg.alpha,
-            batch_size=cfg.batch_size,
-            gs_opts=cfg.model_cfg.train_cfg.gs_opts
-        )
-    presample_ds.presampling()
-    train_loader = DataLoader(
-        ShapeNetPartNormal(
-            dataset_dir=cfg.dataset,
-            presample_path=cfg.presample_path,
             train=True,
             warmup=False,
             voxel_max=cfg.model_cfg.train_cfg.voxel_max,
@@ -146,7 +132,9 @@ def main(cfg):
             alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.model_cfg.train_cfg.gs_opts
-        ),
+        )
+    train_loader = DataLoader(
+        train_ds,
         batch_size=cfg.batch_size,
         collate_fn=shapenetpart_collate_fn,
         shuffle=True,
@@ -156,12 +144,8 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     val_loader = DataLoader(
-        ShapeNetPartNormal(
-            dataset_dir=cfg.dataset,
+        ShapeNetPartNormalTest(
             presample_path=cfg.presample_path,
-            train=False,
-            warmup=False,
-            voxel_max=cfg.model_cfg.train_cfg.voxel_max,
             k=cfg.model_cfg.train_cfg.k,
             n_samples=cfg.model_cfg.train_cfg.n_samples,
             alpha=cfg.model_cfg.train_cfg.alpha,
@@ -243,7 +227,7 @@ def main(cfg):
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
                 val_ins_miou, val_cls_miou, val_ious = validate(
-                    cfg, model, val_loader, epoch, class2parts=presample_ds.class2parts
+                    cfg, model, val_loader, epoch, class2parts=train_ds.class2parts
                 )
             logging.info(f'@E{epoch} val:      '
                          + f'ins_miou={val_ins_miou:.4f} cls_miou={val_cls_miou:.4f}')

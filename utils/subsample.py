@@ -1,5 +1,9 @@
-from pytorch3d.ops import sample_farthest_points
 import torch
+from einops import repeat
+from pytorch3d.ops import sample_farthest_points
+
+from utils.cutils import grid_subsampling
+from utils.pointnet2_ops_lib.pointnet2_ops import pointnet2_utils
 
 
 def create_sampler(sampler='random', **kwargs):
@@ -7,11 +11,26 @@ def create_sampler(sampler='random', **kwargs):
         return random_sample
     elif sampler == 'fps':
         return fps_sample
+    elif sampler == 'fps_cuda':
+        return fps_sample_cuda
     elif sampler == 'visible':
         return visible_sample
+    elif sampler == 'trunc':
+        return trunc_sample
     else:
         raise NotImplementedError(
             f'sampler {sampler} not implemented')
+
+
+def trunc_sample(xyz, n_samples, **kwargs):
+    """
+    :param xyz: [B, N, 3]
+    :return: [B, n_samples, 3], [B, n_samples]
+    """
+    xyz_idx = torch.arange(0, n_samples, dtype=torch.long, device=xyz.device)
+    xyz_idx = repeat(xyz_idx, 'n -> b n', b=xyz.shape[0])
+    xyz_sampled = xyz[:, :n_samples, :]
+    return xyz_sampled, xyz_idx
 
 
 def fps_sample(xyz, n_samples, **kwargs):
@@ -25,6 +44,18 @@ def fps_sample(xyz, n_samples, **kwargs):
         K=n_samples,
         random_start_point=random_start_point,
     )
+    return xyz_sampled, xyz_idx
+
+
+def fps_sample_cuda(xyz, n_samples, **kwargs):
+    """
+    :param xyz: [B, N, 3]
+    :return: [B, n_samples, 3], [B, n_samples]
+    """
+    if not xyz.is_contiguous():
+        xyz = xyz.contiguous()
+    xyz_idx = pointnet2_utils.furthest_point_sample(xyz, n_samples, **kwargs).long()
+    xyz_sampled = torch.gather(xyz, 1, xyz_idx.unsqueeze(-1).expand(-1, -1, 3))
     return xyz_sampled, xyz_idx
 
 

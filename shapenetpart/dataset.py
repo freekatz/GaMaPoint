@@ -1,3 +1,4 @@
+import argparse
 import logging
 
 import __init__
@@ -12,10 +13,10 @@ import torch
 from torch.utils.data import Dataset
 
 from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list
-from utils.subsample import fps_sample
+from utils.subsample import fps_sample_cuda, random_sample, create_sampler
 
 
-def get_ins_mious(pred, target, shape, class_parts,  multihead=False):
+def get_ins_mious(pred, target, shape, class_parts, multihead=False):
     """Get the Shape IoU
     shape IoU: the mean part iou for each shape
     Args:
@@ -46,6 +47,77 @@ def get_ins_mious(pred, target, shape, class_parts,  multihead=False):
     return ins_mious
 
 
+class ShapeNetPartNormalTest(Dataset):
+    classes = ['airplane', 'bag', 'cap', 'car',
+               'chair', 'earphone', 'guitar', 'knife',
+               'lamp', 'laptop', 'motorbike', 'mug',
+               'pistol', 'rocket', 'skateboard', 'table']
+    shape_classes = len(classes)
+    num_classes = 50
+    class_parts = {
+        'earphone': [16, 17, 18], 'motorbike': [30, 31, 32, 33, 34, 35],
+        'rocket': [41, 42, 43], 'car': [8, 9, 10, 11],
+        'laptop': [28, 29], 'cap': [6, 7],
+        'skateboard': [44, 45, 46], 'mug': [36, 37],
+        'guitar': [19, 20, 21], 'bag': [4, 5],
+        'lamp': [24, 25, 26, 27], 'table': [47, 48, 49],
+        'airplane': [0, 1, 2, 3], 'pistol': [38, 39, 40],
+        'chair': [12, 13, 14, 15], 'knife': [22, 23]}
+
+    class2parts = []
+    for i, cls in enumerate(classes):
+        idx = class_parts[cls]
+        class2parts.append(idx)
+    class_segs = [4, 2, 2, 4, 4, 3, 3, 2, 4, 2, 6, 2, 3, 3, 3, 3]
+    part_start = [0, 4, 6, 8, 12, 16, 19, 22, 24, 28, 30, 36, 38, 41, 44, 47]
+
+    def __init__(self,
+                 presample_path,
+                 k=[20, 20, 20, 20],
+                 n_samples=[2048, 512, 192, 64],
+                 visible_sample_stride=0.,
+                 alpha=0.,
+                 batch_size=8,
+                 gs_opts: GaussianOptions = GaussianOptions.default(),
+                 ) -> None:
+        super().__init__()
+        self.k = k
+        self.n_samples = n_samples
+        self.visible_sample_stride = visible_sample_stride
+        self.alpha = alpha
+        self.batch_size = batch_size
+        self.gs_opts = gs_opts
+        self.xyz, self.norm, self.shape, self.seg = torch.load(presample_path)
+
+    def __len__(self):
+        return self.xyz.shape[0]
+
+    @classmethod
+    def get_classes(cls):
+        return cls.classes
+
+    def __getitem__(self, idx):
+        xyz = self.xyz[idx]
+        norm = self.norm[idx]
+        shape = self.shape[idx]
+        seg = self.seg[idx]
+        xyz -= xyz.min(dim=0)[0]
+        height = xyz[:, 2:] * 4
+        height -= height.min(dim=0, keepdim=True)[0]
+        norm = torch.cat([norm, height], dim=-1)
+
+        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
+        gs.gs_points.__update_attr__('p', xyz)
+        gs.gs_points.__update_attr__('f', norm)
+        gs.gs_points.__update_attr__('y', seg)
+        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras * 2)
+        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.n_samples,
+                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
+                                      alpha=self.alpha)
+        return gs, shape
+
+
+
 class ShapeNetPartNormal(Dataset):
     classes = ['airplane', 'bag', 'cap', 'car',
                'chair', 'earphone', 'guitar', 'knife',
@@ -72,9 +144,9 @@ class ShapeNetPartNormal(Dataset):
 
     def __init__(self,
                  dataset_dir: Path,
-                 presample_path='',
                  train=True,
                  warmup=False,
+                 presample=False,
                  voxel_max=2048,
                  k=[20, 20, 20, 20],
                  n_samples=[2048, 512, 192, 64],
@@ -84,7 +156,6 @@ class ShapeNetPartNormal(Dataset):
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
         dataset_dir = Path(dataset_dir)
-        self.presample_path = presample_path
         self.train = train
         self.warmup = warmup
         self.voxel_max = voxel_max
@@ -94,13 +165,7 @@ class ShapeNetPartNormal(Dataset):
         self.alpha = alpha
         self.batch_size = batch_size
         self.gs_opts = gs_opts
-
-        if self.presample_path != '' and not train and os.path.exists(presample_path):
-            self.xyz, self.norm, self.shape, self.seg = torch.load(presample_path)
-            self.presample = False
-            return
-        else:
-            self.presample = True
+        self.presample = presample
 
         self.catfile = os.path.join(dataset_dir, 'synsetoffset2category.txt')
         self.cat = {}
@@ -151,21 +216,17 @@ class ShapeNetPartNormal(Dataset):
                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
 
-
         self.cache = {}
         self.cache_size = 20000
 
     def __len__(self):
-        if self.train or self.presample:
-            return len(self.data_paths)
-        else:
-            return self.xyz.shape[0]
+        return len(self.data_paths)
 
     @classmethod
     def get_classes(cls):
         return cls.classes
 
-    def __getitem_in_cache(self, idx):
+    def __getitem__(self, idx):
         if idx in self.cache:
             xyz, norm, shape, seg = self.cache[idx]
         else:
@@ -178,14 +239,15 @@ class ShapeNetPartNormal(Dataset):
             seg = torch.from_numpy(data[:, -1]).long()
             if len(self.cache) < self.cache_size:
                 self.cache[idx] = (xyz, norm, shape, seg)
-        return xyz, norm, shape, seg
 
-    def __getitem__(self, idx):
-        if not self.train:
-            return self.get_test_item(idx)
+        if self.presample:
+            gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
+            gs.gs_points.__update_attr__('p', xyz)
+            gs.gs_points.__update_attr__('f', norm)
+            gs.gs_points.__update_attr__('y', seg)
+            return gs, shape
 
-        xyz, norm, shape, seg = self.__getitem_in_cache(idx)
-        xyz, mask_idx = fps_sample(xyz.unsqueeze(0), self.voxel_max)
+        xyz, mask_idx = create_sampler('random')(xyz.unsqueeze(0), self.voxel_max)
         xyz = xyz.squeeze(0)
         mask_idx = mask_idx.squeeze(0)
         norm = norm[mask_idx]
@@ -202,80 +264,77 @@ class ShapeNetPartNormal(Dataset):
         jitter = torch.empty_like(xyz).normal_(std=0.001)
         xyz += jitter
 
-        xyz -= xyz.min(dim=0)[0]
-        height = xyz[:, 2:] * 4
-        # height -= height.min(dim=0, keepdim=True)[0]
-        # if self.train:
-        #     height += torch.empty((1, 1), device=xyz.device).uniform_(-0.1, 0.1) * 16
-        norm = torch.cat([norm, height], dim=-1)
-
         mask = mask_idx == 0
         mask[0].fill_(False)
         seg[mask] = 255
 
-        gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
-        gs.gs_points.__update_attr__('p', xyz)
-        gs.gs_points.__update_attr__('f', norm)
-        gs.gs_points.__update_attr__('y', seg)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.n_samples,
-                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
-        return gs, shape
-
-    def get_test_item(self, idx):
-        xyz = self.xyz[idx]
-        norm = self.norm[idx]
-        shape = self.shape[idx]
-        seg = self.seg[idx]
-
-        # xyz -= xyz.min(dim=0)[0]
-        height = xyz[:, 2:] / 10
+        xyz -= xyz.min(dim=0)[0]
+        height = xyz[:, 2:] * 4
         height -= height.min(dim=0, keepdim=True)[0]
+        height += torch.empty((1, 1), device=xyz.device).uniform_(-0.1, 0.1) * 16
         norm = torch.cat([norm, height], dim=-1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', norm)
         gs.gs_points.__update_attr__('y', seg)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras*2)
+        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras * 2)
         gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.n_samples,
                                       up_sample=True, visible_sample_stride=self.visible_sample_stride,
                                       alpha=self.alpha)
         return gs, shape
 
-    def presampling(self):
-        logging.info(f'Presample start')
-        if os.path.exists(self.presample_path):
-            logging.info( f'Presample has done, skip')
-            return
-        xyzs = []
-        shapes = []
-        segs = []
-        normals = []
-        for idx in range(self.__len__()):
-            xyz, normal, shape, seg = self.__getitem_in_cache(idx)
-            xyz = xyz.float().unsqueeze(0)
-            xyz, idx = fps_sample(xyz, self.voxel_max)
-            xyzs.append(xyz.squeeze(0))
-            idx = idx.squeeze(0)
-            shapes.append(shape)
-            seg = seg[idx].long()
-            segs.append(seg)
-            normal = normal[idx].float()
-            normals.append(normal)
 
-        xyzs = torch.stack(xyzs, dim=0)
-        shapes = torch.tensor(shapes, dtype=torch.int64)
-        segs = torch.stack(segs, dim=0)
-        normals = torch.stack(normals, dim=0)
-        logging.info(f'Presample done: xyz: {xyzs.shape}, shape: {shapes.shape}, seg: {segs.shape}, normal: {normals.shape}')
-        torch.save((xyzs, normals, shapes, segs), self.presample_path)
+if __name__ == '__main__':
+    from pointnet2_ops import pointnet2_utils
+    from shapenetpart.configs import model_configs
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', type=str, required=False, default='dataset_link')
+    parser.add_argument('-o', type=str, required=False, default='shapenetpart_presample.pt')
 
-def shapenetpart_collate_fn(batch):
-    gs_list, shape = list(zip(*batch))
-    new_gs = merge_gs_list(gs_list)
-    shape = torch.tensor(shape, dtype=torch.long)
-    new_gs.gs_points.__update_attr__('shape', shape)
-    return new_gs
+    args, opts = parser.parse_known_args()
+
+    presample_path = os.path.join(args.i, args.o)
+    model_cfg = model_configs['s']
+    testset = ShapeNetPartNormal(
+            dataset_dir=args.i,
+            presample=True,
+            train=False,
+            warmup=False,
+            voxel_max=model_cfg.train_cfg.voxel_max,
+            k=model_cfg.train_cfg.k,
+            n_samples=model_cfg.train_cfg.n_samples,
+            alpha=model_cfg.train_cfg.alpha,
+            batch_size=1,
+            gs_opts=model_cfg.train_cfg.gs_opts,
+        )
+
+    cnt = 0
+    xyzs = []
+    shapes = []
+    segs = []
+    normals = []
+    for gs, shape in testset:
+        gs.gs_points.to_cuda(False)
+        xyz, normal, seg = gs.gs_points.p, gs.gs_points.f, gs.gs_points.y
+        xyz = xyz.float().unsqueeze(0)
+        idx = pointnet2_utils.furthest_point_sample(xyz, 2048).long()
+        xyz = torch.gather(xyz, 1, idx.unsqueeze(-1).expand(-1, -1, 3))
+        xyzs.append(xyz)
+        shapes.append(shape)
+        seg = seg.long()[idx.squeeze()]
+        segs.append(seg)
+        normal = normal.float().unsqueeze(0)
+        normal = torch.gather(normal, 1, idx.unsqueeze(-1).expand(-1, -1, 3))
+        normals.append(normal)
+        cnt += 1
+        if cnt % 250 == 0:
+            print(f"{cnt * 100 / len(testset):.1f}% done")
+
+    xyzs = torch.cat(xyzs)
+    shapes = torch.tensor(shapes, dtype=torch.int64)
+    segs = torch.cat(segs).view(len(testset), -1)
+    normals = torch.cat(normals)
+    print(xyzs.shape, normals.shape, shapes.shape, segs.shape)
+    torch.save((xyzs, normals, shapes, segs), presample_path)

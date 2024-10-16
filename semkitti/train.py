@@ -323,6 +323,7 @@ if __name__ == '__main__':
     parser.add_argument("--decay", type=float, required=False, default=0.005)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')
+    parser.add_argument("--strain", action='store_true')
 
     # for validate
     parser.add_argument('--val_freq', type=int, required=False, default=1)
@@ -349,4 +350,9 @@ if __name__ == '__main__':
     cfg.ignore_index = -1
 
     prepare_exp(cfg)
+
+    if cfg.strain:
+        import torch.multiprocessing
+
+        torch.multiprocessing.set_sharing_strategy('file_system')
     main(cfg)

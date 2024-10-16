@@ -6,7 +6,8 @@ import h5py
 import torch
 from torch.utils.data import Dataset
 
-from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list, fps_sample
+from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list
+from utils.subsample import trunc_sample
 
 
 class ModelNet40(Dataset):
@@ -55,7 +56,7 @@ class ModelNet40(Dataset):
             xyz = xyz * scale
             xyz = xyz[torch.randperm(xyz.shape[0])]
 
-        xyz, _ = fps_sample(xyz.unsqueeze(0), self.num_points)
+        xyz, _ = trunc_sample(xyz.unsqueeze(0), self.num_points)
         xyz = xyz.squeeze(0)
         xyz -= xyz.min(dim=0)[0]
         height = xyz[:, 2:] * 4
