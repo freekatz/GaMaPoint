@@ -12,9 +12,9 @@ class ModelNet40Config(EasyConfig):
         super().__init__()
         self.name = 'ModelNet40Config'
         self.k = [32, 32, 32]
-        self.n_samples = [1024, 512, 256]
+        self.n_samples = [2048, 512, 128]
         self.visible_sample_stride = 0.
-        self.num_points = 1024
+        self.num_points = 2048
         gs_opts = GaussianOptions.default()
         gs_opts.n_cameras = 8
         gs_opts.cam_fovy = 120
@@ -36,7 +36,7 @@ class ModelConfig(EasyConfig):
         backbone_cfg.channel_list = [96, 192, 384]
         backbone_cfg.head_channels = 2048
         backbone_cfg.mamba_blocks = [1, 1, 1]
-        backbone_cfg.res_blocks = [4, 8, 4]
+        backbone_cfg.res_blocks = [4, 4, 4]
         backbone_cfg.mlp_ratio = 2.
         backbone_cfg.bn_momentum = self.bn_momentum
         drop_rates = torch.linspace(0., drop_path, sum(backbone_cfg.res_blocks)).split(backbone_cfg.res_blocks)

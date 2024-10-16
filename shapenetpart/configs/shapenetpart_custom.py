@@ -12,8 +12,9 @@ class ShapeNetPartConfig(EasyConfig):
         super().__init__()
         self.name = 'ShapeNetPartConfig'
         self.k = [32, 32, 32, 32]
-        self.n_samples = [2048, 1024, 512, 256]
-        self.voxel_max = 2048
+        self.n_samples = [8192, 2048, 512, 128]
+        self.visible_sample_stride = 0.
+        self.voxel_max = 8192
         gs_opts = GaussianOptions.default()
         gs_opts.n_cameras = 64
         gs_opts.cam_fovy = 120
@@ -33,10 +34,10 @@ class ModelConfig(EasyConfig):
         backbone_cfg = EasyConfig()
         backbone_cfg.name = 'BackboneConfig'
         backbone_cfg.in_channels = 4
-        backbone_cfg.channel_list = [128, 256, 384, 512]
-        backbone_cfg.head_channels = 512
+        backbone_cfg.channel_list = [96, 192, 320, 512]
+        backbone_cfg.head_channels = 320
         backbone_cfg.mamba_blocks = [1, 1, 1, 1]
-        backbone_cfg.res_blocks = [4, 4, 8, 4]
+        backbone_cfg.res_blocks = [4, 4, 4, 4]
         backbone_cfg.mlp_ratio = 2.
         backbone_cfg.bn_momentum = self.bn_momentum
         drop_rates = torch.linspace(0., drop_path, sum(backbone_cfg.res_blocks)).split(backbone_cfg.res_blocks)
