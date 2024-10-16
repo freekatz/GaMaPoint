@@ -46,7 +46,7 @@ class ModelConfig(EasyConfig):
         drop_path = 0.1
         backbone_cfg = EasyConfig()
         backbone_cfg.name = 'BackboneConfig'
-        backbone_cfg.in_channels = 4
+        backbone_cfg.in_channels = 2
         backbone_cfg.channel_list = [64, 96, 160, 288, 512]
         backbone_cfg.head_channels = 256
         backbone_cfg.mamba_blocks = [1, 1, 1, 1, 1]
@@ -59,7 +59,7 @@ class ModelConfig(EasyConfig):
         backbone_cfg.mamba_cfg = MambaConfig.default()
         backbone_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
         backbone_cfg.gs_opts = self.train_cfg.gs_opts
-        backbone_cfg.diff_factor = 60.
-        backbone_cfg.diff_std = [1.6, 2.5, 5, 10, 20]
+        backbone_cfg.diff_factor = 40.
+        backbone_cfg.diff_std = [0.4, 0.8, 1.2, 2.5, 5]
         # backbone_cfg.diff_std = None
         self.backbone_cfg = backbone_cfg

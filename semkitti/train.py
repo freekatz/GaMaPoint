@@ -50,7 +50,11 @@ def warmup(cfg, model: nn.Module, warmup_loader):
         target = gs.gs_points.y
         with autocast():
             pred, diff = model(gs)
-            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
+            loss = F.cross_entropy(pred, target, weight=torch.tensor([3.1557, 8.7029, 7.8281, 6.1354, 6.3161,
+                                                                      7.9937, 8.9704, 10.1922, 1.6155, 4.2187,
+                                                                      1.9385, 5.5455, 2.0198, 2.6261, 1.3212,
+                                                                      5.1102, 2.5492, 5.8585, 7.3929], device=target.device),
+                                   ignore_index=cfg.ignore_index) + diff
         loss.backward()
 
 
@@ -73,7 +77,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
             loss = F.cross_entropy(pred, target, weight=torch.tensor([3.1557, 8.7029, 7.8281, 6.1354, 6.3161,
                                                                       7.9937, 8.9704, 10.1922, 1.6155, 4.2187,
                                                                       1.9385, 5.5455, 2.0198, 2.6261, 1.3212,
-                                                                      5.1102, 2.5492, 5.8585, 7.3929]),
+                                                                      5.1102, 2.5492, 5.8585, 7.3929], device=target.device),
                                    label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:

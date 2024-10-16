@@ -130,7 +130,7 @@ class SemKitti(Dataset):
         self.gs_opts = gs_opts
         self.class_weights = self.get_class_weights()
 
-        raw_root = dataset_dir / 'processed'
+        raw_root = dataset_dir / 'sequences'
         self.seq_list = np.sort(os.listdir(raw_root))
         train_list, val_list, _ = get_semantickitti_file_list(raw_root, 'None')
         if train:
@@ -176,8 +176,8 @@ class SemKitti(Dataset):
             remissions = scan[:, 3]
             labels = load_label_kitti(label_path, remap_lut_read)
             p = torch.from_numpy(points).float()
-            f = torch.from_numpy(remissions).float()
-            y = torch.from_numpy(labels).int()
+            f = torch.from_numpy(remissions).float().unsqueeze(-1)
+            y = torch.from_numpy(labels).long()
             if len(self.cache) < self.cache_size:
                 self.cache[idx] = (p, f, y)
         return p, f, y
@@ -198,9 +198,9 @@ class SemKitti(Dataset):
             xyz -= xyz.min(dim=0)[0]
 
         if self.train:
-            indices = grid_subsampling(xyz, 0.05, 2.5 / 20)
+            indices = grid_subsampling(xyz, 0.02, 2.5 / 1.5)
         else:
-            indices = grid_subsampling_test(xyz, 0.05, 2.5 / 20, pick=0)
+            indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=0)
 
         xyz = xyz[indices]
 
@@ -236,7 +236,7 @@ class SemKitti(Dataset):
 
         xyz, remissions, lbl = self.__getitem_in_cache(idx)
 
-        indices = grid_subsampling_test(xyz, 0.04, 2.5 / 14, pick=pick)
+        indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=pick)
         xyz = xyz[indices]
         lbl = lbl[indices]
         remissions = remissions[indices].float()
