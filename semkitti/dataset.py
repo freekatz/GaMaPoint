@@ -1,3 +1,5 @@
+import logging
+
 import __init__
 
 import math
@@ -129,6 +131,7 @@ class SemKitti(Dataset):
         self.batch_size = batch_size
         self.gs_opts = gs_opts
         self.class_weights = self.get_class_weights()
+        logging.info(f'SemKitti class weights: {self.class_weights}')
 
         raw_root = dataset_dir / 'sequences'
         self.seq_list = np.sort(os.listdir(raw_root))

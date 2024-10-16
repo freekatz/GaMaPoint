@@ -74,9 +74,6 @@ class ScanNetV2(Dataset):
         'desk', 'curtain', 'refrigerator', 'shower curtain',
         'toilet', 'sink', 'bathtub', 'otherfurniture']
     num_classes = len(classes)
-    gravity_dim = 2
-    color_mean = [0.46259782, 0.46253258, 0.46253258]
-    color_std = [0.693565, 0.6852543, 0.68061745]
     cmap = {
         0: (0., 0., 0.),
         1: (174., 199., 232.),
