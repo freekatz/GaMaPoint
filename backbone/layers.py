@@ -266,22 +266,23 @@ class PointMambaLayer(nn.Module):
         self.layer_index = layer_index
         self.config = config
 
-        self.pos_embed = nn.Parameter(torch.randn([gs_opts.n_cameras * 2, channels], dtype=torch.float32))
-        self.mlp = Mlp(
-            in_channels=gs_opts.n_cameras * 2,
-            hidden_channels=gs_opts.n_cameras * 2 * 2,
-            bn_momentum=bn_momentum,
-            init_weight=0.1,
-        )
+        # self.pos_embed = nn.Parameter(torch.randn([gs_opts.n_cameras * 2, channels], dtype=torch.float32))
+        # self.mlp = Mlp(
+        #     in_channels=gs_opts.n_cameras * 2,
+        #     hidden_channels=gs_opts.n_cameras * 2 * 2,
+        #     bn_momentum=bn_momentum,
+        #     init_weight=0.1,
+        # )
         self.mixer = create_mixer(config, channels, hybrid_args)
         self.bn = nn.BatchNorm1d(channels, momentum=bn_momentum)
 
     def forward(self, f, f_gs, gs: NaiveGaussian3D):
         assert len(f.shape) == 2
-        f_gs = self.mlp(f_gs.unsqueeze(0)).squeeze(0)
-        pos_embed = f_gs @ self.pos_embed
-        pos_embed = pos_embed.unsqueeze(0)
-        f = f.unsqueeze(0)
+        # f_gs = self.mlp(f_gs.unsqueeze(0)).squeeze(0)  # [N, n_cameras*2]
+        # pos_embed = f_gs @ self.pos_embed  # [N, n_cameras*2] @ [n_cameras*2, C] = [N, C]
+        # pos_embed = pos_embed.unsqueeze(0)  # [1, N, C]
+        pos_embed = None
+        f = f.unsqueeze(0)  # [1, N, C]
         B, N, C = f.shape
         f = f + self.mixer(input_ids=f, pos_embed=pos_embed, mask=None, gs=gs, order=None)
         f = self.bn(f.view(B * N, -1)).view(B, N, -1)

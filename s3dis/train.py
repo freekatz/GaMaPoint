@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.model import SegSemHead, Backbone
+from backbone.models import SegSemHead, Backbone
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
@@ -308,7 +308,7 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
     parser.add_argument('--model_size', type=str, required=False, default='s',
-                        choices=['s', 'b', 'l', 'xl'])
+                        choices=['s', 'b', 'l', 'xl', 'c'])
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')

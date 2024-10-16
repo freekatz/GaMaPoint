@@ -7,6 +7,7 @@ from glob import glob
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from timm.scheduler.cosine_lr import CosineLRScheduler
 from torch.cuda.amp import GradScaler, autocast
@@ -14,12 +15,12 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone.models import ClsHead, Backbone
-from modelnet40.configs import model_configs
-from modelnet40.dataset import ModelNet40, modelnet40_collate_fn
+from backbone.models import SegSemHead, Backbone
+from semkitti.configs import model_configs
+from semkitti.dataset import SemKitti, semkitti_collate_fn
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
-from utils.logger import setup_logger_dist, format_dict
+from utils.logger import setup_logger_dist, format_dict, format_list
 from utils.metrics import Timer, Metric, AverageMeter
 from utils.random import set_random_seed
 
@@ -41,6 +42,18 @@ def prepare_exp(cfg):
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
+def warmup(cfg, model: nn.Module, warmup_loader):
+    model.train()
+    pbar = tqdm(enumerate(warmup_loader), total=warmup_loader.__len__(), desc='Warmup')
+    for idx, gs in pbar:
+        gs.gs_points.to_cuda(non_blocking=True)
+        target = gs.gs_points.y
+        with autocast():
+            pred, diff = model(gs)
+            loss = F.cross_entropy(pred, target, ignore_index=cfg.ignore_index) + diff
+        loss.backward()
+
+
 def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps):
     model.train()
     pbar = tqdm(enumerate(train_loader), total=train_loader.__len__(), desc='Train')
@@ -57,7 +70,11 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         target = gs.gs_points.y
         with autocast():
             pred, diff = model(gs)
-            loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
+            loss = F.cross_entropy(pred, target, weight=torch.tensor([3.1557, 8.7029, 7.8281, 6.1354, 6.3161,
+                                                                      7.9937, 8.9704, 10.1922, 1.6155, 4.2187,
+                                                                      1.9385, 5.5455, 2.0198, 2.6261, 1.3212,
+                                                                      5.1102, 2.5492, 5.8585, 7.3929]),
+                                   label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
         optimizer.zero_grad(set_to_none=True)
         if cfg.use_amp:
             scaler.scale(loss + diff * lam).backward()
@@ -107,21 +124,37 @@ def main(cfg):
 
     logging.info(f'Config:\n{cfg.__str__()}')
 
+    warmup_loader = DataLoader(
+        SemKitti(
+            dataset_dir=cfg.dataset,
+            train=True,
+            warmup=True,
+            voxel_max=cfg.model_cfg.warmup_cfg.voxel_max,
+            k=cfg.model_cfg.warmup_cfg.k,
+            grid_size=cfg.model_cfg.warmup_cfg.grid_size,
+            alpha=cfg.model_cfg.warmup_cfg.alpha,
+            batch_size=1,
+            gs_opts=cfg.model_cfg.warmup_cfg.gs_opts
+        ),
+        batch_size=1,
+        collate_fn=semkitti_collate_fn,
+        pin_memory=True,
+        num_workers=cfg.num_workers,
+    )
     train_loader = DataLoader(
-        ModelNet40(
+        SemKitti(
             dataset_dir=cfg.dataset,
             train=True,
             warmup=False,
-            num_points=cfg.model_cfg.train_cfg.num_points,
+            voxel_max=cfg.model_cfg.train_cfg.voxel_max,
             k=cfg.model_cfg.train_cfg.k,
-            n_samples=cfg.model_cfg.train_cfg.n_samples,
-            visible_sample_stride=cfg.model_cfg.train_cfg.visible_sample_stride,
+            grid_size=cfg.model_cfg.train_cfg.grid_size,
             alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=cfg.batch_size,
             gs_opts=cfg.model_cfg.train_cfg.gs_opts
         ),
         batch_size=cfg.batch_size,
-        collate_fn=modelnet40_collate_fn,
+        collate_fn=semkitti_collate_fn,
         shuffle=True,
         pin_memory=True,
         persistent_workers=True,
@@ -129,31 +162,28 @@ def main(cfg):
         num_workers=cfg.num_workers,
     )
     val_loader = DataLoader(
-        ModelNet40(
+        SemKitti(
             dataset_dir=cfg.dataset,
             train=False,
             warmup=False,
-            num_points=cfg.model_cfg.train_cfg.num_points,
+            voxel_max=cfg.model_cfg.train_cfg.voxel_max,
             k=cfg.model_cfg.train_cfg.k,
-            n_samples=cfg.model_cfg.train_cfg.n_samples,
-            visible_sample_stride=cfg.model_cfg.train_cfg.visible_sample_stride,
+            grid_size=cfg.model_cfg.train_cfg.grid_size,
             alpha=cfg.model_cfg.train_cfg.alpha,
-            batch_size=cfg.batch_size,
+            batch_size=1,
             gs_opts=cfg.model_cfg.train_cfg.gs_opts
         ),
-        batch_size=cfg.batch_size,
-        collate_fn=modelnet40_collate_fn,
+        batch_size=1,
+        collate_fn=semkitti_collate_fn,
         pin_memory=True,
         persistent_workers=True,
-        drop_last=True,
         num_workers=cfg.num_workers,
     )
 
     backbone = Backbone(
         **cfg.model_cfg.backbone_cfg,
-        task_type='cls',
     ).to('cuda')
-    model = ClsHead(
+    model = SegSemHead(
         backbone=backbone,
         num_classes=cfg.model_cfg.num_classes,
         bn_momentum=cfg.model_cfg.bn_momentum,
@@ -166,21 +196,21 @@ def main(cfg):
     scaler = GradScaler()
     start_epoch = 1
     best_epoch = 0
-    best_accs = 0
+    best_miou = 0
     if cfg.mode == 'resume':
         cfg.ckpt = cfg.last_ckpt_path
         model_dict = resume_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         start_epoch = model_dict['last_epoch'] + 1
         best_epoch = model_dict['best_epoch']
-        best_accs = model_dict['best_accs']
+        best_miou = model_dict['best_miou']
         logging.info(
-            f"Resume model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+            f"Resume model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
     if cfg.mode == 'finetune':
         model_dict = load_state(model, cfg.ckpt, optimizer=optimizer, scaler=scaler)
         best_epoch = model_dict['best_epoch']
-        best_accs = model_dict['best_accs']
+        best_miou = model_dict['best_miou']
         logging.info(
-            f"Finetune model from {cfg.ckpt}, best_accs={best_accs:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
+            f"Finetune model from {cfg.ckpt}, best_miou={best_miou:.4f}, best_epoch={best_epoch}, start_epoch={start_epoch}")
 
     steps_per_epoch = len(train_loader)
     scheduler_steps = steps_per_epoch * (start_epoch - 1)
@@ -191,15 +221,16 @@ def main(cfg):
                                   warmup_t=cfg.warmup_epochs * steps_per_epoch,
                                   warmup_lr_init=cfg.lr / 20)
 
-    val_macc, val_accs = 0., 0.
+    val_miou, val_macc, val_ious, val_accs = 0., 0., [], []
     macc_when_best = 0.
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
 
+    warmup(cfg, model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
-        train_loss, train_diff, _, train_macc, _, train_accs, scheduler_steps = train(
+        train_loss, train_diff, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
@@ -207,26 +238,27 @@ def main(cfg):
         timer_meter.update(time_cost)
         logging.info(
             f'@E{epoch} train:    '
-            + f'macc={train_macc:.4f} oa={train_accs:.4f} loss={train_loss:.4f} '
+            + f'miou={train_miou:.4f} macc={train_macc:.4f} oa={train_accs:.4f} loss={train_loss:.4f} '
             + f'diff={train_diff:.4f} lr={lr:.6f}')
 
         is_best = False
         if epoch % cfg.val_freq == 0:
             with torch.no_grad():
-                val_loss, _, val_macc, _, val_accs = validate(
+                val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
                 )
             logging.info(f'@E{epoch} val:      '
-                         + f'macc={val_macc:.4f} oa={val_accs:.4f} loss={val_loss:.4f}')
-            if val_accs > best_accs:
-                logging.info(f'@E{epoch} new best: oa {best_accs:.4f} => {val_accs:.4f}')
+                         + f'miou={val_miou:.4f} macc={val_macc:.4f} oa={val_accs:.4f} loss={val_loss:.4f}')
+            if val_miou > best_miou:
+                logging.info(f'@E{epoch} new best: miou {best_miou:.4f} => {val_miou:.4f}')
                 is_best = True
-                best_accs = val_accs
+                best_miou = val_miou
                 macc_when_best = val_macc
             else:
-                logging.info(f'@E{epoch} cur best: oa {best_accs:.4f}')
+                logging.info(f'@E{epoch} cur best: miou {best_miou:.4f}')
         if is_best:
             train_info = {
+                'miou': train_miou,
                 'macc': train_macc,
                 'oa': train_accs,
                 'loss': train_loss,
@@ -236,28 +268,30 @@ def main(cfg):
                 'time_cost_avg': f"{timer_meter.avg:.2f}s",
             }
             val_info = {
+                'miou': val_miou,
                 'macc': val_macc,
                 'oa': val_accs,
                 'loss': val_loss,
             }
             logging.info(f'@E{epoch} summary:'
                          + f'\ntrain: \n{format_dict(train_info)}'
-                         + f'\nval: \n{format_dict(val_info)}')
+                         + f'\nval: \n{format_dict(val_info)}'
+                         + f'\nious: \n{format_list(SemKitti.get_classes(), val_ious)}')
             best_epoch = epoch
             save_state(cfg.best_small_ckpt_path, model=model)
             save_state(cfg.best_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                       best_epoch=best_epoch, last_epoch=epoch, best_accs=best_accs)
+                       best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
         save_state(cfg.last_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
-                   best_epoch=best_epoch, last_epoch=epoch, best_accs=best_accs)
+                   best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
         if writer is not None:
-            writer.add_scalar('best_accs', best_accs, epoch)
-            writer.add_scalar('val_accs', val_accs, epoch)
+            writer.add_scalar('best_miou', best_miou, epoch)
+            writer.add_scalar('val_miou', val_miou, epoch)
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
             writer.add_scalar('val_macc', val_macc, epoch)
             writer.add_scalar('val_loss', val_loss, epoch)
             writer.add_scalar('train_loss', train_loss, epoch)
             writer.add_scalar('train_diff', train_diff, epoch)
-            writer.add_scalar('train_accs', train_accs, epoch)
+            writer.add_scalar('train_miou', train_miou, epoch)
             writer.add_scalar('train_macc', train_macc, epoch)
             writer.add_scalar('lr', lr, epoch)
             writer.add_scalar('time_cost_avg', timer_meter.avg, epoch)
@@ -265,9 +299,9 @@ def main(cfg):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('modelnet40 training')
+    parser = argparse.ArgumentParser('semkitti training')
     # for prepare
-    parser.add_argument('--exp', type=str, required=False, default='modelnet40')
+    parser.add_argument('--exp', type=str, required=False, default='semkitti')
     parser.add_argument('--mode', type=str, required=False, default='train', choices=['train', 'finetune', 'resume'])
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
@@ -276,13 +310,13 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
-    parser.add_argument('--batch_size', type=int, required=False, default=32)
+    parser.add_argument('--batch_size', type=int, required=False, default=8)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for train
-    parser.add_argument('--epochs', type=int, required=False, default=400)
-    parser.add_argument("--warmup_epochs", type=int, required=False, default=40)
-    parser.add_argument("--lr", type=float, required=False, default=5e-4)
+    parser.add_argument('--epochs', type=int, required=False, default=100)
+    parser.add_argument("--warmup_epochs", type=int, required=False, default=10)
+    parser.add_argument("--lr", type=float, required=False, default=1e-3)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
     parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
@@ -308,9 +342,9 @@ if __name__ == '__main__':
         assert cfg.ckpt != ''
     cfg.use_amp = not cfg.no_amp
 
-    # modelnet40
-    cfg.num_classes = 40
-    cfg.ignore_index = -100
+    # semkitti
+    cfg.num_classes = 19
+    cfg.ignore_index = -1
 
     prepare_exp(cfg)
     main(cfg)
