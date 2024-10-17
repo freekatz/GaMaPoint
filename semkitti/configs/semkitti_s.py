@@ -13,10 +13,10 @@ class SemKittiConfig(EasyConfig):
         self.name = 'SemKittiConfig'
         self.k = [24, 24, 24, 24, 24]
         self.grid_size = [0.04, 0.08, 0.16, 0.32]
-        self.voxel_max = 48000
+        self.voxel_max = 64000
         gs_opts = GaussianOptions.default()
-        gs_opts.n_cameras = 64
-        gs_opts.cam_fovy = 120
+        gs_opts.n_cameras = 96
+        gs_opts.cam_fovy = 150
         self.gs_opts = gs_opts
         self.alpha = 0.1
 
@@ -27,10 +27,10 @@ class SemKittiWarmupConfig(EasyConfig):
         self.name = 'SemKittiWarmupConfig'
         self.k = [24, 24, 24, 24, 24]
         self.grid_size = [0.04, 0.08, 0.16, 0.32]
-        self.voxel_max = 48000
+        self.voxel_max = 64000
         gs_opts = GaussianOptions.default()
-        gs_opts.n_cameras = 64
-        gs_opts.cam_fovy = 120
+        gs_opts.n_cameras = 96
+        gs_opts.cam_fovy = 150
         self.gs_opts = gs_opts
         self.alpha = 0.1
 
@@ -47,8 +47,8 @@ class ModelConfig(EasyConfig):
         backbone_cfg = EasyConfig()
         backbone_cfg.name = 'BackboneConfig'
         backbone_cfg.in_channels = 2
-        backbone_cfg.channel_list = [64, 96, 160, 288, 512]
-        backbone_cfg.head_channels = 256
+        backbone_cfg.channel_list = [96, 192, 288, 384, 512]
+        backbone_cfg.head_channels = 384
         backbone_cfg.mamba_blocks = [1, 1, 1, 1, 1]
         backbone_cfg.res_blocks = [4, 4, 4, 8, 4]
         backbone_cfg.mlp_ratio = 2.
