@@ -247,7 +247,7 @@ def main(cfg):
                        best_epoch=best_epoch, last_epoch=epoch, best_accs=best_accs)
         save_state(cfg.last_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
                    best_epoch=best_epoch, last_epoch=epoch, best_accs=best_accs)
-        if writer is not None:
+        if writer is not None and (epoch % cfg.val_freq == 0 or epoch >= cfg.epochs):
             writer.add_scalar('best_accs', best_accs, epoch)
             writer.add_scalar('val_accs', val_accs, epoch)
             writer.add_scalar('macc_when_best', macc_when_best, epoch)

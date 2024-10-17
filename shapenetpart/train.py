@@ -270,7 +270,7 @@ def main(cfg):
                            best_cls_miou=best_cls_miou)
         save_state(cfg.last_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
                    best_epoch=best_epoch, last_epoch=epoch, best_ins_miou=best_ins_miou, best_cls_miou=best_cls_miou)
-        if writer is not None:
+        if writer is not None and (epoch % cfg.val_freq == 0 or epoch >= cfg.epochs):
             writer.add_scalar('best_ins_miou', best_ins_miou, epoch)
             writer.add_scalar('best_cls_miou', best_cls_miou, epoch)
             writer.add_scalar('val_ins_miou', val_ins_miou, epoch)

@@ -285,7 +285,7 @@ def main(cfg):
                        best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
         save_state(cfg.last_ckpt_path, model=model, optimizer=optimizer, scaler=scaler,
                    best_epoch=best_epoch, last_epoch=epoch, best_miou=best_miou)
-        if writer is not None:
+        if writer is not None and (epoch % cfg.val_freq == 0 or epoch >= cfg.epochs):
             writer.add_scalar('best_miou', best_miou, epoch)
             writer.add_scalar('val_miou', val_miou, epoch)
             writer.add_scalar('macc_when_best', macc_when_best, epoch)
