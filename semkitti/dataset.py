@@ -203,9 +203,10 @@ class SemKitti(Dataset):
         lbl = lbl[indices]
         remissions = remissions.float()
 
-        height = xyz[:, 2:]
+        height = xyz[:, 2:] * 6
         height -= height.min(dim=0, keepdim=True)[0]
-        feature = torch.cat([remissions, height], dim=1)
+        height += torch.empty((1, 1), device=xyz.device).uniform_(-0.1, 0.1) * 6
+        feature = torch.cat([xyz, remissions, height], dim=1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
@@ -235,7 +236,9 @@ class SemKitti(Dataset):
         remissions = remissions[indices].float()
 
         xyz -= xyz.min(dim=0)[0]
-        feature = torch.cat([remissions, xyz[:, 2:]], dim=1)
+        height = xyz[:, 2:] * 6
+        height -= height.min(dim=0, keepdim=True)[0]
+        feature = torch.cat([xyz, remissions, height], dim=1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
