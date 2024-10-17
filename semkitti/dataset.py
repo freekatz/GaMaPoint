@@ -160,27 +160,19 @@ class SemKitti(Dataset):
         ce_label_weight = 1 / (weight + 0.02)
         return np.expand_dims(ce_label_weight, axis=0)
 
-    def __getitem_in_cache(self, idx):
-        if idx in self.cache:
-            p, f, y = self.cache[idx]
-        else:
-            pc_path, label_path = self.data_paths[idx]
-            scan = load_scan_kitti(pc_path)
-            points = scan[:, 0:3]
-            remissions = scan[:, 3]
-            labels = load_label_kitti(label_path, remap_lut_read)
-            p = torch.from_numpy(points).float()
-            f = torch.from_numpy(remissions).float().unsqueeze(-1)
-            y = torch.from_numpy(labels).long()
-            if len(self.cache) < self.cache_size:
-                self.cache[idx] = (p, f, y)
-        return p, f, y
 
     def __getitem__(self, idx):
         if not self.train:
             return self.get_test_item(idx)
 
-        xyz, remissions, lbl = self.__getitem_in_cache(idx)
+        pc_path, label_path = self.data_paths[idx]
+        scan = load_scan_kitti(pc_path)
+        points = scan[:, 0:3]
+        remissions = scan[:, 3]
+        labels = load_label_kitti(label_path, remap_lut_read)
+        xyz = torch.from_numpy(points).float()
+        remissions = torch.from_numpy(remissions).float().unsqueeze(-1)
+        lbl = torch.from_numpy(labels).long()
 
         if self.train:
             angle = random.random() * 2 * math.pi
@@ -228,7 +220,14 @@ class SemKitti(Dataset):
     def get_test_item(self, idx):
         pick = idx * 5
 
-        xyz, remissions, lbl = self.__getitem_in_cache(idx)
+        pc_path, label_path = self.data_paths[idx]
+        scan = load_scan_kitti(pc_path)
+        points = scan[:, 0:3]
+        remissions = scan[:, 3]
+        labels = load_label_kitti(label_path, remap_lut_read)
+        xyz = torch.from_numpy(points).float()
+        remissions = torch.from_numpy(remissions).float().unsqueeze(-1)
+        lbl = torch.from_numpy(labels).long()
 
         indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=pick)
         xyz = xyz[indices]

@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from backbone.models import SegPartHead, Backbone
 from shapenetpart.configs import model_configs
-from shapenetpart.dataset import ShapeNetPartNormal, shapenetpart_collate_fn, get_ins_mious, presampling, \
+from shapenetpart.dataset import ShapeNetPartNormal, shapenetpart_collate_fn, get_ins_mious, \
     ShapeNetPartNormalTest
 from utils.ckpt_util import load_state, save_state, cal_model_params, resume_state
 from utils.config import EasyConfig
@@ -58,6 +58,7 @@ def train(cfg, model, train_loader, optimizer, scheduler, scaler, epoch, schedul
         gs.gs_points.to_cuda(non_blocking=True)
         shape = gs.gs_points.__get_attr__('shape')
         target = gs.gs_points.y
+        target = target.flatten()
         with autocast():
             pred, diff = model(gs, shape)
             loss = F.cross_entropy(pred, target, label_smoothing=cfg.ls, ignore_index=cfg.ignore_index)
@@ -125,7 +126,6 @@ def main(cfg):
     train_ds = ShapeNetPartNormal(
             dataset_dir=cfg.dataset,
             train=True,
-            warmup=False,
             voxel_max=cfg.model_cfg.train_cfg.voxel_max,
             k=cfg.model_cfg.train_cfg.k,
             n_samples=cfg.model_cfg.train_cfg.n_samples,
@@ -224,7 +224,7 @@ def main(cfg):
             + f'loss={train_loss:.4f} diff={train_diff:.4f} lr={lr:.6f}')
 
         is_best_ins, is_best_cls = False, False
-        if epoch % cfg.val_freq == 0:
+        if epoch % cfg.val_freq == 0 or epoch >= cfg.epochs:
             with torch.no_grad():
                 val_ins_miou, val_cls_miou, val_ious = validate(
                     cfg, model, val_loader, epoch, class2parts=train_ds.class2parts

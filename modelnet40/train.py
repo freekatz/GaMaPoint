@@ -211,7 +211,7 @@ def main(cfg):
             + f'diff={train_diff:.4f} lr={lr:.6f}')
 
         is_best = False
-        if epoch % cfg.val_freq == 0:
+        if epoch % cfg.val_freq == 0 or epoch >= cfg.epochs:
             with torch.no_grad():
                 val_loss, _, val_macc, _, val_accs = validate(
                     cfg, model, val_loader, epoch,

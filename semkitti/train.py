@@ -244,7 +244,7 @@ def main(cfg):
             + f'diff={train_diff:.4f} lr={lr:.6f}')
 
         is_best = False
-        if epoch % cfg.val_freq == 0:
+        if epoch % cfg.val_freq == 0 or epoch >= cfg.epochs:
             with torch.no_grad():
                 val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
@@ -314,16 +314,16 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
     parser.add_argument('--batch_size', type=int, required=False, default=4)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
+    parser.add_argument("--strain", action='store_true')
 
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=50)
     parser.add_argument("--warmup_epochs", type=int, required=False, default=5)
-    parser.add_argument("--lr", type=float, required=False, default=5e-4)
+    parser.add_argument("--lr", type=float, required=False, default=1e-3)
     parser.add_argument("--lr_decay", type=float, required=False, default=1.)
-    parser.add_argument("--decay", type=float, required=False, default=0.005)
+    parser.add_argument("--decay", type=float, required=False, default=0.05)
     parser.add_argument("--ls", type=float, required=False, default=0.2)
     parser.add_argument("--no_amp", action='store_true')
-    parser.add_argument("--strain", action='store_true')
 
     # for validate
     parser.add_argument('--val_freq', type=int, required=False, default=1)
@@ -353,6 +353,5 @@ if __name__ == '__main__':
 
     if cfg.strain:
         import torch.multiprocessing
-
         torch.multiprocessing.set_sharing_strategy('file_system')
     main(cfg)

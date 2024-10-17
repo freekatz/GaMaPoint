@@ -1,19 +1,21 @@
-import argparse
-import logging
-
+"""
+    adapted from https://github.com/yanx27/Pointnet_Pointnet2_pytorch/blob/master/data_utils/ShapeNetDataLoader.py
+"""
 import __init__
 
-import json
-from pathlib import Path
-import os
+import argparse
 import random
+from pathlib import Path
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import os
+import json
+from torch.nn import functional as F
 
 from backbone.gs_3d import GaussianOptions, NaiveGaussian3D, make_gs_points, merge_gs_list
-from utils.subsample import fps_sample_cuda, random_sample, create_sampler
+from utils.subsample import random_sample, fps_sample
 
 
 def get_ins_mious(pred, target, shape, class_parts, multihead=False):
@@ -117,7 +119,6 @@ class ShapeNetPartNormalTest(Dataset):
         return gs, shape
 
 
-
 class ShapeNetPartNormal(Dataset):
     classes = ['airplane', 'bag', 'cap', 'car',
                'chair', 'earphone', 'guitar', 'knife',
@@ -145,7 +146,6 @@ class ShapeNetPartNormal(Dataset):
     def __init__(self,
                  dataset_dir: Path,
                  train=True,
-                 warmup=False,
                  presample=False,
                  voxel_max=2048,
                  k=[20, 20, 20, 20],
@@ -155,19 +155,17 @@ class ShapeNetPartNormal(Dataset):
                  batch_size=8,
                  gs_opts: GaussianOptions = GaussianOptions.default(),
                  ):
-        dataset_dir = Path(dataset_dir)
         self.train = train
-        self.warmup = warmup
-        self.voxel_max = voxel_max
+        self.presample = presample
         self.k = k
         self.n_samples = n_samples
         self.visible_sample_stride = visible_sample_stride
         self.alpha = alpha
         self.batch_size = batch_size
         self.gs_opts = gs_opts
-        self.presample = presample
-
-        self.catfile = os.path.join(dataset_dir, 'synsetoffset2category.txt')
+        self.root = dataset_dir
+        self.npoints = voxel_max
+        self.catfile = os.path.join(self.root, 'synsetoffset2category.txt')
         self.cat = {}
 
         with open(self.catfile, 'r') as f:
@@ -178,16 +176,16 @@ class ShapeNetPartNormal(Dataset):
         self.classes_original = dict(zip(self.cat, range(len(self.cat))))
 
         self.meta = {}
-        with open(os.path.join(dataset_dir, 'train_test_split', 'shuffled_train_file_list.json'), 'r') as f:
+        with open(os.path.join(self.root, 'train_test_split', 'shuffled_train_file_list.json'), 'r') as f:
             train_ids = set([str(d.split('/')[2]) for d in json.load(f)])
-        with open(os.path.join(dataset_dir, 'train_test_split', 'shuffled_val_file_list.json'), 'r') as f:
+        with open(os.path.join(self.root, 'train_test_split', 'shuffled_val_file_list.json'), 'r') as f:
             val_ids = set([str(d.split('/')[2]) for d in json.load(f)])
-        with open(os.path.join(dataset_dir, 'train_test_split', 'shuffled_test_file_list.json'), 'r') as f:
+        with open(os.path.join(self.root, 'train_test_split', 'shuffled_test_file_list.json'), 'r') as f:
             test_ids = set([str(d.split('/')[2]) for d in json.load(f)])
         for item in self.cat:
             # print('category', item)
             self.meta[item] = []
-            dir_point = os.path.join(dataset_dir, self.cat[item])
+            dir_point = os.path.join(self.root, self.cat[item])
             fns = sorted(os.listdir(dir_point))
             # print(fns[0][0:-4])
             if train:
@@ -200,14 +198,14 @@ class ShapeNetPartNormal(Dataset):
                 token = (os.path.splitext(os.path.basename(fn))[0])
                 self.meta[item].append(os.path.join(dir_point, token + '.txt'))
 
-        self.data_paths = []
+        self.datapath = []
         for item in self.cat:
             for fn in self.meta[item]:
-                self.data_paths.append((item, fn))
+                self.datapath.append((item, fn))
 
-        self.classes_dict = {}
+        self.classes = {}
         for i in self.cat.keys():
-            self.classes_dict[i] = self.classes_original[i]
+            self.classes[i] = self.classes_original[i]
 
         # Mapping from category ('Chair') to a list of int [10,11,12,13] as segmentation labels
         self.seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
@@ -216,73 +214,74 @@ class ShapeNetPartNormal(Dataset):
                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
 
-        self.cache = {}
-        self.cache_size = 20000
+        # for cat in sorted(self.seg_classes.keys()):
+        #     print(cat, self.seg_classes[cat])
 
     def __len__(self):
-        return len(self.data_paths)
+        return len(self.datapath)
 
     @classmethod
     def get_classes(cls):
         return cls.classes
 
     def __getitem__(self, idx):
-        if idx in self.cache:
-            xyz, norm, shape, seg = self.cache[idx]
-        else:
-            fn = self.data_paths[idx]
-            cat = self.data_paths[idx][0]
-            shape = self.classes_dict[cat]
-            data = np.loadtxt(fn[1]).astype(np.float32)
-            xyz = torch.from_numpy(data[:, 0:3]).float()
-            norm = torch.from_numpy(data[:, 3:6]).float()
-            seg = torch.from_numpy(data[:, -1]).long()
-            if len(self.cache) < self.cache_size:
-                self.cache[idx] = (xyz, norm, shape, seg)
+        fn = self.datapath[idx]
+        cat = self.datapath[idx][0]
+        cls = self.classes[cat]
+        data = np.loadtxt(fn[1]).astype(np.float32)
+        xyz = data[:, 0:3]
+        norm = data[:, 3:6]
+        seg = data[:, -1]
+        xyz = torch.from_numpy(xyz).float()
+        norm = torch.from_numpy(norm).float()
+        seg = torch.from_numpy(seg).long()
 
-        if self.presample:
-            gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
-            gs.gs_points.__update_attr__('p', xyz)
-            gs.gs_points.__update_attr__('f', norm)
-            gs.gs_points.__update_attr__('y', seg)
-            return gs, shape
+        if self.train:
+            xyz, mask_idx = random_sample(xyz.unsqueeze(0), self.npoints)
+            xyz = xyz.squeeze(0)
+            mask_idx = mask_idx.squeeze(0)
+            # mask = mask_idx == 0
+            # mask[0].fill_(False)
+            norm = norm[mask_idx]
+            seg = seg[mask_idx]
+            # seg[mask] = 255
+            scale = torch.rand((3,)) * 0.4 + 0.8
+            xyz *= scale
+            if random.random() < 0.2:
+                norm.fill_(0.)
+            else:
+                norm *= scale[[1, 2, 0]] * scale[[2, 0, 1]]
+                norm = torch.nn.functional.normalize(norm, p=2, dim=-1, eps=1e-8)
 
-        xyz, mask_idx = create_sampler('random')(xyz.unsqueeze(0), self.voxel_max)
-        xyz = xyz.squeeze(0)
-        mask_idx = mask_idx.squeeze(0)
-        norm = norm[mask_idx]
-        seg = seg[mask_idx]
+            jitter = torch.empty_like(xyz).normal_(std=0.001)
+            xyz += jitter
 
-        scale = torch.rand((3,)) * 0.4 + 0.8
-        xyz *= scale
-        if random.random() < 0.2:
-            norm.fill_(0.)
-        else:
-            norm *= scale[[1, 2, 0]] * scale[[2, 0, 1]]
-            norm = torch.nn.functional.normalize(norm, p=2, dim=-1, eps=1e-8)
-
-        jitter = torch.empty_like(xyz).normal_(std=0.001)
-        xyz += jitter
-
-        mask = mask_idx == 0
-        mask[0].fill_(False)
-        seg[mask] = 255
-
-        xyz -= xyz.min(dim=0)[0]
-        height = xyz[:, 2:] * 4
-        height -= height.min(dim=0, keepdim=True)[0]
-        height += torch.empty((1, 1), device=xyz.device).uniform_(-0.1, 0.1) * 16
-        norm = torch.cat([norm, height], dim=-1)
+        if not self.presample:
+            xyz -= xyz.min(dim=0)[0]
+            height = xyz[:, 2:] * 4
+            height -= height.min(dim=0, keepdim=True)[0]
+            if self.train:
+                height += torch.empty((1, 1), device=xyz.device).uniform_(-0.1, 0.1) * 4
+            norm = torch.cat([norm, height], dim=-1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)
         gs.gs_points.__update_attr__('f', norm)
         gs.gs_points.__update_attr__('y', seg)
-        gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras * 2)
-        gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.n_samples,
-                                      up_sample=True, visible_sample_stride=self.visible_sample_stride,
-                                      alpha=self.alpha)
-        return gs, shape
+        if not self.presample:
+            gs.projects(xyz, cam_seed=idx, cam_batch=gs.opt.n_cameras * 2)
+            gs.gs_points = make_gs_points(gs.gs_points, self.k, None, self.n_samples,
+                                          up_sample=True, visible_sample_stride=self.visible_sample_stride,
+                                          alpha=self.alpha)
+        return gs, cls
+
+
+def shapenetpart_collate_fn(batch):
+    gs_list, shape = list(zip(*batch))
+    new_gs = merge_gs_list(gs_list)
+    shape = torch.tensor(shape, dtype=torch.long)
+    new_gs.gs_points.__update_attr__('shape', shape)
+    return new_gs
 
 
 if __name__ == '__main__':
@@ -301,7 +300,6 @@ if __name__ == '__main__':
             dataset_dir=args.i,
             presample=True,
             train=False,
-            warmup=False,
             voxel_max=model_cfg.train_cfg.voxel_max,
             k=model_cfg.train_cfg.k,
             n_samples=model_cfg.train_cfg.n_samples,

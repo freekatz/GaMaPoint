@@ -241,7 +241,7 @@ def main(cfg):
             + f'diff={train_diff:.4f} lr={lr:.6f}')
 
         is_best = False
-        if epoch % cfg.val_freq == 0:
+        if epoch % cfg.val_freq == 0 or epoch >= cfg.epochs:
             with torch.no_grad():
                 val_loss, val_miou, val_macc, val_ious, val_accs = validate(
                     cfg, model, val_loader, epoch,
@@ -313,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_loop', type=int, required=False, default=1)
     parser.add_argument('--batch_size', type=int, required=False, default=6)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
+    parser.add_argument("--strain", action='store_true')
 
     # for train
     parser.add_argument('--epochs', type=int, required=False, default=200)
@@ -348,4 +349,8 @@ if __name__ == '__main__':
     cfg.ignore_index = 20
 
     prepare_exp(cfg)
+
+    if cfg.strain:
+        import torch.multiprocessing
+        torch.multiprocessing.set_sharing_strategy('file_system')
     main(cfg)

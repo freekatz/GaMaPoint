@@ -12,11 +12,11 @@ class ShapeNetPartConfig(EasyConfig):
         super().__init__()
         self.name = 'ShapeNetPartConfig'
         self.k = [32, 32, 32, 32]
-        self.n_samples = [8192, 2048, 512, 128]
+        self.n_samples = [4096, 1024, 256, 64]
         self.visible_sample_stride = 0.
-        self.voxel_max = 8192
+        self.voxel_max = 4096
         gs_opts = GaussianOptions.default()
-        gs_opts.n_cameras = 16
+        gs_opts.n_cameras = 64
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
         self.alpha = 0.1
@@ -33,7 +33,7 @@ class ModelConfig(EasyConfig):
         drop_path = 0.15
         backbone_cfg = EasyConfig()
         backbone_cfg.name = 'BackboneConfig'
-        backbone_cfg.in_channels = 4
+        backbone_cfg.in_channels = 7
         backbone_cfg.channel_list = [128, 256, 384, 512]
         backbone_cfg.head_channels = 384
         backbone_cfg.mamba_blocks = [1, 1, 1, 1]

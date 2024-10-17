@@ -66,9 +66,11 @@ class ScanObjectNN(Dataset):
             xyz = xyz[:, torch.randperm(self.num_points + 200)[:self.num_points]]
         xyz = xyz.squeeze(0)
         xyz -= xyz.min(dim=0)[0]
-        height = xyz[:, 2:]
+        height = xyz[:, 2:] * 4
         height -= height.min(dim=0, keepdim=True)[0]
-        feature = height
+        if self.train:
+            height += torch.empty((1, 1)).uniform_(-0.2, 0.2) * 4
+        feature = torch.cat([xyz, height], dim=-1)
 
         gs = NaiveGaussian3D(self.gs_opts, batch_size=self.batch_size, device=xyz.device)
         gs.gs_points.__update_attr__('p', xyz)

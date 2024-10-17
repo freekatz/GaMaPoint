@@ -32,7 +32,7 @@ class ModelConfig(EasyConfig):
         drop_path = 0.15
         backbone_cfg = EasyConfig()
         backbone_cfg.name = 'BackboneConfig'
-        backbone_cfg.in_channels = 1
+        backbone_cfg.in_channels = 4
         backbone_cfg.channel_list = [96, 192, 384]
         backbone_cfg.head_channels = 2048
         backbone_cfg.mamba_blocks = [1, 1, 1]
