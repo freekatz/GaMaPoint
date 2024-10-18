@@ -240,11 +240,13 @@ class ShapeNetPartNormal(Dataset):
             xyz, mask_idx = random_sample(xyz.unsqueeze(0), self.npoints)
             xyz = xyz.squeeze(0)
             mask_idx = mask_idx.squeeze(0)
-            # mask = mask_idx == 0
-            # mask[0].fill_(False)
             norm = norm[mask_idx]
             seg = seg[mask_idx]
-            # seg[mask] = 255
+            # mask
+            mask = mask_idx == 0
+            mask[0].fill_(False)
+            seg[mask] = 255
+
             scale = torch.rand((3,)) * 0.4 + 0.8
             xyz *= scale
             if random.random() < 0.2:
