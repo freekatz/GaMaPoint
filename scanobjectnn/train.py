@@ -157,6 +157,7 @@ def main(cfg):
         backbone=backbone,
         num_classes=cfg.model_cfg.num_classes,
         bn_momentum=cfg.model_cfg.bn_momentum,
+        cls_type='mean_max',
     ).to('cuda')
     model_size, trainable_model_size = cal_model_params(model)
     logging.info('Number of params: %.4f M' % (model_size / 1e6))

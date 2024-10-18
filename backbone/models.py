@@ -276,11 +276,14 @@ class ClsHead(nn.Module):
                  backbone: Backbone,
                  num_classes=13,
                  bn_momentum=0.1,
+                 cls_type='mean_max',
                  **kwargs
                  ):
         super().__init__()
         self.backbone = backbone
         self.num_classes = num_classes
+        self.cls_type = cls_type
+        assert cls_type in ['mean_max', 'max', 'mean']
 
         self.proj = nn.Sequential(
             nn.BatchNorm1d(backbone.channel_list[-1], momentum=bn_momentum),
@@ -307,6 +310,16 @@ class ClsHead(nn.Module):
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
+    def __get_cls(self, f):
+        if self.cls_type == 'mean_max':
+            return f.max(1)[0] + f.mean(1)[0]
+        elif self.cls_type == 'max':
+            return f.max(1)[0]
+        elif self.cls_type == 'mean':
+            return f.mean(1)[0]
+        else:
+            return f.max(1)[0] + f.mean(1)[0]
+
     def forward(self, gs: NaiveGaussian3D):
         p = gs.gs_points.p
         f = gs.gs_points.f
@@ -315,7 +328,7 @@ class ClsHead(nn.Module):
         f, diff = self.backbone(p, f, f_gs, gs)
         f = self.proj(f)
         f = f.view(gs.batch_size, -1, self.backbone.head_channels)
-        f = f.max(1)[0].squeeze(1)
+        f = self.__get_cls(f).squeeze(1)
         f = self.head(f)
         f = f.view(-1, self.num_classes)
         if self.training:
