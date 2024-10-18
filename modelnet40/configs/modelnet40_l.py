@@ -12,9 +12,9 @@ class ModelNet40Config(EasyConfig):
         super().__init__()
         self.name = 'ModelNet40Config'
         self.k = [32, 32, 32]
-        self.n_samples = [1024, 256, 64]
+        self.n_samples = [2048, 512, 128]
         self.visible_sample_stride = 0.
-        self.num_points = 1024
+        self.num_points = 2048
         gs_opts = GaussianOptions.default()
         gs_opts.n_cameras = 8
         gs_opts.cam_fovy = 120
@@ -33,7 +33,7 @@ class ModelConfig(EasyConfig):
         backbone_cfg = EasyConfig()
         backbone_cfg.name = 'BackboneConfig'
         backbone_cfg.in_channels = 4
-        backbone_cfg.channel_list = [96, 192, 384]
+        backbone_cfg.channel_list = [128, 256, 512]
         backbone_cfg.head_channels = 2048
         backbone_cfg.mamba_blocks = [1, 1, 1]
         backbone_cfg.res_blocks = [4, 4, 4]

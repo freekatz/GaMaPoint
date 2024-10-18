@@ -229,7 +229,8 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
 
-    warmup(cfg, model, warmup_loader)
+    if cfg.mode == 'train':
+        warmup(cfg, model, warmup_loader)
     for epoch in range(start_epoch, cfg.epochs + 1):
         timer.record(f'E{epoch}_start')
         train_loss, train_diff, train_miou, train_macc, train_ious, train_accs, scheduler_steps = train(
@@ -308,7 +309,7 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
     parser.add_argument('--model_size', type=str, required=False, default='s',
-                        choices=['s', 'b', 'l', 'xl', 'c'])
+                        choices=['s', 'l', 'xl', 'c'])
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')

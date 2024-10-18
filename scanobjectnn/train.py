@@ -270,7 +270,7 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt', type=str, required=False, default='')
     parser.add_argument('--seed', type=int, required=False, default=np.random.randint(1, 10000))
     parser.add_argument('--model_size', type=str, required=False, default='s',
-                        choices=['s', 'b', 'l', 'xl', 'c'])
+                        choices=['s', 'l', 'xl', 'c'])
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')

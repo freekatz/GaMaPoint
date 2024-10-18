@@ -13,8 +13,9 @@ class MambaConfig(dict):
     attn_cfg: ObjDict = field(default_factory=ObjDict)
     rms_norm: bool = True
     residual_in_fp32: bool = True
-    scan_method: str = ''  # ["random", "random2", "bidi"]
+    scan_method: str = ''
     use_mask: bool = False
+    use_pos: bool = False
 
     @classmethod
     def default(cls):
@@ -25,4 +26,5 @@ class MambaConfig(dict):
                 residual_in_fp32=True,
                 scan_method='',
                 use_mask=False,
+                use_pos=False,
             )
