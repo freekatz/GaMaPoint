@@ -331,7 +331,7 @@ if __name__ == '__main__':
     # shapenetpart
     cfg.num_classes = 50
     cfg.shape_classes = 16
-    cfg.ignore_index = -100
+    cfg.ignore_index = 255
 
     prepare_exp(cfg)
     main(cfg)
