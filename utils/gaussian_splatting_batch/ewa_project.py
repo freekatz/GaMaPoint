@@ -17,7 +17,7 @@ def ewa_project(
         a pytorch implementation support batch @msplat
 
     Args:
-        xyz (torch.Tensor): points, [B, N, 3]
+        xyz (torch.Tensor): points, [B, N, 3], todo support [N, 3]
         cov3d (torch.Tensor): camera intrinsics, [B, N, 3, 3]
         intr (torch.Tensor): camera intrinsics, [B, 4]
         extr (torch.Tensor): camera pose, [B, 4, 4]

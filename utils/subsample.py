@@ -11,8 +11,8 @@ def create_sampler(sampler='random', **kwargs):
         return random_sample
     elif sampler == 'fps':
         return fps_sample
-    elif sampler == 'fps_cuda':
-        return fps_sample_cuda
+    elif sampler == 'fps_2':
+        return fps_sample_2
     elif sampler == 'visible':
         return visible_sample
     elif sampler == 'trunc':
@@ -47,7 +47,7 @@ def fps_sample(xyz, n_samples, **kwargs):
     return xyz_sampled, xyz_idx
 
 
-def fps_sample_cuda(xyz, n_samples, **kwargs):
+def fps_sample_2(xyz, n_samples, **kwargs):
     """
     :param xyz: [B, N, 3]
     :return: [B, n_samples, 3], [B, n_samples]

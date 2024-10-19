@@ -19,6 +19,8 @@ class S3disConfig(EasyConfig):
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
         self.alpha = 0.1
+        if self.alpha == 0:
+            self.gs_opts.n_cameras = 1  # use min numbers
 
 
 class S3disWarmupConfig(EasyConfig):
@@ -33,6 +35,8 @@ class S3disWarmupConfig(EasyConfig):
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
         self.alpha = 0.1
+        if self.alpha == 0:
+            self.gs_opts.n_cameras = 1  # use min numbers
 
 
 class ModelConfig(EasyConfig):
@@ -57,6 +61,8 @@ class ModelConfig(EasyConfig):
         backbone_cfg.drop_paths = [d.tolist() for d in drop_rates]
         backbone_cfg.head_drops = torch.linspace(0., 0.15, len(backbone_cfg.res_blocks)).tolist()
         backbone_cfg.mamba_cfg = MambaConfig.default()
+        if self.train_cfg.alpha == 0:
+            backbone_cfg.mamba_cfg.use_pos = False
         backbone_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
         backbone_cfg.gs_opts = self.train_cfg.gs_opts
         backbone_cfg.diff_factor = 40.

@@ -20,6 +20,8 @@ class ScanObjectNNConfig(EasyConfig):
         gs_opts.cam_fovy = 120
         self.gs_opts = gs_opts
         self.alpha = 0.1
+        if self.alpha == 0:
+            self.gs_opts.n_cameras = 1  # use min numbers
 
 
 class ModelConfig(EasyConfig):
@@ -42,6 +44,8 @@ class ModelConfig(EasyConfig):
         drop_rates = torch.linspace(0., drop_path, sum(backbone_cfg.res_blocks)).split(backbone_cfg.res_blocks)
         backbone_cfg.drop_paths = [d.tolist() for d in drop_rates]
         backbone_cfg.mamba_cfg = MambaConfig.default()
+        if self.train_cfg.alpha == 0:
+            backbone_cfg.mamba_cfg.use_pos = False
         backbone_cfg.hybrid_args = {'hybrid': False}  # whether hybrid mha, {'hybrid': True, 'type': 'post', 'ratio': 0.5}
         backbone_cfg.gs_opts = self.train_cfg.gs_opts
         backbone_cfg.diff_factor = 40.
