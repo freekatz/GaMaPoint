@@ -71,15 +71,17 @@ class Backbone(nn.Module):
             drop_path=drop_paths[layer_index],
         )
 
-        mamba_config.n_layer = mamba_blocks[layer_index]
-        self.pm = PointMambaLayer(
-            layer_index=layer_index,
-            channels=self.out_channels,
-            config=mamba_config,
-            hybrid_args=hybrid_args,
-            bn_momentum=bn_momentum,
-            gs_opts=gs_opts,
-        )
+        self.use_mamba = mamba_blocks[layer_index] > 0
+        if self.use_mamba:
+            mamba_config.n_layer = mamba_blocks[layer_index]
+            self.pm = PointMambaLayer(
+                layer_index=layer_index,
+                channels=self.out_channels,
+                config=mamba_config,
+                hybrid_args=hybrid_args,
+                bn_momentum=bn_momentum,
+                gs_opts=gs_opts,
+            )
 
         if self.task_type != 'cls':
             self.post_proj = nn.Sequential(
@@ -161,10 +163,13 @@ class Backbone(nn.Module):
         f_local = f_local.squeeze(0)
 
         # point mamba: extract the global feature from center points of local
-        f_global = self.pm(f_local, f_gs, gs)
+        if self.use_mamba:
+            f_global = self.pm(f_local, f_gs, gs)
 
-        # fuse local and global feature
-        f = f_global + f_local
+            # fuse local and global feature
+            f = f_global + f_local
+        else:
+            f = f_local
 
         # 2. netx layer
         if not self.is_tail:
