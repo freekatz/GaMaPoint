@@ -37,7 +37,7 @@ def prepare_exp(cfg):
     cfg.last_ckpt_path = f'{cfg.exp_dir}/last.ckpt'
 
     os.makedirs(cfg.exp_dir, exist_ok=True)
-    cfg.save(f'{cfg.exp_dir}/config.yaml')
+    # cfg.save(f'{cfg.exp_dir}/config.yaml')
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
