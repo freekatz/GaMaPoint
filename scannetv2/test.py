@@ -78,7 +78,7 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
     m = Metric(cfg.num_classes)
-    pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Test')
+    pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Testing')
     steps_per_epoch = len(test_loader)
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)

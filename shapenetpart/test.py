@@ -31,66 +31,6 @@ def prepare_exp(cfg):
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
-def batched_bincount(x, dim, max_value):
-    target = torch.zeros(x.shape[0], max_value, dtype=x.dtype, device=x.device)
-    values = torch.ones_like(x)
-    target.scatter_add_(dim, x, values)
-    return target
-
-def knn_point(k, query, support=None):
-    """Get the distances and indices to a fixed number of neighbors
-        Args:
-            support ([tensor]): [B, N, C]
-            query ([tensor]): [B, M, C]
-
-        Returns:
-            [int]: neighbor idx. [B, M, K]
-    """
-    if support is None:
-        support = query
-    dist = torch.cdist(query, support)
-    k_dist = dist.topk(k=k, dim=-1, largest=False, sorted=True)
-    return k_dist.values, k_dist.indices
-
-def torch_grouping_operation(features, idx):
-    r"""from torch points kernels
-    Parameters
-    ----------
-    features : torch.Tensor
-        (B, C, N) tensor of features to group
-    idx : torch.Tensor
-        (B, npoint, nsample) tensor containing the indicies of features to group with
-
-    Returns
-    -------
-    torch.Tensor
-        (B, C, npoint, nsample) tensor
-    """
-    all_idx = idx.reshape(idx.shape[0], -1)
-    all_idx = all_idx.unsqueeze(1).repeat(1, features.shape[1], 1)
-    grouped_features = features.gather(2, all_idx)
-    return grouped_features.reshape(idx.shape[0], features.shape[1], idx.shape[1], idx.shape[2])
-
-
-def part_seg_refinement(pred, pos, cls, cls2parts, n=10):
-    pred_np = pred.cpu().data.numpy()
-    for shape_idx in range(pred.size(0)):  # sample_idx
-        parts = cls2parts[cls[shape_idx]]
-        counter_part = Counter(pred_np[shape_idx])
-        if len(counter_part) > 1:
-            for i in counter_part:
-                if counter_part[i] < n or i not in parts:
-                    less_idx = np.where(pred_np[shape_idx] == i)[0]
-                    less_pos = pos[shape_idx][less_idx]
-                    knn_idx = knn_point(n + 1, torch.unsqueeze(less_pos, axis=0),
-                                        torch.unsqueeze(pos[shape_idx], axis=0))[1]
-                    neighbor = torch_grouping_operation(pred[shape_idx:shape_idx + 1].unsqueeze(1), knn_idx)[0][0]
-                    counts = batched_bincount(neighbor, 1, cls2parts[-1][-1] + 1)
-                    counts[:, i] = 0
-                    pred[shape_idx][less_idx] = counts.max(dim=1)[1]
-    return pred
-
-
 @torch.no_grad()
 def main(cfg):
     torch.cuda.set_device(0)
@@ -137,7 +77,7 @@ def main(cfg):
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
-    pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Test')
+    pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Testing')
     steps_per_epoch = len(test_loader)
     cls_mious = torch.zeros(cfg.shape_classes, dtype=torch.float32, device="cuda")
     cls_nums = torch.zeros(cfg.shape_classes, dtype=torch.int32, device="cuda")
@@ -148,25 +88,10 @@ def main(cfg):
         target = gs.gs_points.y
         B, N = cfg.batch_size, target.shape[0] // cfg.batch_size
         timer.record(f'I{idx}_start')
-        p = gs.gs_points.p
-        f = gs.gs_points.f
-        pred = 0
-        for i in range(cfg.voting):
-            if i > 1:
-                scale = torch.rand((3,), device=p.device) * 0.4 + 0.8
-                p = p * scale
-                height = p[:, 2:] * 4
-                height -= height.min(dim=0, keepdim=True)[0]
-                norm = f[:, :3]
-                norm = norm * (scale[[1, 2, 0]] * scale[[2, 0, 1]])
-                norm = torch.nn.functional.normalize(norm, p=2, dim=-1, eps=1e-8)
-                f = torch.cat([norm, height], dim=-1)
-                gs.gs_points.__update_attr__('p', p)
-                gs.gs_points.__update_attr__('f', f)
-            with autocast():
-                pred = pred + model(gs, shape)
-        pred = pred.max(dim=1)[1].view(B, N)
-        target = target.view(B, N)
+        with autocast():
+            pred = pred + model(gs, shape)
+            pred = pred.max(dim=1)[1].view(B, N)
+            target = target.view(B, N)
         time_cost = timer.record(f'I{idx}_end')
         timer_meter.update(time_cost)
         ins_mious = get_ins_mious(pred, target, shape, test_ds.class2parts)
@@ -210,6 +135,7 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
+    parser.add_argument('--presample', type=str, required=False, default='shapenetpart_presample.pt')
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
@@ -230,6 +156,7 @@ if __name__ == '__main__':
     cfg.model_cfg.backbone_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
         cfg.model_cfg.backbone_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
+    cfg.presample_path = os.path.join(cfg.dataset, cfg.presample)
 
     # shapenetpart
     cfg.num_classes = 50
