@@ -15,7 +15,7 @@ from tqdm import tqdm
 from backbone import Backbone, SegPartHead
 from shapenetpart.configs import model_configs
 from shapenetpart.dataset import ShapeNetPartNormalTest, shapenetpart_collate_fn, get_ins_mious
-from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
+from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, \
     cal_model_params
 from utils.logger import format_dict, format_list
 
@@ -140,7 +140,6 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for test
-    parser.add_argument("--voting", type=int, required=False, default=1)
     parser.add_argument("--metric_freq", type=int, required=False, default=1)
 
     # for model
