@@ -202,7 +202,7 @@ def main(cfg):
             cfg, model, train_loader, optimizer, scheduler, scaler, epoch, scheduler_steps,
         )
         lr = optimizer.param_groups[0]['lr']
-        time_cost = timer.record(f'epoch_{epoch}_end')
+        time_cost = timer.record(f'E{epoch}_end')
         timer_meter.update(time_cost)
         logging.info(
             f'@E{epoch} train:    '
