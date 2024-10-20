@@ -4,6 +4,21 @@ import cv2
 import numpy as np
 import torch
 
+
+def write_obj(points, colors, out_filename):
+    N = points.shape[0]
+    fout = open(out_filename, 'w')
+    for i in range(N):
+        c = colors[i]
+        fout.write('v %f %f %f %f %f %f\n' % (points[i, 0], points[i, 1], points[i, 2], c[0], c[1], c[2]))
+    fout.close()
+
+
+def read_obj(filename):
+    values = np.loadtxt(filename, usecols=(1, 2, 3, 4, 5, 6))
+    return values[:, :3], values[:, 3:6]
+
+
 # show multiple point clouds at once in splitted windows.
 def vis_multi_points(points, colors=None, labels=None,
                      opacity=1.0, point_size=10.0,
@@ -57,7 +72,8 @@ def vis_multi_points(points, colors=None, labels=None,
                 color_maps = cm.get_cmap(color_map, labels[idx].max() + 1)
                 colors[idx] = color_maps(labels[idx])[:, :3]
                 if colors[idx].min() < 0:
-                    colors[idx] = np.array((colors[idx] - colors[idx].min) / (colors[idx].max() - colors[idx].min()) * 255).astype(
+                    colors[idx] = np.array(
+                        (colors[idx] - colors[idx].min) / (colors[idx].max() - colors[idx].min()) * 255).astype(
                         np.int8)
             plotter.add_points(points[idx], opacity=opacity, point_size=point_size, render_points_as_spheres=True,
                                scalars=colors[idx], rgb=True, style='points')
@@ -70,23 +86,23 @@ def vis_multi_points(points, colors=None, labels=None,
 
 
 def calc_cmap(labels):
-        max_pixel = np.max(labels)
-        min_pixel = np.min(labels)
-        delta = max_pixel - min_pixel
-        cmap = ((labels - min_pixel) / delta * 255)
-        cmap = cmap * (-1)
-        cmap = cmap + 255
-        cmap = cmap.astype(np.uint8)
-        return cmap
+    max_pixel = np.max(labels)
+    min_pixel = np.min(labels)
+    delta = max_pixel - min_pixel
+    cmap = ((labels - min_pixel) / delta * 255)
+    cmap = cmap * (-1)
+    cmap = cmap + 255
+    cmap = cmap.astype(np.uint8)
+    return cmap
 
 
-red = torch.tensor([1.,0.,0.])
-blue = torch.tensor([0.,0., 1.])
-black = torch.tensor([0,0,0])
+red = torch.tensor([1., 0., 0.])
+blue = torch.tensor([0., 0., 1.])
+black = torch.tensor([0, 0, 0])
 white = torch.tensor([1., 1., 1.])
-gray = torch.tensor([128/255, 128/255, 128/255])
+gray = torch.tensor([128 / 255, 128 / 255, 128 / 255])
 yellow = torch.tensor([1., 1., 0])
-green = torch.tensor([0., 128/255, 0.])
+green = torch.tensor([0., 128 / 255, 0.])
 
 
 def vis_knn(p, p_idx, group_idx, **kwargs):
@@ -143,8 +159,6 @@ def vis_knn3(p, p_idx, group_idx_1, group_idx_2, **kwargs):
         [colors.detach().cpu().numpy()],
         plot_shape=(1, 1), **kwargs
     )
-
-
 
 #
 # # visual visible total for xyz and xyz_sampled

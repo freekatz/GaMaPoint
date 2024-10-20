@@ -16,7 +16,7 @@ from backbone import Backbone, SegSemHead
 from scannetv2.configs import model_configs
 from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
-    cal_model_params
+    cal_model_params, write_obj
 from utils.logger import format_dict, format_list
 
 
@@ -26,9 +26,31 @@ def prepare_exp(cfg):
     cfg.exp_name = f'{cfg.exp}-{exp_id:03d}'
     cfg.exp_dir = f'{exp_root}/{cfg.exp_name}'
     cfg.log_path = f'{cfg.exp_dir}/test.log'
+    cfg.vis_root = 'visual'
 
     os.makedirs(cfg.exp_dir, exist_ok=True)
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
+
+
+def save_results(cfg, file_name, xyz, feat, label, pred):
+    rgb = feat.cpu().numpy().squeeze()
+
+    gt = label.cpu().numpy().squeeze()
+    gt = cfg.cmap[gt, :]
+
+    pred = pred.argmax(dim=1)
+    pred = pred.cpu().numpy().squeeze()
+    label_int_mapping = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10, 10: 11, 11: 12, 12: 14, 13: 16,
+                         14: 24, 15: 28, 16: 33, 17: 34, 18: 36, 19: 39}
+    pred = np.vectorize(label_int_mapping.get)(pred)
+    pred = cfg.cmap[pred, :]
+
+    write_obj(xyz, rgb, os.path.join(cfg.vis_dir, f'{cfg.vis_root}/rgb-{file_name}.txt'))
+    # output ground truth labels
+    write_obj(xyz, gt, os.path.join(cfg.vis_dir, f'{cfg.vis_root}/gt-{file_name}.txt'))
+    # output pred labels
+    write_obj(xyz, pred,  os.path.join(cfg.vis_dir, f'{cfg.vis_root}/pred-{file_name}.txt'))
+
 
 @torch.no_grad()
 def main(cfg):
@@ -96,6 +118,15 @@ def main(cfg):
         if writer is not None and idx % cfg.metric_freq == 0:
             writer.add_scalar('time_cost_avg', timer_meter.avg, idx)
             writer.add_scalar('time_cost', time_cost, idx)
+        if cfg.vis:
+            save_results(
+                cfg,
+                f'scannetv2-{idx}',
+                gs.gs_points.p,
+                gs.gs_points.f[:, :3],
+                target[mask],
+                pred[mask],
+            )
     acc, macc, miou, iou = m.calc()
     test_info = {
         'miou': miou,
@@ -126,6 +157,9 @@ if __name__ == '__main__':
 
     # for test
     parser.add_argument("--metric_freq", type=int, required=False, default=1)
+
+    # for vis
+    parser.add_argument("--vis", action='store_true')
 
     # for model
     parser.add_argument("--use_cp", action='store_true')
