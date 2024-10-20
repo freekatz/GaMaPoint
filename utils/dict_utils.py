@@ -29,4 +29,7 @@ class ObjDict(dict):
     def __setstate__(self, state):
         self.__dict__ = pickle.loads(state)
 
+    def __exists__(self, name):
+        return name in self.__dict__
+
 
