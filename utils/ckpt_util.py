@@ -11,7 +11,7 @@ def resume_state(model, ckpt, compat=False, **args):
         new_state_dict = OrderedDict()
         for key in list(state['model'].keys()):
             new_state_dict[key.replace('sub_stage', 'sub').replace('stage', 'backbone')] = state['model'].pop(key)
-        state = new_state_dict
+        state['model'] = new_state_dict
     model.load_state_dict(state['model'], strict=True)
     for i in args.keys():
         if hasattr(args[i], "load_state_dict"):
@@ -25,7 +25,7 @@ def load_state(model, ckpt, compat=False, **args):
         new_state_dict = OrderedDict()
         for key in list(state['model'].keys()):
             new_state_dict[key.replace('sub_stage', 'sub').replace('stage', 'backbone')] = state['model'].pop(key)
-        state = new_state_dict
+        state['model'] = new_state_dict
     if hasattr(model, 'module'):
         incompatible = model.module.load_state_dict(state['model'], strict=False)
     else:
