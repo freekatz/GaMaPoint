@@ -21,7 +21,7 @@ def read_obj(filename):
 
 # show multiple point clouds at once in splitted windows.
 def vis_multi_points(points, colors=None, labels=None,
-                     opacity=1.0, point_size=10.0,
+                     opacity=1.0, point_size=10.0, title='title',
                      color_map='Paired', save_fig=False, save_name='example',
                      plot_shape=None, **kwargs):
     """Visualize a point cloud
@@ -45,6 +45,7 @@ def vis_multi_points(points, colors=None, labels=None,
     my_theme.edge_color = 'white'
     my_theme.background = 'white'
     my_theme.allow_empty_mesh = True
+    my_theme.title = title
     pv.set_plot_theme(my_theme)
 
     n_clouds = len(points)

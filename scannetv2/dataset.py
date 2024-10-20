@@ -74,7 +74,7 @@ class ScanNetV2(Dataset):
         'desk', 'curtain', 'refrigerator', 'shower curtain',
         'toilet', 'sink', 'bathtub', 'otherfurniture']
     num_classes = len(classes)
-    cmap = {
+    label2color = {
         0: (0., 0., 0.),
         1: (174., 199., 232.),
         2: (152., 223., 138.),

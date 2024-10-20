@@ -1,3 +1,5 @@
+import math
+
 import __init__
 
 import argparse
@@ -12,12 +14,14 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import Backbone, SegSemHead
+from backbone import Backbone, SegSemHead, NaiveGaussian3D
 from scannetv2.configs import model_configs
 from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
     cal_model_params, write_obj
 from utils.logger import format_dict, format_list
+from utils.pykdtree.pykdtree.kdtree import KDTree
+from utils.subsample import fps_sample
 
 
 def prepare_exp(cfg):
@@ -29,20 +33,19 @@ def prepare_exp(cfg):
     cfg.vis_root = 'visual'
 
     os.makedirs(cfg.exp_dir, exist_ok=True)
+    os.makedirs(cfg.vis_root, exist_ok=True)
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
 
-def save_results(cfg, file_name, xyz, feat, label, pred):
-    rgb = feat.cpu().numpy().squeeze()
+def save_vis_results(cfg, file_name, xyz, feat, label, pred):
+    rgb = feat.cpu().numpy().squeeze() * 250.0 / 255.0
 
+    label = label.long()
     gt = label.cpu().numpy().squeeze()
     gt = cfg.cmap[gt, :]
 
-    pred = pred.argmax(dim=1)
+    pred = pred.argmax(1)
     pred = pred.cpu().numpy().squeeze()
-    label_int_mapping = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10, 10: 11, 11: 12, 12: 14, 13: 16,
-                         14: 24, 15: 28, 16: 33, 17: 34, 18: 36, 19: 39}
-    pred = np.vectorize(label_int_mapping.get)(pred)
     pred = cfg.cmap[pred, :]
 
     write_obj(xyz, rgb, f'{cfg.vis_root}/rgb-{file_name}.txt')
@@ -50,6 +53,32 @@ def save_results(cfg, file_name, xyz, feat, label, pred):
     write_obj(xyz, gt, f'{cfg.vis_root}/gt-{file_name}.txt')
     # output pred labels
     write_obj(xyz, pred,  f'{cfg.vis_root}/pred-{file_name}.txt')
+
+
+def calc_knn_rate(cfg, xyz, label):
+    k = cfg.model_cfg.train_cfg.k[0]
+    alpha = cfg.model_cfg.train_cfg.alpha
+
+    gs = NaiveGaussian3D(cfg.model_cfg.train_cfg.gs_opts, batch_size=cfg.batch_size, device=xyz.device)
+    gs.projects(xyz, cam_seed=0, cam_batch=gs.opt.n_cameras * 2)
+    visible = gs.gs_points.visible
+
+    # estimating a distance in Euclidean space as the scaler by random fps
+    ps, _ = fps_sample(xyz.unsqueeze(0), 2, random_start_point=True)
+    ps = ps.squeeze(0)
+    p0, p1 = ps[0], ps[1]
+    scaler = math.sqrt((p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2)
+
+    kdt = KDTree(xyz.numpy(), visible.numpy())
+    _, gidx_1 = kdt.query(xyz.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
+    _, gidx_2 = kdt.query(xyz.numpy(), visible.numpy(), k=k, alpha=0)
+    glabel_1 = label[gidx_1] - label.unsqueeze(-1)
+    glabel_2 = label[gidx_2] - label.unsqueeze(-1)
+
+    n = xyz.shape[0] * k
+    n1 = torch.count_nonzero(glabel_1)
+    n2 = torch.count_nonzero(glabel_2)
+    return n1/n, n2/n
 
 
 @torch.no_grad()
@@ -79,10 +108,12 @@ def main(cfg):
         collate_fn=scannetv2_collate_fn,
         pin_memory=True,
         persistent_workers=True,
-        shuffle=True,
         num_workers=cfg.num_workers,
     )
-    cfg.cmap = np.array(test_ds.cmap)
+    cmap = {}
+    for i, x in enumerate([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39]):
+        cmap[i] = test_ds.label2color[x]
+    cfg.cmap = np.array([*cmap.values()]).astype(np.float32) / 255.
 
     backbone = Backbone(
         **cfg.model_cfg.backbone_cfg,
@@ -121,11 +152,11 @@ def main(cfg):
             writer.add_scalar('time_cost_avg', timer_meter.avg, idx)
             writer.add_scalar('time_cost', time_cost, idx)
         if cfg.vis:
-            save_results(
+            save_vis_results(
                 cfg,
                 f'scannetv2-{idx}',
-                gs.gs_points.p,
-                gs.gs_points.f[:, :3],
+                gs.gs_points.p[mask],
+                gs.gs_points.f[:, :3][mask],
                 target[mask],
                 pred[mask],
             )
