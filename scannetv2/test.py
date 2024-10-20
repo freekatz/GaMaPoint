@@ -80,8 +80,6 @@ def main(cfg):
     m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Testing')
     steps_per_epoch = len(test_loader)
-    pred = 0
-    test_idx = 0
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
@@ -89,13 +87,9 @@ def main(cfg):
         timer.record(f'I{idx}_start')
         with autocast():
             pred = pred + model(gs)
-        test_idx += 1
         time_cost = timer.record(f'I{idx}_end')
         timer_meter.update(time_cost)
-        if test_idx % cfg.test_loop == 0:
-            m.update(pred[mask], target[mask])
-            pred = 0
-            test_idx = 0
+        m.update(pred[mask], target[mask])
         pbar.set_description(f"Testing [{idx}/{steps_per_epoch}] "
                              + f"mACC {m.calc_macc():.4f}")
         if writer is not None and idx % cfg.metric_freq == 0:
