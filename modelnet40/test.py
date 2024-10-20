@@ -1,16 +1,16 @@
 import __init__
 
-import logging
 import argparse
-from glob import glob
+import logging
 import os
+from glob import glob
 
+import numpy as np
+import torch
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-import numpy as np
-import torch
 
 from backbone import Backbone, ClsHead
 from modelnet40.configs import model_configs
@@ -30,7 +30,7 @@ def prepare_exp(cfg):
     os.makedirs(cfg.exp_dir, exist_ok=True)
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
 
-
+@torch.no_grad()
 def main(cfg):
     torch.cuda.set_device(0)
     set_random_seed(cfg.seed, deterministic=True)
@@ -90,8 +90,6 @@ def main(cfg):
         with autocast():
             pred = model(gs)
         time_cost = timer.record(f'I{idx}_end')
-        if idx == 0:
-            time_cost = 0
         timer_meter.update(time_cost)
         m.update(pred, target)
         pbar.set_description(f"Testing [{idx}/{steps_per_epoch}] "
@@ -106,7 +104,7 @@ def main(cfg):
         'time_cost_avg': f"{timer_meter.avg:.2f}s",
     }
     logging.info(f'Summary:'
-                 + f'\n{format_dict(test_info)}')
+                 + f'\ntest: \n{format_dict(test_info)}')
 
 
 if __name__ == '__main__':
@@ -143,6 +141,7 @@ if __name__ == '__main__':
 
     # modelnet40
     cfg.num_classes = 40
+    cfg.ignore_index = -100
 
     prepare_exp(cfg)
     main(cfg)
