@@ -86,13 +86,13 @@ def main(cfg):
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
-        if idx > 0:
-            timer.record(f'I{idx}_start')
+        timer.record(f'I{idx}_start')
         with autocast():
             pred = model(gs)
         time_cost = timer.record(f'I{idx}_end')
-        if idx > 0:
-            timer_meter.update(time_cost)
+        if idx == 0:
+            time_cost = 0
+        timer_meter.update(time_cost)
         m.update(pred, target)
         pbar.set_description(f"Testing [{idx}/{steps_per_epoch}] "
                              + f"mACC {m.calc_macc():.4f}")

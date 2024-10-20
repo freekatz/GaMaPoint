@@ -15,8 +15,6 @@ class Timer:
         self.start_time = time.time()
 
     def record(self, desc):
-        if not self.rec.__exists__(desc):
-            return 0
         rec_time = time.time()
         self.rec[desc] = rec_time - self.start_time
         self.start_time = rec_time
