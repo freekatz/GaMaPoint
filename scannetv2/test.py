@@ -56,6 +56,7 @@ def main(cfg):
         collate_fn=scannetv2_collate_fn,
         pin_memory=True,
         persistent_workers=True,
+        shuffle=True,
         num_workers=cfg.num_workers,
     )
 
