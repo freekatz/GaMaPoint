@@ -51,8 +51,8 @@ class ModelConfig(EasyConfig):
         backbone_cfg = EasyConfig()
         backbone_cfg.name = 'BackboneConfig'
         backbone_cfg.in_channels = 7
-        backbone_cfg.channel_list = [64, 128, 256, 384, 512]
-        backbone_cfg.head_channels = 384
+        backbone_cfg.channel_list = [64, 96, 160, 288, 512]
+        backbone_cfg.head_channels = 288
         backbone_cfg.mamba_blocks = [1, 1, 1, 1, 1]
         backbone_cfg.res_blocks = [4, 4, 4, 8, 4]
         backbone_cfg.mlp_ratio = 2.
