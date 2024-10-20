@@ -86,7 +86,7 @@ def main(cfg):
         mask = target != cfg.ignore_index
         timer.record(f'I{idx}_start')
         with autocast():
-            pred = pred + model(gs)
+            pred = model(gs)
         time_cost = timer.record(f'I{idx}_end')
         timer_meter.update(time_cost)
         m.update(pred[mask], target[mask])
