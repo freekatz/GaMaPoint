@@ -5,23 +5,27 @@ import torch
 from termcolor import colored
 
 
-def resume_state(model, ckpt ,compat=False, **args):
+def resume_state(model, ckpt, compat=False, **args):
     state = torch.load(ckpt)
     if compat:  # compatible old model
         new_state_dict = OrderedDict()
         for key in list(state['model'].keys()):
             new_state_dict[key.replace('sub_stage', 'sub').replace('stage', 'backbone')] = state['model'].pop(key)
-        model.load_state_dict(new_state_dict, strict=True)
-    else:
-        model.load_state_dict(state['model'], strict=True)
+        state = new_state_dict
+    model.load_state_dict(state['model'], strict=True)
     for i in args.keys():
         if hasattr(args[i], "load_state_dict"):
             args[i].load_state_dict(state[i])
     return state
 
 
-def load_state(model, ckpt, **args):
+def load_state(model, ckpt, compat=False, **args):
     state = torch.load(ckpt)
+    if compat:  # compatible old model
+        new_state_dict = OrderedDict()
+        for key in list(state['model'].keys()):
+            new_state_dict[key.replace('sub_stage', 'sub').replace('stage', 'backbone')] = state['model'].pop(key)
+        state = new_state_dict
     if hasattr(model, 'module'):
         incompatible = model.module.load_state_dict(state['model'], strict=False)
     else:

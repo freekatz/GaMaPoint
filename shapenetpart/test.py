@@ -71,7 +71,7 @@ def main(cfg):
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
     logging.info('Number of trainable params: %.4f M' % (trainable_model_size / 1e6))
 
-    resume_state(model, cfg.ckpt)
+    resume_state(model, cfg.ckpt, compat=True)
     model.eval()
 
     writer = SummaryWriter(log_dir=cfg.exp_dir)
