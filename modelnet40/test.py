@@ -81,7 +81,7 @@ def main(cfg):
     timer = Timer(dec=1)
     timer_meter = AverageMeter()
     m = Metric(cfg.num_classes)
-    pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Train')
+    pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Test')
     steps_per_epoch = len(test_loader)
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
     # for test
-    parser.add_argument("--metric_freq", type=int, required=False, default=20)
+    parser.add_argument("--metric_freq", type=int, required=False, default=1)
 
     # for model
     parser.add_argument("--use_cp", action='store_true')
@@ -131,15 +131,13 @@ if __name__ == '__main__':
     args, opts = parser.parse_known_args()
     cfg = EasyConfig()
     cfg.load_args(args)
+    assert cfg.ckpt != ''
 
     model_cfg = model_configs[cfg.model_size]
     cfg.model_cfg = model_cfg
     cfg.model_cfg.backbone_cfg.use_cp = cfg.use_cp
     if cfg.use_cp:
         cfg.model_cfg.backbone_cfg.bn_momentum = 1 - (1 - cfg.model_cfg.bn_momentum) ** 0.5
-
-    assert cfg.ckpt != ''
-    cfg.use_amp = not cfg.no_amp
 
     # modelnet40
     cfg.num_classes = 40
