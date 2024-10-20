@@ -42,7 +42,7 @@ def main(cfg):
     test_loader = DataLoader(
         ScanNetV2(
             dataset_dir=cfg.dataset,
-            loop=cfg.val_loop,
+            loop=cfg.test_loop,
             train=False,
             warmup=False,
             voxel_max=cfg.model_cfg.train_cfg.voxel_max,
@@ -80,16 +80,22 @@ def main(cfg):
     m = Metric(cfg.num_classes)
     pbar = tqdm(enumerate(test_loader), total=test_loader.__len__(), desc='Testing')
     steps_per_epoch = len(test_loader)
+    pred = 0
+    test_idx = 0
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         target = gs.gs_points.y
         mask = target != cfg.ignore_index
         timer.record(f'I{idx}_start')
         with autocast():
-            pred = model(gs)
+            pred = pred + model(gs)
+        test_idx += 1
         time_cost = timer.record(f'I{idx}_end')
         timer_meter.update(time_cost)
-        m.update(pred[mask], target[mask])
+        if test_idx % cfg.test_loop == 0:
+            m.update(pred[mask], target[mask])
+            pred = 0
+            test_idx = 0
         pbar.set_description(f"Testing [{idx}/{steps_per_epoch}] "
                              + f"mACC {m.calc_macc():.4f}")
         if writer is not None and idx % cfg.metric_freq == 0:
@@ -119,7 +125,7 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
-    parser.add_argument('--val_loop', type=int, required=False, default=4 * 4 * 3)
+    parser.add_argument('--test_loop', type=int, required=False, default=4 * 4 * 3)
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
