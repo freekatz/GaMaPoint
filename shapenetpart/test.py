@@ -89,7 +89,7 @@ def main(cfg):
         B, N = cfg.batch_size, target.shape[0] // cfg.batch_size
         timer.record(f'I{idx}_start')
         with autocast():
-            pred = pred + model(gs, shape)
+            pred = model(gs, shape)
             pred = pred.max(dim=1)[1].view(B, N)
             target = target.view(B, N)
         time_cost = timer.record(f'I{idx}_end')
