@@ -119,6 +119,7 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
+    parser.add_argument('--val_loop', type=int, required=False, default=4 * 4 * 3)
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
