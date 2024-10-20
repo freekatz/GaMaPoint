@@ -45,11 +45,11 @@ def save_results(cfg, file_name, xyz, feat, label, pred):
     pred = np.vectorize(label_int_mapping.get)(pred)
     pred = cfg.cmap[pred, :]
 
-    write_obj(xyz, rgb, os.path.join(cfg.vis_dir, f'{cfg.vis_root}/rgb-{file_name}.txt'))
+    write_obj(xyz, rgb, f'{cfg.vis_root}/rgb-{file_name}.txt')
     # output ground truth labels
-    write_obj(xyz, gt, os.path.join(cfg.vis_dir, f'{cfg.vis_root}/gt-{file_name}.txt'))
+    write_obj(xyz, gt, f'{cfg.vis_root}/gt-{file_name}.txt')
     # output pred labels
-    write_obj(xyz, pred,  os.path.join(cfg.vis_dir, f'{cfg.vis_root}/pred-{file_name}.txt'))
+    write_obj(xyz, pred,  f'{cfg.vis_root}/pred-{file_name}.txt')
 
 
 @torch.no_grad()
@@ -61,8 +61,7 @@ def main(cfg):
 
     logging.info(f'Config:\n{cfg.__str__()}')
 
-    test_loader = DataLoader(
-        ScanNetV2(
+    test_ds = ScanNetV2(
             dataset_dir=cfg.dataset,
             loop=cfg.test_loop,
             train=False,
@@ -73,7 +72,9 @@ def main(cfg):
             alpha=cfg.model_cfg.train_cfg.alpha,
             batch_size=1,
             gs_opts=cfg.model_cfg.train_cfg.gs_opts
-        ),
+        )
+    test_loader = DataLoader(
+        test_ds,
         batch_size=1,
         collate_fn=scannetv2_collate_fn,
         pin_memory=True,
@@ -81,6 +82,7 @@ def main(cfg):
         shuffle=True,
         num_workers=cfg.num_workers,
     )
+    cfg.cmap = np.array(test_ds.cmap)
 
     backbone = Backbone(
         **cfg.model_cfg.backbone_cfg,
