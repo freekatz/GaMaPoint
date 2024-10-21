@@ -220,14 +220,21 @@ def vis_knn4(p, label, p_idx, group_idx_1, group_idx_2, **kwargs):
     l_idx_2 = torch.nonzero(l_2 != 0)  # knn2 wrong index
     l_idx_3 = torch.nonzero(l_1 == 0)  # knn1 right index
     l_idx_4 = torch.nonzero(l_2 == 0)  # knn2 right index
-    g_idx_1 = g_idx_1[l_idx_1].unsqueeze(-1).expand(-1, 3)
-    g_idx_2 = g_idx_2[l_idx_2].unsqueeze(-1).expand(-1, 3)
-    g_idx_3 = g_idx_1[l_idx_3].unsqueeze(-1).expand(-1, 3)
-    g_idx_4 = g_idx_2[l_idx_4].unsqueeze(-1).expand(-1, 3)
-    colors_1[g_idx_1] = red  # wrong
-    colors_2[g_idx_2] = red  # wrong
-    colors_1[g_idx_3] = green  # right
-    colors_2[g_idx_4] = green  # right
+    g_idx_w1 = g_idx_1[l_idx_1].expand(-1, 3)
+    g_idx_w2 = g_idx_2[l_idx_2].expand(-1, 3)
+    g_idx_r1 = g_idx_1[l_idx_3].expand(-1, 3)
+    g_idx_r2 = g_idx_2[l_idx_4].expand(-1, 3)
+    colors_1[g_idx_w1] = yellow  # wrong
+    colors_2[g_idx_w2] = yellow  # wrong
+    colors_1[g_idx_r1] = green  # right
+    colors_2[g_idx_r2] = green  # right
+    colors_1[p_idx] = red
+    colors_2[p_idx] = red
+
+    r1, w1 = g_idx_r1.shape[0], g_idx_w1.shape[0]
+    r2, w2 = g_idx_r2.shape[0], g_idx_w2.shape[0]
+    # print(f'knn1 right:{r1}, knn1 wrong:{w1}')
+    # print(f'knn2 right:{r2}, knn2 wrong:{w2}')
     if vis:
         vis_multi_points(
             [p.detach().cpu().numpy(), p.detach().cpu().numpy()],
@@ -235,7 +242,25 @@ def vis_knn4(p, label, p_idx, group_idx_1, group_idx_2, **kwargs):
             plot_shape=(1, 2), **kwargs
         )
     else:
-        return colors_1, colors_2
+        return colors_1, colors_2, r1, w1, r2, w2
+
+
+def vis_labels(p, label, cmap=None, **kwargs):
+    vis = kwargs.get('vis', True)
+    # colors = torch.zeros_like(p, dtype=torch.float, device=p.device)
+    # u_label = torch.unique(label)
+    if cmap is None:
+        cmap = calc_cmap(label.detach().cpu().numpy())
+    colors = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_RAINBOW)).squeeze()
+    if p.is_cuda:
+        colors = colors.cuda()
+    if vis:
+        vis_multi_points([p.detach().cpu().numpy()],
+                         [colors.detach().cpu().numpy()],
+                         plot_shape=(1, 1), **kwargs)
+    else:
+        return colors
+
 
 
 #
