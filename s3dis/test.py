@@ -154,7 +154,7 @@ if __name__ == '__main__':
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
     parser.add_argument('--test_loop', type=int, required=False, default=1)
-    parser.add_argument('--test_area', type=str, required=False, default='5')
+    parser.add_argument('--test_area', type=str, required=False, default='!0')
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
