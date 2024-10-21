@@ -50,7 +50,7 @@ def save_vis_results(cfg, file_name, xyz, feat, label, pred):
     # output ground truth labels
     write_obj(xyz, gt, f'{cfg.vis_root}/gt-{file_name}.txt')
     # output pred labels
-    write_obj(xyz, pred,  f'{cfg.vis_root}/pred-{file_name}.txt')
+    write_obj(xyz, pred, f'{cfg.vis_root}/pred-{file_name}.txt')
 
 
 @torch.no_grad()
@@ -63,17 +63,18 @@ def main(cfg):
     logging.info(f'Config:\n{cfg.__str__()}')
 
     test_ds = S3DIS(
-            dataset_dir=cfg.dataset,
-            loop=cfg.test_loop,
-            train=False,
-            warmup=False,
-            voxel_max=cfg.model_cfg.train_cfg.voxel_max,
-            k=cfg.model_cfg.train_cfg.k,
-            grid_size=cfg.model_cfg.train_cfg.grid_size,
-            alpha=cfg.model_cfg.train_cfg.alpha,
-            batch_size=1,
-            gs_opts=cfg.model_cfg.train_cfg.gs_opts
-        )
+        dataset_dir=cfg.dataset,
+        area=cfg.test_area,
+        loop=cfg.test_loop,
+        train=False,
+        warmup=False,
+        voxel_max=cfg.model_cfg.train_cfg.voxel_max,
+        k=cfg.model_cfg.train_cfg.k,
+        grid_size=cfg.model_cfg.train_cfg.grid_size,
+        alpha=cfg.model_cfg.train_cfg.alpha,
+        batch_size=1,
+        gs_opts=cfg.model_cfg.train_cfg.gs_opts
+    )
     test_loader = DataLoader(
         test_ds,
         batch_size=1,
