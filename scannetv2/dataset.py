@@ -173,26 +173,19 @@ class ScanNetV2(Dataset):
         idx //= self.loop
         xyz, col, norm, lbl = self.datas[idx]
 
-        if self.train:
-            angle = random.random() * 2 * math.pi
-            cos, sin = math.cos(angle), math.sin(angle)
-            rotmat = torch.tensor([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
-            norm = norm @ rotmat
-            rotmat *= random.uniform(0.8, 1.2)
-            xyz = xyz @ rotmat
-            xyz = self.els(xyz)
-            xyz -= xyz.min(dim=0)[0]
+        angle = random.random() * 2 * math.pi
+        cos, sin = math.cos(angle), math.sin(angle)
+        rotmat = torch.tensor([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
+        norm = norm @ rotmat
+        rotmat *= random.uniform(0.8, 1.2)
+        xyz = xyz @ rotmat
+        xyz = self.els(xyz)
+        xyz -= xyz.min(dim=0)[0]
 
         # here grid size is assumed 0.02, so estimated downsampling ratio is ~1.5
-        if self.train:
-            indices = grid_subsampling(xyz, 0.02, 2.5 / 1.5)
-        else:
-            indices = grid_subsampling_test(xyz, 0.02, 2.5 / 1.5, pick=0)
-
+        indices = grid_subsampling(xyz, 0.02, 2.5 / 1.5)
         xyz = xyz[indices]
-        if not self.train:
-            xyz -= xyz.min(dim=0)[0]
-        if xyz.shape[0] > self.voxel_max and self.train:
+        if xyz.shape[0] > self.voxel_max:
             pt = random.choice(xyz)
             condition = (xyz - pt).square().sum(dim=1).argsort()[:self.voxel_max].sort()[0]  # sort to preserve locality
             xyz = xyz[condition]
@@ -203,10 +196,10 @@ class ScanNetV2(Dataset):
         norm = norm[indices]
         col = col.float()
 
-        if self.train and random.random() < 0.2:
+        if random.random() < 0.2:
             col.fill_(0.)
         else:
-            if self.train and random.random() < 0.2:
+            if random.random() < 0.2:
                 colmin = col.min(dim=0, keepdim=True)[0]
                 colmax = col.max(dim=0, keepdim=True)[0]
                 scale = 255 / (colmax - colmin)

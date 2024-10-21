@@ -14,14 +14,12 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import Backbone, SegSemHead, NaiveGaussian3D
+from backbone import Backbone, SegSemHead
 from scannetv2.configs import model_configs
 from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
     cal_model_params, write_obj
 from utils.logger import format_dict, format_list
-from utils.pykdtree.pykdtree.kdtree import KDTree
-from utils.subsample import fps_sample
 
 
 def prepare_exp(cfg):
@@ -53,32 +51,6 @@ def save_vis_results(cfg, file_name, xyz, feat, label, pred):
     write_obj(xyz, gt, f'{cfg.vis_root}/gt-{file_name}.txt')
     # output pred labels
     write_obj(xyz, pred,  f'{cfg.vis_root}/pred-{file_name}.txt')
-
-
-def calc_knn_rate(cfg, xyz, label):
-    k = cfg.model_cfg.train_cfg.k[0]
-    alpha = cfg.model_cfg.train_cfg.alpha
-
-    gs = NaiveGaussian3D(cfg.model_cfg.train_cfg.gs_opts, batch_size=cfg.batch_size, device=xyz.device)
-    gs.projects(xyz, cam_seed=0, cam_batch=gs.opt.n_cameras * 2)
-    visible = gs.gs_points.visible
-
-    # estimating a distance in Euclidean space as the scaler by random fps
-    ps, _ = fps_sample(xyz.unsqueeze(0), 2, random_start_point=True)
-    ps = ps.squeeze(0)
-    p0, p1 = ps[0], ps[1]
-    scaler = math.sqrt((p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2)
-
-    kdt = KDTree(xyz.numpy(), visible.numpy())
-    _, gidx_1 = kdt.query(xyz.numpy(), visible.numpy(), k=k, alpha=alpha, scaler=scaler)
-    _, gidx_2 = kdt.query(xyz.numpy(), visible.numpy(), k=k, alpha=0)
-    glabel_1 = label[gidx_1] - label.unsqueeze(-1)
-    glabel_2 = label[gidx_2] - label.unsqueeze(-1)
-
-    n = xyz.shape[0] * k
-    n1 = torch.count_nonzero(glabel_1)
-    n2 = torch.count_nonzero(glabel_2)
-    return n1/n, n2/n
 
 
 @torch.no_grad()
@@ -184,7 +156,7 @@ if __name__ == '__main__':
 
     # for dataset
     parser.add_argument('--dataset', type=str, required=False, default='dataset_link')
-    parser.add_argument('--test_loop', type=int, required=False, default=4 * 4 * 3)
+    parser.add_argument('--test_loop', type=int, required=False, default=1)
     parser.add_argument('--batch_size', type=int, required=False, default=32)
     parser.add_argument('--num_workers', type=int, required=False, default=12)
 
