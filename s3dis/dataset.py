@@ -18,19 +18,19 @@ class S3DIS(Dataset):
         'table', 'bookcase', 'sofa', 'board',
         'clutter']
     num_classes = len(classes)
-    class2color = {'ceiling': [0, 255, 0],
-                   'floor': [0, 0, 255],
-                   'wall': [0, 255, 255],
-                   'beam': [255, 255, 0],
-                   'column': [255, 0, 255],
-                   'window': [100, 100, 255],
-                   'door': [200, 200, 100],
-                   'table': [170, 120, 200],
-                   'chair': [255, 0, 0],
-                   'sofa': [200, 100, 100],
-                   'bookcase': [10, 200, 100],
-                   'board': [200, 200, 200],
-                   'clutter': [50, 50, 50]}
+    class2color = {'ceiling': (23., 190., 207.),
+                   'floor': (152., 223., 138.),
+                   'wall': (174., 199., 232.),
+                   'beam': (255., 187., 120.),
+                   'column': (255., 127., 14.),
+                   'window': (197., 176., 213.),
+                   'door': (214., 39., 40.),
+                   'table': (255., 152., 150.),
+                   'chair': (188., 189., 34.),
+                   'sofa': (140., 86., 75.),
+                   'bookcase': (148., 103., 189.),
+                   'board': (196., 156., 148.),
+                   'clutter': [0, 0, 0]}
     cmap = [*class2color.values()]
 
     def __init__(self,
