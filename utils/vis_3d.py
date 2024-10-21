@@ -107,20 +107,44 @@ green = torch.tensor([0., 128 / 255, 0.])
 
 
 def vis_knn(p, p_idx, group_idx, **kwargs):
+    """
+    Visualize a point cloud with k-nearest neighbors.
+        pc is white, center is red, neighbors is blue.
+    :param p: point cloud
+    :param p_idx: center point index
+    :param group_idx: neighbor point index
+    :param kwargs:
+    :return:
+    """
+    vis = kwargs.get('vis', True)
     group_idx = group_idx.long()
     colors = torch.zeros_like(p, dtype=torch.float, device=p.device)
     colors[:] = white
     g_idx = group_idx[p_idx]
     colors[g_idx] = blue
     colors[p_idx] = red
-    vis_multi_points(
-        [p.detach().cpu().numpy()],
-        [colors.detach().cpu().numpy()],
-        plot_shape=(1, 1), **kwargs
-    )
+    if vis:
+        vis_multi_points(
+            [p.detach().cpu().numpy()],
+            [colors.detach().cpu().numpy()],
+            plot_shape=(1, 1), **kwargs
+        )
+    else:
+        return colors
 
 
 def vis_knn2(p, p_idx, group_idx_1, group_idx_2, **kwargs):
+    """
+    Visualize a point cloud with k-nearest neighbors.
+        pc is white, center is red, neighbors1 is blue, neighbors2 is yellow, same is green.
+    :param p: point cloud
+    :param p_idx: center point index
+    :param group_idx_1: knn1 neighbor point index
+    :param group_idx_2: knn2 neighbor point index
+    :param kwargs:
+    :return:
+    """
+    vis = kwargs.get('vis', True)
     group_idx_1 = group_idx_1.long()
     group_idx_2 = group_idx_2.long()
     colors_1 = torch.zeros_like(p, dtype=torch.float, device=p.device)
@@ -136,14 +160,28 @@ def vis_knn2(p, p_idx, group_idx_1, group_idx_2, **kwargs):
     colors_2[g_idx_3] = green  # same
     colors_1[p_idx] = red
     colors_2[p_idx] = red
-    vis_multi_points(
-        [p.detach().cpu().numpy(), p.detach().cpu().numpy()],
-        [colors_1.detach().cpu().numpy(), colors_2.detach().cpu().numpy()],
-        plot_shape=(1, 2), **kwargs
-    )
+    if vis:
+        vis_multi_points(
+            [p.detach().cpu().numpy(), p.detach().cpu().numpy()],
+            [colors_1.detach().cpu().numpy(), colors_2.detach().cpu().numpy()],
+            plot_shape=(1, 2), **kwargs
+        )
+    else:
+        return colors_1, colors_2
 
 
 def vis_knn3(p, p_idx, group_idx_1, group_idx_2, **kwargs):
+    """
+    Visualize a point cloud with k-nearest neighbors.
+        pc is white, center is red, diff is yellow, same is green.
+    :param p: point cloud
+    :param p_idx: center point index
+    :param group_idx_1: knn1 neighbor point index
+    :param group_idx_2: knn2 neighbor point index
+    :param kwargs:
+    :return:
+    """
+    vis = kwargs.get('vis', True)
     group_idx_1 = group_idx_1.long()
     group_idx_2 = group_idx_2.long()
     colors = torch.ones_like(p, dtype=torch.float, device=p.device)
@@ -155,11 +193,50 @@ def vis_knn3(p, p_idx, group_idx_1, group_idx_2, **kwargs):
     colors[g_idx_3] = green  # same
     colors[g_idx_4] = yellow  # diff
     colors[p_idx] = red
-    vis_multi_points(
-        [p.detach().cpu().numpy()],
-        [colors.detach().cpu().numpy()],
-        plot_shape=(1, 1), **kwargs
-    )
+    if vis:
+        vis_multi_points(
+            [p.detach().cpu().numpy()],
+            [colors.detach().cpu().numpy()],
+            plot_shape=(1, 1), **kwargs
+        )
+    else:
+        return colors
+
+
+def vis_knn4(p, label, p_idx, group_idx_1, group_idx_2, **kwargs):
+    vis = kwargs.get('vis', True)
+    group_idx_1 = group_idx_1.long()
+    group_idx_2 = group_idx_2.long()
+    colors_1 = torch.zeros_like(p, dtype=torch.float, device=p.device)
+    colors_2 = torch.zeros_like(p, dtype=torch.float, device=p.device)
+    colors_1[:] = white
+    colors_2[:] = white
+    g_idx_1 = group_idx_1[p_idx]
+    g_idx_2 = group_idx_2[p_idx]
+    l = label[p_idx]  # center label
+    l_1 = label[g_idx_1] - l  # knn1 labels
+    l_2 = label[g_idx_2] - l  # knn2 labels
+    l_idx_1 = torch.nonzero(l_1 != 0)  # knn1 wrong index
+    l_idx_2 = torch.nonzero(l_2 != 0)  # knn2 wrong index
+    l_idx_3 = torch.nonzero(l_1 == 0)  # knn1 right index
+    l_idx_4 = torch.nonzero(l_2 == 0)  # knn2 right index
+    g_idx_1 = g_idx_1[l_idx_1].unsqueeze(-1).expand(-1, 3)
+    g_idx_2 = g_idx_2[l_idx_2].unsqueeze(-1).expand(-1, 3)
+    g_idx_3 = g_idx_1[l_idx_3].unsqueeze(-1).expand(-1, 3)
+    g_idx_4 = g_idx_2[l_idx_4].unsqueeze(-1).expand(-1, 3)
+    colors_1[g_idx_1] = red  # wrong
+    colors_2[g_idx_2] = red  # wrong
+    colors_1[g_idx_3] = green  # right
+    colors_2[g_idx_4] = green  # right
+    if vis:
+        vis_multi_points(
+            [p.detach().cpu().numpy(), p.detach().cpu().numpy()],
+            [colors_1.detach().cpu().numpy(), colors_2.detach().cpu().numpy()],
+            plot_shape=(1, 2), **kwargs
+        )
+    else:
+        return colors_1, colors_2
+
 
 #
 # # visual visible total for xyz and xyz_sampled
