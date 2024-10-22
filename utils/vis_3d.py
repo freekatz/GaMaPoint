@@ -1,8 +1,14 @@
+import math
 import os
 
 import cv2
 import numpy as np
 import torch
+from einops import repeat
+from matplotlib import pyplot as plt
+from torch import nn
+
+from utils import points_scaler
 
 
 def write_obj(points, colors, out_filename):
@@ -90,7 +96,7 @@ def calc_cmap(labels):
     max_pixel = np.max(labels)
     min_pixel = np.min(labels)
     delta = max_pixel - min_pixel
-    cmap = ((labels - min_pixel) / delta * 255)
+    cmap = (labels - min_pixel) / (delta + 1e-6) * 255
     cmap = cmap * (-1)
     cmap = cmap + 255
     cmap = cmap.astype(np.uint8)
@@ -204,6 +210,17 @@ def vis_knn3(p, p_idx, group_idx_1, group_idx_2, **kwargs):
 
 
 def vis_knn4(p, label, p_idx, group_idx_1, group_idx_2, **kwargs):
+    """
+    Visualize a point cloud with k-nearest neighbors and label.
+        pc is white, wrong is yellow, center is red, right is green.
+    :param p: point cloud
+    :param label: label of points
+    :param p_idx: center point index
+    :param group_idx_1: knn1 neighbor point index
+    :param group_idx_2: knn2 neighbor point index
+    :param kwargs:
+    :return:
+    """
     vis = kwargs.get('vis', True)
     group_idx_1 = group_idx_1.long()
     group_idx_2 = group_idx_2.long()
@@ -262,64 +279,67 @@ def vis_labels(p, label, cmap=None, **kwargs):
         return colors
 
 
+def vis_projects(group_idx, gs, gs_color=False, n_cam=-1, cam_idx=-1, **kwargs):
+    vis = kwargs.get('vis', True)
+    uv = gs.gs_points.uv
+    delta = torch.round((uv % 1) * 1e5) / 1e5
+    xy = uv - delta
+    depths = gs.gs_points.depths
+    if gs_color:
+        cov3d = gs.cov3d(gs.gs_points.p[group_idx])
+        cov2d = gs.cov2d(gs.gs_points.p, cov3d)
+        power = -(
+                0.5 * cov2d[:, 0, :] * delta[:, 0, :] * delta[:, 0, :]
+                + 0.5 * cov2d[:, 2, :] * delta[:, 1, :] * delta[:, 1, :]
+                + cov2d[:, 1, :] * delta[:, 0, :] * delta[:, 1, :])  # [N, n_cameras*2]
+        # use depths as opacity
+        opacity = nn.functional.softmax(depths.squeeze(1), dim=0)  # [N, n_cameras*2]
+        a = torch.clamp(torch.exp(power), min=1.0 / 255.0, max=0.99)  # [N, n_cameras*2]
+        colors = opacity * a * (1 - a)  # [N, n_cameras*2]
+        colors = colors.unsqueeze(1)
+    else:
+        colors = depths
+    if vis:
+        if cam_idx < 0:
+            n = int(math.sqrt(n_cam))
+            fig, axes = plt.subplots(n, n)
+            axes_list = []
+            for i in range(axes.shape[0]):
+                for j in range(axes.shape[1]):
+                    axes_list.append(axes[i, j])
+            cam_idx = 0
+            for a in axes_list:
+                a.scatter(xy[:, 0, cam_idx], xy[:, 1, cam_idx], s=4, c=colors[:, 0, cam_idx], cmap='rainbow')
+                a.set_xticks([])
+                a.set_yticks([])
+                a.set_title(f'camera-{cam_idx}', loc='left', fontsize=12)
+                cam_idx += 1
+            fig.set_size_inches(10 * n // 4, 8 * n // 4)
+            fig.show()
+        else:
+            plt.scatter(xy[:, 0, cam_idx], xy[:, 1, cam_idx], s=4, c=colors[:, 0, cam_idx], cmap='rainbow')
+            plt.xticks([])
+            plt.yticks([])
+            plt.show()
+    else:
+        return xy, colors
 
-#
-# # visual visible total for xyz and xyz_sampled
-# if __name__ == '__main__':
-#     train_datas = read_gs_features('train')
-#     val_datas = read_gs_features('val')
-#     train_p0, train_f0, train_means, train_means2d, train_depths, train_visible, train_cov3d, train_conics, train_radius, train_num_tiles_hit = train_datas
-#     val_p0, val_f0, val_means, val_means2d, val_depths, val_visible, val_cov3d, val_conics, val_radius, val_num_tiles_hit = val_datas
-#
-#     n_cameras = 2
-#     stride = 64
-#     fovy = 120
-#
-#     gs = NaiveGaussian3D(opt=GaussianOptions(n_cameras=n_cameras, cam_field_size=[512, 512], cam_fovy=fovy, cam_sampler='fps'), device='cuda')
-#     uv, depths, visible, camid = gs.projects(train_p0)
-#     visible_total = gs.gs_points.visible.sum(-1).squeeze(-1) # [B, N, 1]
-#
-#
-#     def get_cmap(labels):
-#         # labels是一个二维数组，是密度图
-#         max_pixel = np.max(labels)
-#         min_pixel = np.min(labels)
-#         delta = max_pixel - min_pixel
-#         cmap = ((labels - min_pixel) / delta * 255)
-#         # 以下操作是为了反转jet的颜色，不然就会出现数值高的反而是蓝色，数值低的是红色，不像热力图了
-#         cmap = cmap * (-1)
-#         cmap = cmap + 255
-#         cmap = cmap.astype(np.uint8)
-#         return cmap
-#
-#     cmap = get_cmap(visible_total.detach().cpu().numpy())
-#     train_color = torch.ones_like(train_p0, device='cuda')
-#     visible_color = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_JET)).cuda()
-#
-#     visible_xyz_sampled, visible_xyz_idx = create_sampler('visible')(xyz=train_p0, visible=visible, n_samples=train_p0.shape[1]//stride)
-#     visible_colors_sampled = torch.gather(visible_color, 1, visible_xyz_idx.unsqueeze(-1).expand(-1, -1, 3))
-#
-#     # gs.apply_sampling(visible_xyz_idx)
-#     # xyz_sampled, xyz_idx = create_sampler('fps')(xyz=visible_xyz_sampled, visible=gs.gs_points.visible, n_samples=visible_xyz_sampled.shape[1] // 4)
-#     # colors_sampled = torch.gather(visible_colors_sampled, 1, xyz_idx.unsqueeze(-1).expand(-1, -1, 3))
-#
-#     xyz_sampled, xyz_idx = create_sampler('fps')(xyz=train_p0, visible=visible, n_samples=train_p0.shape[1] // stride)
-#     colors_sampled = torch.gather(visible_color, 1, xyz_idx.unsqueeze(-1).expand(-1, -1, 3))
-#
-#     print(visible_xyz_sampled.shape, xyz_sampled.shape)
-#
-#     # todo make points and color by func and loop
-#
-#     vis_multi_points(
-#         [
-#             train_p0[0].detach().cpu().numpy(), train_p0[0].detach().cpu().numpy(),
-#             visible_xyz_sampled[0].detach().cpu().numpy(), xyz_sampled[0].detach().cpu().numpy(),
-#             train_p0[1].detach().cpu().numpy(), train_p0[1].detach().cpu().numpy(),
-#             visible_xyz_sampled[1].detach().cpu().numpy(), xyz_sampled[1].detach().cpu().numpy(),],
-#         [
-#             train_color[0].detach().cpu().numpy(), visible_color[0].detach().cpu().numpy(),
-#             visible_colors_sampled[0].detach().cpu().numpy(), colors_sampled[0].detach().cpu().numpy(),
-#             train_color[1].detach().cpu().numpy(), visible_color[1].detach().cpu().numpy(),
-#             visible_colors_sampled[1].detach().cpu().numpy(), colors_sampled[1].detach().cpu().numpy(),],
-#         plot_shape=(2, 4), point_size=6)
-#
+
+def vis_visible(p, label, visible, camid, **kwargs):
+    vis = kwargs.get('vis', True)
+    cmap = calc_cmap(label.detach().cpu().numpy())
+    colors = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_RAINBOW)).squeeze()
+
+    i = torch.arange(1, visible.shape[-1]+1)
+    i = repeat(i, 'c -> n c', n=visible.shape[0])
+    visible_code = (visible * i * camid).mean(dim=-1)
+    cmap = calc_cmap(visible_code.detach().cpu().numpy())
+    visible_colors = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_RAINBOW))
+    visible_colors = visible_colors.squeeze(1)
+    if vis:
+        vis_multi_points([p.detach().cpu().numpy(), p.detach().cpu().numpy()],
+                         [colors.detach().cpu().numpy(), visible_colors.detach().cpu().numpy()],
+                         plot_shape=(1, 2), **kwargs)
+    else:
+        return visible_colors
+
