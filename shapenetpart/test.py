@@ -12,12 +12,12 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import Backbone, SegPartHead
+from backbone import Backbone, SegPartHead, merge_gs_list
 from shapenetpart.configs import model_configs
 from shapenetpart.dataset import ShapeNetPartNormalTest, shapenetpart_collate_fn, get_ins_mious
-from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, \
-    cal_model_params, cal_flops
-from utils.logger import format_dict, format_list
+from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
+    cal_model_params, cal_model_flops
+from utils.logger import format_dict
 
 
 def prepare_exp(cfg):
@@ -29,6 +29,23 @@ def prepare_exp(cfg):
 
     os.makedirs(cfg.exp_dir, exist_ok=True)
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
+    logfile = open(cfg.log_path, "a", 1)
+    sys.stdout = logfile
+
+
+def cal_flops(cfg, model):
+    cfg.model_cfg.train_cfg.n_samples = [1024, 256, 64]
+    ds = ShapeNetPartNormalTest(
+        presample_path=cfg.presample_path,
+        k=cfg.model_cfg.train_cfg.k,
+        n_samples=cfg.model_cfg.train_cfg.n_samples,
+        alpha=cfg.model_cfg.train_cfg.alpha,
+        batch_size=1,
+        gs_opts=cfg.model_cfg.train_cfg.gs_opts
+    )
+    gs = merge_gs_list([ds[0]])
+    gs.gs_points.to_cuda(non_blocking=True)
+    cal_model_flops(model, inputs=dict(gs=gs))
 
 
 @torch.no_grad()
@@ -41,13 +58,13 @@ def main(cfg):
     logging.info(f'Config:\n{cfg.__str__()}')
 
     test_ds = ShapeNetPartNormalTest(
-            presample_path=cfg.presample_path,
-            k=cfg.model_cfg.train_cfg.k,
-            n_samples=cfg.model_cfg.train_cfg.n_samples,
-            alpha=cfg.model_cfg.train_cfg.alpha,
-            batch_size=cfg.batch_size,
-            gs_opts=cfg.model_cfg.train_cfg.gs_opts
-        )
+        presample_path=cfg.presample_path,
+        k=cfg.model_cfg.train_cfg.k,
+        n_samples=cfg.model_cfg.train_cfg.n_samples,
+        alpha=cfg.model_cfg.train_cfg.alpha,
+        batch_size=cfg.batch_size,
+        gs_opts=cfg.model_cfg.train_cfg.gs_opts
+    )
     test_loader = DataLoader(
         test_ds,
         batch_size=cfg.batch_size,
@@ -71,8 +88,11 @@ def main(cfg):
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
     logging.info('Number of trainable params: %.4f M' % (trainable_model_size / 1e6))
 
-    resume_state(model, cfg.ckpt, compat=True)
+    if cfg.ckpt != '':
+        resume_state(model, cfg.ckpt, compat=True)
     model.eval()
+
+    cal_flops(cfg, model)
 
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
@@ -150,7 +170,6 @@ if __name__ == '__main__':
     args, opts = parser.parse_known_args()
     cfg = EasyConfig()
     cfg.load_args(args)
-    assert cfg.ckpt != ''
 
     model_cfg = model_configs[cfg.model_size]
     cfg.model_cfg = model_cfg

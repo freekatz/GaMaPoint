@@ -203,6 +203,10 @@ class NaiveGaussian3D:
     def init_points(self):
         self.gs_points = GaussianPoints()
 
+    def to(self, device):
+        self.device = device
+        return self
+
     def generate_cameras(self, xyz):
         """
         :param xyz: [N, 3]

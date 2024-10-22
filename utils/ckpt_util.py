@@ -2,8 +2,8 @@ import logging
 from collections import defaultdict, OrderedDict
 
 import torch
+from calflops import calculate_flops
 from termcolor import colored
-from thop import profile
 
 
 def resume_state(model, ckpt, compat=False, **args):
@@ -63,9 +63,11 @@ def cal_model_params(model):
     return total, trainable
 
 
-def cal_flops(model, inputs=None):
-    flops, _ = profile(model, inputs=inputs, verbose=True)
-    logging.info('FLOPs = ' + str(flops / 1000 ** 3) + 'G')
+def cal_model_flops(model, inputs=None):
+    flops, macs, params = calculate_flops(model=model,
+                                          kwargs=inputs,
+                                          print_results=True)
+    logging.info(f'FLOPs = {flops}, Macs = {macs}, Params = {params}')
 
 
 def get_missing_parameters_message(keys):

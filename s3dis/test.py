@@ -1,11 +1,10 @@
-import math
-
 import __init__
 
 import argparse
 import logging
 import os
 from glob import glob
+import sys
 
 import numpy as np
 import torch
@@ -14,11 +13,11 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from backbone import Backbone, SegSemHead
+from backbone import Backbone, SegSemHead, merge_gs_list
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
-    cal_model_params, write_obj, cal_flops
+    cal_model_params, cal_model_flops, write_obj
 from utils.logger import format_dict, format_list
 
 
@@ -33,6 +32,28 @@ def prepare_exp(cfg):
     os.makedirs(cfg.exp_dir, exist_ok=True)
     os.makedirs(cfg.vis_root, exist_ok=True)
     setup_logger_dist(cfg.log_path, 0, name=cfg.exp_name)
+    logfile = open(cfg.log_path, "a", 1)
+    sys.stdout = logfile
+
+
+def cal_flops(cfg, model):
+    cfg.model_cfg.train_cfg.voxel_max = 1024
+    ds = S3DIS(
+        dataset_dir=cfg.dataset,
+        area=cfg.test_area,
+        loop=cfg.test_loop,
+        train=False,
+        warmup=False,
+        voxel_max=cfg.model_cfg.train_cfg.voxel_max,
+        k=cfg.model_cfg.train_cfg.k,
+        grid_size=cfg.model_cfg.train_cfg.grid_size,
+        alpha=cfg.model_cfg.train_cfg.alpha,
+        batch_size=1,
+        gs_opts=cfg.model_cfg.train_cfg.gs_opts
+    )
+    gs = merge_gs_list([ds[0]])
+    gs.gs_points.to_cuda(non_blocking=True)
+    cal_model_flops(model, inputs=dict(gs=gs))
 
 
 def save_vis_results(cfg, file_name, xyz, feat, label, pred):
@@ -97,8 +118,11 @@ def main(cfg):
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
     logging.info('Number of trainable params: %.4f M' % (trainable_model_size / 1e6))
 
-    resume_state(model, cfg.ckpt, compat=True)
+    if cfg.ckpt != '':
+        resume_state(model, cfg.ckpt, compat=True)
     model.eval()
+
+    cal_flops(cfg, model)
 
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
@@ -172,7 +196,6 @@ if __name__ == '__main__':
     args, opts = parser.parse_known_args()
     cfg = EasyConfig()
     cfg.load_args(args)
-    assert cfg.ckpt != ''
 
     model_cfg = model_configs[cfg.model_size]
     cfg.model_cfg = model_cfg
