@@ -118,11 +118,12 @@ def main(cfg):
     logging.info('Number of params: %.4f M' % (model_size / 1e6))
     logging.info('Number of trainable params: %.4f M' % (trainable_model_size / 1e6))
 
-    if cfg.ckpt != '':
-        resume_state(model, cfg.ckpt, compat=True)
     model.eval()
-
     cal_flops(cfg, model)
+
+    if cfg.ckpt == '':
+        return
+    resume_state(model, cfg.ckpt, compat=True)
 
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)
