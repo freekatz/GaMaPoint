@@ -18,7 +18,7 @@ from backbone import Backbone, SegSemHead
 from s3dis.configs import model_configs
 from s3dis.dataset import S3DIS, s3dis_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
-    cal_model_params, write_obj
+    cal_model_params, write_obj, cal_fops
 from utils.logger import format_dict, format_list
 
 
@@ -108,6 +108,8 @@ def main(cfg):
     steps_per_epoch = len(test_loader)
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
+        if idx == 0:
+            cal_fops(model, inputs=(gs,))
         target = gs.gs_points.y
         timer.record(f'I{idx}_start')
         with autocast():

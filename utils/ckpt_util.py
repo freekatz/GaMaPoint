@@ -3,6 +3,7 @@ from collections import defaultdict, OrderedDict
 
 import torch
 from termcolor import colored
+from thop import profile
 
 
 def resume_state(model, ckpt, compat=False, **args):
@@ -60,6 +61,11 @@ def cal_model_params(model):
     trainable = sum([param.nelement() for param in model.parameters() if param.requires_grad])
 
     return total, trainable
+
+
+def cal_fops(model, inputs=None):
+    flops, _ = profile(model, inputs=inputs, verbose=True)
+    logging.info('FLOPs = ' + str(flops / 1000 ** 3) + 'G')
 
 
 def get_missing_parameters_message(keys):

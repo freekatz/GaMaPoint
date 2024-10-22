@@ -16,7 +16,7 @@ from backbone import Backbone, ClsHead
 from scanobjectnn.configs import model_configs
 from scanobjectnn.dataset import ScanObjectNN, scanobjectnn_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
-    cal_model_params
+    cal_model_params, cal_fops
 from utils.logger import format_dict
 
 
@@ -85,6 +85,8 @@ def main(cfg):
     steps_per_epoch = len(test_loader)
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
+        if idx == 0:
+            cal_fops(model, inputs=(gs,))
         target = gs.gs_points.y
         timer.record(f'I{idx}_start')
         with autocast():
