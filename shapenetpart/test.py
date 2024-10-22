@@ -16,7 +16,7 @@ from backbone import Backbone, SegPartHead
 from shapenetpart.configs import model_configs
 from shapenetpart.dataset import ShapeNetPartNormalTest, shapenetpart_collate_fn, get_ins_mious
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, \
-    cal_model_params, cal_fops
+    cal_model_params, cal_flops
 from utils.logger import format_dict, format_list
 
 
@@ -86,7 +86,7 @@ def main(cfg):
         gs.gs_points.to_cuda(non_blocking=True)
         shape = gs.gs_points.__get_attr__('shape')
         if idx == 0:
-            cal_fops(model, inputs=(gs, shape))
+            cal_flops(model, inputs=(gs, shape))
         target = gs.gs_points.y
         B, N = cfg.batch_size, target.shape[0] // cfg.batch_size
         timer.record(f'I{idx}_start')

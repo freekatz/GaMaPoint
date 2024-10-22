@@ -16,7 +16,7 @@ from backbone import Backbone, ClsHead
 from modelnet40.configs import model_configs
 from modelnet40.dataset import ModelNet40, modelnet40_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
-    cal_model_params, cal_fops
+    cal_model_params, cal_flops
 from utils.logger import format_dict
 
 
@@ -86,7 +86,7 @@ def main(cfg):
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         if idx == 0:
-            cal_fops(model, inputs=(gs,))
+            cal_flops(model, inputs=(gs,))
         target = gs.gs_points.y
         timer.record(f'I{idx}_start')
         with autocast():

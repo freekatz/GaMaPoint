@@ -63,7 +63,7 @@ def cal_model_params(model):
     return total, trainable
 
 
-def cal_fops(model, inputs=None):
+def cal_flops(model, inputs=None):
     flops, _ = profile(model, inputs=inputs, verbose=True)
     logging.info('FLOPs = ' + str(flops / 1000 ** 3) + 'G')
 

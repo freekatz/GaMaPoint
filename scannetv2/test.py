@@ -18,7 +18,7 @@ from backbone import Backbone, SegSemHead
 from scannetv2.configs import model_configs
 from scannetv2.dataset import ScanNetV2, scannetv2_collate_fn
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
-    cal_model_params, write_obj, cal_fops
+    cal_model_params, write_obj, cal_flops
 from utils.logger import format_dict, format_list
 
 
@@ -111,7 +111,7 @@ def main(cfg):
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
         if idx == 0:
-            cal_fops(model, inputs=(gs,))
+            cal_flops(model, inputs=(gs,))
         target = gs.gs_points.y
         mask = target != cfg.ignore_index
         timer.record(f'I{idx}_start')
