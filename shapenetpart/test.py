@@ -44,9 +44,9 @@ def cal_flops(cfg, model):
         batch_size=1,
         gs_opts=cfg.model_cfg.train_cfg.gs_opts
     )
-    gs = merge_gs_list([ds[0]])
+    gs = merge_gs_list([ds[0][0]])
     gs.gs_points.to_cuda(non_blocking=True)
-    cal_model_flops(model, inputs=dict(gs=gs))
+    cal_model_flops(model, inputs=dict(gs=gs, shape=ds[0][1]))
 
 
 @torch.no_grad()
