@@ -41,7 +41,7 @@ def cal_flops(cfg, model):
     ds = ScanNetV2(
         dataset_dir=cfg.dataset,
         loop=cfg.test_loop,
-        train=False,
+        train=True,
         warmup=False,
         voxel_max=cfg.model_cfg.train_cfg.voxel_max,
         k=cfg.model_cfg.train_cfg.k,
@@ -133,8 +133,6 @@ def main(cfg):
     steps_per_epoch = len(test_loader)
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
-        if idx == 0:
-            cal_flops(model, inputs=(gs,))
         target = gs.gs_points.y
         mask = target != cfg.ignore_index
         timer.record(f'I{idx}_start')

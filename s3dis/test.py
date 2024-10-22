@@ -42,7 +42,7 @@ def cal_flops(cfg, model):
         dataset_dir=cfg.dataset,
         area=cfg.test_area,
         loop=cfg.test_loop,
-        train=False,
+        train=True,
         warmup=False,
         voxel_max=cfg.model_cfg.train_cfg.voxel_max,
         k=cfg.model_cfg.train_cfg.k,
@@ -132,8 +132,6 @@ def main(cfg):
     steps_per_epoch = len(test_loader)
     for idx, gs in pbar:
         gs.gs_points.to_cuda(non_blocking=True)
-        if idx == 0:
-            cal_flops(model, inputs=(gs,))
         target = gs.gs_points.y
         timer.record(f'I{idx}_start')
         with autocast():

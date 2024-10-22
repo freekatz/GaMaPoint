@@ -39,7 +39,7 @@ def cal_flops(cfg, model):
     cfg.model_cfg.train_cfg.n_samples = [1024, 256, 64]
     ds = ModelNet40(
         dataset_dir=cfg.dataset,
-        train=False,
+        train=True,
         warmup=False,
         num_points=cfg.model_cfg.train_cfg.num_points,
         k=cfg.model_cfg.train_cfg.k,
