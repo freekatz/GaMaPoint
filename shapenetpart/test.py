@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from backbone import Backbone, SegPartHead, merge_gs_list
 from shapenetpart.configs import model_configs
-from shapenetpart.dataset import ShapeNetPartNormalTest, shapenetpart_collate_fn, get_ins_mious
+from shapenetpart.dataset import ShapeNetPartNormalTest, shapenetpart_collate_fn, get_ins_mious, ShapeNetPartNormal
 from utils import EasyConfig, setup_logger_dist, set_random_seed, resume_state, Timer, AverageMeter, Metric, \
     cal_model_params, cal_model_flops
 from utils.logger import format_dict, format_list
@@ -35,9 +35,12 @@ def prepare_exp(cfg):
 
 
 def cal_flops(cfg, model):
+    cfg.model_cfg.train_cfg.voxel_max = 1024
     cfg.model_cfg.train_cfg.n_samples = [1024, 256, 64]
-    ds = ShapeNetPartNormalTest(
-        presample_path=cfg.presample_path,
+    ds = ShapeNetPartNormal(
+        dataset_dir=cfg.dataset,
+        train=True,
+        voxel_max=cfg.model_cfg.train_cfg.voxel_max,
         k=cfg.model_cfg.train_cfg.k,
         n_samples=cfg.model_cfg.train_cfg.n_samples,
         alpha=cfg.model_cfg.train_cfg.alpha,
