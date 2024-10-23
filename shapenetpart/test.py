@@ -97,7 +97,11 @@ def main(cfg):
 
     if cfg.ckpt == '':
         return
-    resume_state(model, cfg.ckpt, compat=True)
+    model_dict = resume_state(model, cfg.ckpt, compat=True)
+    if model_dict is not None:
+        best_ins_miou = model_dict.get('best_ins_miou', -1)
+        best_cls_miou = model_dict.get('best_cls_miou', -1)
+        logging.info(f"Resume model from {cfg.ckpt}, best_ins_miou={best_ins_miou:.4f}, best_cls_miou={best_cls_miou:.4f}")
 
     writer = SummaryWriter(log_dir=cfg.exp_dir)
     timer = Timer(dec=1)

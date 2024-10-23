@@ -286,6 +286,7 @@ def vis_projects(group_idx, gs, gs_color=False, n_cam=-1, cam_idx=-1, **kwargs):
     xy = uv - delta
     depths = gs.gs_points.depths
     if gs_color:
+        # alpha blend
         cov3d = gs.cov3d(gs.gs_points.p[group_idx])
         cov2d = gs.cov2d(gs.gs_points.p, cov3d)
         power = -(
@@ -298,6 +299,7 @@ def vis_projects(group_idx, gs, gs_color=False, n_cam=-1, cam_idx=-1, **kwargs):
         colors = opacity * a * (1 - a)  # [N, n_cameras*2]
         colors = colors.unsqueeze(1)
     else:
+        # depths map
         colors = depths
     if vis:
         if cam_idx < 0:
