@@ -293,22 +293,27 @@ def vis_projects_3d(p, gs, cam_idx, hidden=False, **kwargs):
             c_idx = cam_idx[i * n + j]
             visible = depths[:, 0, c_idx] != 0
             camera = cameras[c_idx]
-            colors = torch.zeros_like(p)
-            colors[:] = white
+            # color = torch.zeros_like(p)
+            # color[:] = white
+            cmap = calc_cmap(depths[:, 0, c_idx] .detach().cpu().numpy())
+            color = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_JET)).squeeze()
             if_visible = torch.nonzero(visible)
             if_visible = if_visible.squeeze(-1)
+            if if_visible.shape[0] == 0:
+                pad_index = camera.cam_index if camera.cam_index >= 0 else camera.target_index
+                if_visible = torch.tensor([pad_index], device=p.device)
             if hidden:
                 visible_p = torch.index_select(p, 0, if_visible)
-                visible_c = torch.index_select(colors, 0, if_visible)
+                visible_c = torch.index_select(color, 0, if_visible)
             else:
                 visible_p = p
-                visible_c = colors
-                visible_c[if_visible] = yellow
+                visible_c = color
+                # visible_c[if_visible] = yellow
 
-            campos = camera.campos
-            target = camera.target
-            visible_p = torch.cat([visible_p, campos.unsqueeze(0), target.unsqueeze(0)], dim=0)
-            visible_c = torch.cat([visible_c, torch.tensor([[1, 0, 0], [0, 0, 1]], device=p.device)], dim=0)
+            # campos = camera.campos
+            # target = camera.target
+            # visible_p = torch.cat([visible_p, campos.unsqueeze(0), target.unsqueeze(0)], dim=0)
+            # visible_c = torch.cat([visible_c, torch.tensor([[1, 0, 0], [0, 0, 1]], device=p.device)], dim=0)
 
             ps.append(visible_p.detach().cpu().numpy())
             cs.append(visible_c.detach().cpu().numpy())
@@ -362,7 +367,6 @@ def vis_visible(ps, ys, vs, cs, **kwargs):
     m, n = len(ps), len(vs) // len(ps)
     points = []
     colors = []
-    print(m, n, len(vs))
     for i in range(m):
         label = ys[i]
         cmap = calc_cmap(label.detach().cpu().numpy())

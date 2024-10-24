@@ -183,7 +183,7 @@ def visual_gs():
     gs = NaiveGaussian3D(GaussianOptions.default(), batch_size=1, device=xyz.device)
     gs.opt.n_cameras = 8
     gs.opt.cam_fovy = 120
-    gs.opt.cam_gen_method = 'farthest'
+    gs.opt.cam_gen_method = 'centroid'
     k = 64
     n_samples = 256
 
@@ -198,9 +198,9 @@ def visual_gs():
     n = int(math.sqrt(gs.opt.n_cameras*2))
     for i in range(n**2):
         cam_idx.append(i)
-    # cam_idx = [2, 4, 6, 7, 8, 10, 12, 13, 15]
+    # cam_idx = [1, 2, 5, 6, 9, 10, 13, 14, 15]
     vis_projects_2d(gs, cam_idx=cam_idx)
-    vis_projects_3d(p, gs, cam_idx=cam_idx, hidden=False)
+    vis_projects_3d(p, gs, cam_idx=cam_idx, hidden=True)
 
 
 def visual_visible():
@@ -239,7 +239,6 @@ def visual_visible():
             visible = visible[ds_idx]
             camid = camid[ds_idx]
 
-
             vs.append(visible)
             cs.append(camid)
 
@@ -249,5 +248,5 @@ def visual_visible():
 if __name__ == '__main__':
     # analyse()
     # visual_knn()
-    # visual_gs()
-    visual_visible()
+    visual_gs()
+    # visual_visible()
