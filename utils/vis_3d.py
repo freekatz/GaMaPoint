@@ -279,31 +279,81 @@ def vis_labels(p, label, cmap=None, **kwargs):
         return colors
 
 
-def vis_projects(group_idx, gs, gs_color=False, n_cam=-1, cam_idx=-1, **kwargs):
+def vis_projects_3d(p, gs, cam_idx=-1, hidden=False, **kwargs):
+    vis = kwargs.get('vis', True)
+    p = points_scaler(p.unsqueeze(0), scale=1.0).squeeze(0)
+    cameras = gs.gs_points.cameras
+    depths = gs.gs_points.depths
+    if vis:
+        n = 1
+        ps = []
+        cs = []
+        if cam_idx < 0:
+            n_cam = gs.opt.n_cameras*2
+            n = int(math.sqrt(n_cam))
+
+            for i in range(n):
+                for j in range(n):
+                    visible = depths[:, 0, i * n + j] != 0
+                    camera = cameras[i * n + j]
+                    colors = torch.zeros_like(p)
+                    colors[:] = white
+                    if_visible = torch.nonzero(visible)
+                    if_visible = if_visible.squeeze(-1)
+                    if hidden:
+                        visible_p = torch.index_select(p, 0, if_visible)
+                        visible_c = torch.index_select(colors, 0, if_visible)
+                    else:
+                        visible_p = p
+                        visible_c = colors
+                        visible_c[if_visible] = yellow
+
+                    campos = camera.campos
+                    target = camera.target
+                    visible_p = torch.cat([visible_p, campos.unsqueeze(0), target.unsqueeze(0)], dim=0)
+                    visible_c = torch.cat([visible_c, torch.tensor([[1, 0, 0], [0, 0, 1]], device=p.device)], dim=0)
+
+                    ps.append(visible_p.detach().cpu().numpy())
+                    cs.append(visible_c.detach().cpu().numpy())
+        else:
+            visible = depths[:, 0, cam_idx] != 0
+            camera = cameras[cam_idx]
+            colors = torch.zeros_like(p)
+            colors[:] = white
+            if_visible = torch.nonzero(visible)
+            if_visible = if_visible.squeeze(-1)
+            if hidden:
+                visible_p = torch.index_select(p, 0, if_visible)
+                visible_c = torch.index_select(colors, 0, if_visible)
+            else:
+                visible_p = p
+                visible_c = colors
+                visible_c[if_visible] = yellow
+
+            campos = camera.campos
+            target = camera.target
+            visible_p = torch.cat([visible_p, campos.unsqueeze(0), target.unsqueeze(0)], dim=0)
+            visible_c = torch.cat([visible_c, torch.tensor([[1, 0, 0], [0, 0, 1]], device=p.device)], dim=0)
+
+            ps.append(visible_p.detach().cpu().numpy())
+            cs.append(visible_c.detach().cpu().numpy())
+        vis_multi_points(ps, cs, plot_shape=(n, n), **kwargs)
+    else:
+        return xy, colors
+
+
+def vis_projects_2d(gs, cam_idx=-1, **kwargs):
     vis = kwargs.get('vis', True)
     uv = gs.gs_points.uv
     delta = torch.round((uv % 1) * 1e5) / 1e5
     xy = uv - delta
-    depths = gs.gs_points.depths
-    if gs_color:
-        # alpha blend
-        cov3d = gs.cov3d(gs.gs_points.p[group_idx])
-        cov2d = gs.cov2d(gs.gs_points.p, cov3d)
-        power = -(
-                0.5 * cov2d[:, 0, :] * delta[:, 0, :] * delta[:, 0, :]
-                + 0.5 * cov2d[:, 2, :] * delta[:, 1, :] * delta[:, 1, :]
-                + cov2d[:, 1, :] * delta[:, 0, :] * delta[:, 1, :])  # [N, n_cameras*2]
-        # use depths as opacity
-        opacity = nn.functional.softmax(depths.squeeze(1), dim=0)  # [N, n_cameras*2]
-        a = torch.clamp(torch.exp(power), min=1.0 / 255.0, max=0.99)  # [N, n_cameras*2]
-        colors = opacity * a * (1 - a)  # [N, n_cameras*2]
-        colors = colors.unsqueeze(1)
-    else:
-        # depths map
-        colors = depths
+    colors = gs.gs_points.depths
     if vis:
-        if cam_idx < 0:
-            n = int(math.sqrt(n_cam))
+        n_cam = gs.opt.n_cameras * 2
+        n = int(math.sqrt(n_cam))
+        if n <= 1:
+            cam_idx = 0
+        if cam_idx < 0 and n > 1:
             fig, axes = plt.subplots(n, n)
             axes_list = []
             for i in range(axes.shape[0]):

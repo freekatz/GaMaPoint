@@ -20,7 +20,7 @@ class SemKittiConfig(EasyConfig):
         self.gs_opts = gs_opts
         self.alpha = 0.1
         if self.alpha == 0:
-            self.gs_opts.n_cameras = 1  # use min numbers
+            self.gs_opts.n_cameras = 1  # whatever
 
 
 class SemKittiWarmupConfig(EasyConfig):
@@ -36,7 +36,7 @@ class SemKittiWarmupConfig(EasyConfig):
         self.gs_opts = gs_opts
         self.alpha = 0.1
         if self.alpha == 0:
-            self.gs_opts.n_cameras = 1  # use min numbers
+            self.gs_opts.n_cameras = 1  # whatever
 
 
 class ModelConfig(EasyConfig):

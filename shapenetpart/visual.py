@@ -8,7 +8,7 @@ from backbone.gs_3d import NaiveGaussian3D, GaussianOptions
 from utils import points_scaler, vis_multi_points, vis_visible
 from utils.binary import bin2dec_split
 from utils.subsample import fps_sample
-from utils.vis_3d import vis_knn, vis_knn2, vis_knn3, vis_knn4, vis_labels, vis_projects
+from utils.vis_3d import vis_knn, vis_knn2, vis_knn3, vis_knn4, vis_labels, vis_projects_2d, vis_projects_3d
 
 
 def analyse():
@@ -172,24 +172,23 @@ def visual_knn():
 
 def visual_gs():
     shape_id = 0
-    obj_id = 315
+    obj_id = 0
 
     presample_path = './dataset_link/shapenetpart_presample.pt'
     xyz, norm, shape, seg = torch.load(presample_path)
 
     alpha = 0.1
     gs = NaiveGaussian3D(GaussianOptions.default(), batch_size=1, device=xyz.device)
-    gs.opt.n_cameras = 18
+    gs.opt.n_cameras = 8
     gs.opt.cam_fovy = 120
+    gs.opt.cam_gen_method = 'farthest'
     k = 64
     n_samples = 256
 
     idx_all = torch.nonzero((shape == shape_id).int())
     idx = idx_all[obj_id]  # 23-156 19-15 46-15
-    p = xyz[idx]
-    p, ds_idx = fps_sample(p, n_samples)
-    p = p.squeeze(0)
-    ds_idx = ds_idx.squeeze(0)
+    p = xyz[idx].squeeze(0)
+    f = norm[idx].squeeze(0)
     gs.projects(p, cam_seed=1, cam_batch=gs.opt.n_cameras * 2)
     gs.gs_points.__update_attr__('p', p)
     ps, _ = fps_sample(p.unsqueeze(0), 2, random_start_point=True)
@@ -201,7 +200,8 @@ def visual_gs():
     kdt_1 = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy())
     _, group_idx = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=k, alpha=alpha, scaler=scaler)
     group_idx = torch.from_numpy(group_idx)
-    vis_projects(group_idx, gs, gs_color=False, n_cam=gs.opt.n_cameras*2, cam_idx=-1)
+    vis_projects_2d(gs, cam_idx=-1)
+    vis_projects_3d(p, gs, cam_idx=-1, hidden=False)
 
 
 def visual_visible():

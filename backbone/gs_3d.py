@@ -233,11 +233,11 @@ class NaiveGaussian3D:
         centroid = points_centroid(xyz.unsqueeze(0)).squeeze(0)
         xyz_sampled, _ = self.cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras)
         xyz_sampled = xyz_sampled.squeeze(0)
-        outside_cameras = inside_cameras = []
+        cameras_all = []
         for j in range(n_cameras):
             cx, cy, cz = centroid
             x, y, z = xyz_sampled[j]
-            outside_cameras.append(OrbitCamera(
+            cameras_all.append(OrbitCamera(
                 camid=2 * j + 1,
                 width=cam_width,
                 height=cam_height,
@@ -246,7 +246,7 @@ class NaiveGaussian3D:
                 fovy=cam_fovy,
                 device=self.device,
             ))
-            inside_cameras.append(OrbitCamera(
+            cameras_all.append(OrbitCamera(
                 camid=2 * j + 2,
                 width=cam_width,
                 height=cam_height,
@@ -255,7 +255,7 @@ class NaiveGaussian3D:
                 fovy=cam_fovy,
                 device=self.device,
             ))
-        cameras_all = outside_cameras + inside_cameras
+            print(cameras_all[-1].pose == cameras_all[-2].pose)
         self.gs_points.__update_attr__('cameras', cameras_all)
         return cameras_all
 
@@ -270,7 +270,7 @@ class NaiveGaussian3D:
         cam_width, cam_height = self.opt.cam_field_size
         assert self.opt.cam_sampler == 'fps'
 
-        xyz_sampled, _ = self.cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras * 2 + 1)
+        xyz_sampled, idx = self.cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras * 2 + 1)
         xyz_sampled = xyz_sampled.squeeze(0)
         cameras_all = []
         for j in range(1, n_cameras * 2 + 1):
@@ -283,6 +283,7 @@ class NaiveGaussian3D:
                 campos=(x, y, z),
                 target=(cx, cy, cz),
                 fovy=cam_fovy,
+                cam_index=idx[0][j],
                 device=self.device,
             ))
         self.gs_points.__update_attr__('cameras', cameras_all)

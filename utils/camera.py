@@ -1,5 +1,6 @@
 import torch
 from kiui.op import safe_normalize
+from kiui.cam import undo_orbit_camera
 
 
 def look_at(campos, target, opengl=True, device='cuda'):
@@ -35,7 +36,7 @@ class OrbitCamera:
     """
 
     def __init__(self, camid: int, width: int, height: int, campos: tuple,
-                 target: tuple = None, fovy: float = 60, device='cuda'):
+                 target: tuple = None, fovy: float = 60, cam_index = -1, device='cuda'):
         """init function
 
         Args:
@@ -45,6 +46,7 @@ class OrbitCamera:
             campos (tuple): camera position.
             target (tuple, optional): look at target position. by default (0, 0, 0).
             fovy (float, optional): camera field of view in degree along y-axis. by default 60.
+            cam_index (float, optional): the camera index in point cloud. by default -1.
             device (str, optional): device. by default 'cuda'
         """
         self.camid = torch.tensor(camid, device=device)
@@ -56,6 +58,11 @@ class OrbitCamera:
             target = (0, 0, 0)
         self.target = torch.tensor(target, dtype=torch.float32, device=device)  # look at this point
         self.device = device
+
+        elevation, azimuth, radius = undo_orbit_camera(self.pose)
+        self.elevation = elevation
+        self.azimuth = azimuth
+        self.radius = radius
 
     @property
     def fovx(self):
