@@ -233,11 +233,12 @@ class NaiveGaussian3D:
         centroid = points_centroid(xyz.unsqueeze(0)).squeeze(0)
         xyz_sampled, idx = self.cam_sampler(xyz=xyz.unsqueeze(0), n_samples=n_cameras)
         xyz_sampled = xyz_sampled.squeeze(0)
-        cameras_all = []
+        outside_cameras = []
+        inside_cameras = []
         for j in range(n_cameras):
             cx, cy, cz = centroid
             x, y, z = xyz_sampled[j]
-            cameras_all.append(OrbitCamera(
+            outside_cameras.append(OrbitCamera(
                 camid=2 * j + 1,
                 width=cam_width,
                 height=cam_height,
@@ -248,7 +249,7 @@ class NaiveGaussian3D:
                 target_index=-1,
                 device=self.device,
             ))
-            cameras_all.append(OrbitCamera(
+            inside_cameras.append(OrbitCamera(
                 camid=2 * j + 2,
                 width=cam_width,
                 height=cam_height,
@@ -259,6 +260,7 @@ class NaiveGaussian3D:
                 target_index=idx[0][j],
                 device=self.device,
             ))
+        cameras_all = outside_cameras + inside_cameras
         self.gs_points.__update_attr__('cameras', cameras_all)
         return cameras_all
 
