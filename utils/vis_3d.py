@@ -356,21 +356,33 @@ def vis_projects_2d(gs, cam_idx, **kwargs):
         return xy, colors
 
 
-def vis_visible(p, label, visible, camid, **kwargs):
+def vis_visible(ps, ys, vs, cs, **kwargs):
     vis = kwargs.get('vis', True)
-    cmap = calc_cmap(label.detach().cpu().numpy())
-    colors = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_RAINBOW)).squeeze()
-
-    i = torch.arange(1, visible.shape[-1]+1)
-    i = repeat(i, 'c -> n c', n=visible.shape[0])
-    visible_code = (visible * i * camid).mean(dim=-1)
-    cmap = calc_cmap(visible_code.detach().cpu().numpy())
-    visible_colors = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_RAINBOW))
-    visible_colors = visible_colors.squeeze(1)
+    visible_colors = []
+    m, n = len(ps), len(vs) // len(ps)
+    points = []
+    colors = []
+    print(m, n, len(vs))
+    for i in range(m):
+        label = ys[i]
+        cmap = calc_cmap(label.detach().cpu().numpy())
+        color = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_RAINBOW)).squeeze()
+        colors.append(color.detach().cpu().numpy())
+        points.append(ps[i].detach().cpu().numpy())
+        for j in range(n):
+            visible = vs[i * n + j]
+            camid = cs[i * n + j]
+            idx = torch.arange(1, visible.shape[-1] + 1)
+            idx = repeat(idx, 'c -> n c', n=visible.shape[0])
+            visible_code = (visible * idx * camid).sum(dim=-1)
+            # visible_code = visible.sum(dim=-1)
+            cmap = calc_cmap(visible_code.detach().cpu().numpy())
+            visible_color = torch.from_numpy(cv2.applyColorMap(cmap, cv2.COLORMAP_RAINBOW))
+            visible_color = visible_color.squeeze(1)
+            colors.append(visible_color.detach().cpu().numpy())
+            points.append(ps[i].detach().cpu().numpy())
     if vis:
-        vis_multi_points([p.detach().cpu().numpy(), p.detach().cpu().numpy()],
-                         [colors.detach().cpu().numpy(), visible_colors.detach().cpu().numpy()],
-                         plot_shape=(1, 2), **kwargs)
+        vis_multi_points(points, colors, plot_shape=(m, n+1), **kwargs)
     else:
         return visible_colors
 

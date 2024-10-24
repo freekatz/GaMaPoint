@@ -204,43 +204,50 @@ def visual_gs():
 
 
 def visual_visible():
-    shape_id = 0
-    obj_id = range(0, 1)  # 15-8, 12-8
-    #     shape_id = [0, 4, 7, 10]
-    #     obj_id = [90, 520, 79, 37]
-    #     p_idx = [241, 72, 20, 21]
-
     presample_path = './dataset_link/shapenetpart_presample.pt'
     xyz, norm, shape, seg = torch.load(presample_path)
 
-    alpha = 0.1
-    gs = NaiveGaussian3D(GaussianOptions.default(), batch_size=1, device=xyz.device)
-    gs.opt.n_cameras = 64
-    gs.opt.cam_fovy = 120
-    k = 64
-    n_samples = 2048
-
-    idx_all = torch.nonzero((shape == shape_id).int())
-    for o_id in obj_id:
+    n_samples = 512
+    cams = [4, 16, 64]
+    fovy = 120
+    shape_id = [0, 4, 8, 12]  # 23-156 19-15 46-15
+    obj_id = [0, 0, 0, 0]
+    ps = []
+    ys = []
+    vs = []
+    cs = []
+    for s_id, o_id in zip(shape_id, obj_id):
+        idx_all = torch.nonzero((shape == s_id).int())
         idx = idx_all[o_id]  # 23-156 19-15 46-15
         p = xyz[idx]
         y = seg[idx].squeeze(0)
-        p, ds_idx = fps_sample(p, n_samples)
-        p = p.squeeze(0)
-        gs.projects(p, cam_seed=1, cam_batch=gs.opt.n_cameras * 2)
-
+        sp, ds_idx = fps_sample(p, n_samples)
+        sp = sp.squeeze(0)
         ds_idx = ds_idx.squeeze(0)
         y = y[ds_idx]
-        gs.gs_points.__update_attr__('p', p)
-        visible = gs.gs_points.visible.squeeze(1).float()
-        camid = gs.gs_points.camid.squeeze(1).float()
-        visible = visible[ds_idx]
-        camid = camid[ds_idx]
-        vis_visible(p, y, visible, camid, title=f'{o_id}')
+        ps.append(sp)
+        ys.append(y)
+        for n_c in cams:
+            gs = NaiveGaussian3D(GaussianOptions.default(), batch_size=1, device=xyz.device)
+            gs.opt.n_cameras = n_c
+            gs.opt.cam_fovy = fovy
+            gs.opt.cam_gen_method = 'farthest'
+            gs.projects(p.squeeze(0), cam_seed=1, cam_batch=gs.opt.n_cameras * 2)
+
+            visible = gs.gs_points.visible.squeeze(1).float()
+            camid = gs.gs_points.camid.squeeze(1).float()
+            visible = visible[ds_idx]
+            camid = camid[ds_idx]
+
+
+            vs.append(visible)
+            cs.append(camid)
+
+    vis_visible(ps, ys, vs, cs)
 
 
 if __name__ == '__main__':
     # analyse()
     # visual_knn()
-    visual_gs()
-    # visual_visible()
+    # visual_gs()
+    visual_visible()
