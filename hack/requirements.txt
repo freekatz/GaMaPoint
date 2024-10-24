@@ -19,6 +19,7 @@ plyfile
 protobuf
 pyvista
 pyyaml
+seaborn
 scipy
 scikit-build
 scikit_image
