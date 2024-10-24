@@ -57,6 +57,7 @@ class OrbitCamera:
         if target is None:
             target = (0, 0, 0)
         self.target = torch.tensor(target, dtype=torch.float32, device=device)  # look at this point
+        self.cam_index = cam_index
         self.device = device
 
         elevation, azimuth, radius = undo_orbit_camera(self.pose.detach().cpu().numpy())

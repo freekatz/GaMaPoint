@@ -7,6 +7,7 @@ import torch
 from einops import repeat
 from matplotlib import pyplot as plt
 from torch import nn
+import matplotlib.markers as mmarkers
 
 from utils import points_scaler
 
@@ -279,45 +280,19 @@ def vis_labels(p, label, cmap=None, **kwargs):
         return colors
 
 
-def vis_projects_3d(p, gs, cam_idx=-1, hidden=False, **kwargs):
+def vis_projects_3d(p, gs, cam_idx, hidden=False, **kwargs):
     vis = kwargs.get('vis', True)
     p = points_scaler(p.unsqueeze(0), scale=1.0).squeeze(0)
     cameras = gs.gs_points.cameras
     depths = gs.gs_points.depths
-    if vis:
-        n = 1
-        ps = []
-        cs = []
-        if cam_idx < 0:
-            n_cam = gs.opt.n_cameras*2
-            n = int(math.sqrt(n_cam))
-
-            for i in range(n):
-                for j in range(n):
-                    visible = depths[:, 0, i * n + j] != 0
-                    camera = cameras[i * n + j]
-                    colors = torch.zeros_like(p)
-                    colors[:] = white
-                    if_visible = torch.nonzero(visible)
-                    if_visible = if_visible.squeeze(-1)
-                    if hidden:
-                        visible_p = torch.index_select(p, 0, if_visible)
-                        visible_c = torch.index_select(colors, 0, if_visible)
-                    else:
-                        visible_p = p
-                        visible_c = colors
-                        visible_c[if_visible] = yellow
-
-                    campos = camera.campos
-                    target = camera.target
-                    visible_p = torch.cat([visible_p, campos.unsqueeze(0), target.unsqueeze(0)], dim=0)
-                    visible_c = torch.cat([visible_c, torch.tensor([[1, 0, 0], [0, 0, 1]], device=p.device)], dim=0)
-
-                    ps.append(visible_p.detach().cpu().numpy())
-                    cs.append(visible_c.detach().cpu().numpy())
-        else:
-            visible = depths[:, 0, cam_idx] != 0
-            camera = cameras[cam_idx]
+    ps = []
+    cs = []
+    n = int(math.sqrt(len(cam_idx)))
+    for i in range(n):
+        for j in range(n):
+            c_idx = cam_idx[i * n + j]
+            visible = depths[:, 0, c_idx] != 0
+            camera = cameras[c_idx]
             colors = torch.zeros_like(p)
             colors[:] = white
             if_visible = torch.nonzero(visible)
@@ -337,42 +312,55 @@ def vis_projects_3d(p, gs, cam_idx=-1, hidden=False, **kwargs):
 
             ps.append(visible_p.detach().cpu().numpy())
             cs.append(visible_c.detach().cpu().numpy())
+    if vis:
         vis_multi_points(ps, cs, plot_shape=(n, n), **kwargs)
     else:
-        return xy, colors
+        return cs
 
 
-def vis_projects_2d(gs, cam_idx=-1, **kwargs):
+def mscatter(x, y, ax=None, m=None, **kw):
+    if not ax: ax = plt.gca()
+    sc = ax.scatter(x, y, **kw)
+    if (m is not None) and (len(m) == len(x)):
+        paths = []
+        for marker in m:
+            if isinstance(marker, mmarkers.MarkerStyle):
+                marker_obj = marker
+            else:
+                marker_obj = mmarkers.MarkerStyle(marker)
+            path = marker_obj.get_path().transformed(
+                marker_obj.get_transform())
+            paths.append(path)
+        sc.set_paths(paths)
+    return sc
+
+
+def vis_projects_2d(gs, cam_idx, **kwargs):
     vis = kwargs.get('vis', True)
     uv = gs.gs_points.uv
     delta = torch.round((uv % 1) * 1e5) / 1e5
     xy = uv - delta
     colors = gs.gs_points.depths
     if vis:
-        n_cam = gs.opt.n_cameras * 2
-        n = int(math.sqrt(n_cam))
-        if n <= 1:
-            cam_idx = 0
-        if cam_idx < 0 and n > 1:
-            fig, axes = plt.subplots(n, n)
-            axes_list = []
-            for i in range(axes.shape[0]):
-                for j in range(axes.shape[1]):
-                    axes_list.append(axes[i, j])
-            cam_idx = 0
-            for a in axes_list:
-                a.scatter(xy[:, 0, cam_idx], xy[:, 1, cam_idx], s=4, c=colors[:, 0, cam_idx], cmap='rainbow')
-                a.set_xticks([])
-                a.set_yticks([])
-                a.set_title(f'camera-{cam_idx}', loc='left', fontsize=12)
-                cam_idx += 1
-            fig.set_size_inches(10 * n // 4, 8 * n // 4)
-            fig.show()
-        else:
-            plt.scatter(xy[:, 0, cam_idx], xy[:, 1, cam_idx], s=4, c=colors[:, 0, cam_idx], cmap='rainbow')
-            plt.xticks([])
-            plt.yticks([])
-            plt.show()
+        n = int(math.sqrt(len(cam_idx)))
+        fig, axes = plt.subplots(n, n, dpi=640)
+        axes_list = []
+        for i in range(axes.shape[0]):
+            for j in range(axes.shape[1]):
+                axes_list.append(axes[i, j])
+        for i in range(len(axes_list)):
+            a = axes_list[i]
+            c_idx = cam_idx[i]
+            c = colors[:, 0, c_idx]
+            m = ['o'] * c.shape[0]
+            if gs.gs_points.cameras[c_idx].cam_index >= 0:
+                m[gs.gs_points.cameras[c_idx].cam_index] = 'v'
+            mscatter(xy[:, 0, c_idx], xy[:, 1, c_idx], a, s=4, c=c, m=m, cmap='rainbow')
+            a.set_xticks([])
+            a.set_yticks([])
+            a.set_title(f'camera-{c_idx}', loc='left', fontsize=12)
+        fig.set_size_inches(10 * n // 4, 8 * n // 4)
+        fig.show()
     else:
         return xy, colors
 
