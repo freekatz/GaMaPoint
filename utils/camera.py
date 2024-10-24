@@ -59,7 +59,7 @@ class OrbitCamera:
         self.target = torch.tensor(target, dtype=torch.float32, device=device)  # look at this point
         self.device = device
 
-        elevation, azimuth, radius = undo_orbit_camera(self.pose)
+        elevation, azimuth, radius = undo_orbit_camera(self.pose.detach().cpu().numpy())
         self.elevation = elevation
         self.azimuth = azimuth
         self.radius = radius

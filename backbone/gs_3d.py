@@ -255,7 +255,6 @@ class NaiveGaussian3D:
                 fovy=cam_fovy,
                 device=self.device,
             ))
-            print(cameras_all[-1].pose == cameras_all[-2].pose)
         self.gs_points.__update_attr__('cameras', cameras_all)
         return cameras_all
 
