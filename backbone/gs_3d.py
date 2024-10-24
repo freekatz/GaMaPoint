@@ -236,7 +236,7 @@ class NaiveGaussian3D:
         cameras_all = []
         for j in range(1, n_cameras * 2 + 1):
             cx, cy, cz = centroid
-            x, y, z = xyz_sampled[j]
+            x, y, z = xyz_sampled[j-1]
             cameras_all.append(OrbitCamera(
                 camid=j,
                 width=cam_width,
