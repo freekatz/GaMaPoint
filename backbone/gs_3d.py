@@ -245,6 +245,7 @@ class NaiveGaussian3D:
                 target=(cx, cy, cz),
                 fovy=cam_fovy,
                 cam_index=idx[0][j],
+                target_index=-1,
                 device=self.device,
             ))
             cameras_all.append(OrbitCamera(
@@ -255,6 +256,7 @@ class NaiveGaussian3D:
                 target=(x, y, z),
                 fovy=cam_fovy,
                 cam_index=-1,
+                target_index=idx[0][j],
                 device=self.device,
             ))
         self.gs_points.__update_attr__('cameras', cameras_all)
@@ -285,6 +287,7 @@ class NaiveGaussian3D:
                 target=(cx, cy, cz),
                 fovy=cam_fovy,
                 cam_index=idx[0][j],
+                target_index=idx[0][j-1],
                 device=self.device,
             ))
         self.gs_points.__update_attr__('cameras', cameras_all)

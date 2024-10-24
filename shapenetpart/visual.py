@@ -193,27 +193,19 @@ def visual_gs():
     f = norm[idx].squeeze(0)
     gs.projects(p, cam_seed=1, cam_batch=gs.opt.n_cameras * 2)
     gs.gs_points.__update_attr__('p', p)
-    ps, _ = fps_sample(p.unsqueeze(0), 2, random_start_point=True)
-    ps = ps.squeeze(0)
-    p0, p1 = ps[0], ps[1]
-    scaler = (p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2 + (p0[2] - p1[2]) ** 2
-    visible = gs.gs_points.visible.squeeze(1).float()
 
-    kdt_1 = KDTree(p.detach().cpu().numpy(), visible.detach().cpu().numpy())
-    _, group_idx = kdt_1.query(p.detach().cpu().numpy(), visible.detach().cpu().numpy(), k=k, alpha=alpha, scaler=scaler)
-    group_idx = torch.from_numpy(group_idx)
-    # cam_idx = []
-    # n = int(math.sqrt(gs.opt.n_cameras*2))
-    # for i in range(n**2):
-    #     cam_idx.append(i)
-    cam_idx = [2, 4, 6, 7, 8, 10, 12, 13, 15]
+    cam_idx = []
+    n = int(math.sqrt(gs.opt.n_cameras*2))
+    for i in range(n**2):
+        cam_idx.append(i)
+    # cam_idx = [2, 4, 6, 7, 8, 10, 12, 13, 15]
     vis_projects_2d(gs, cam_idx=cam_idx)
     vis_projects_3d(p, gs, cam_idx=cam_idx, hidden=False)
 
 
 def visual_visible():
     shape_id = 0
-    obj_id = range(90, 91)  # 15-8, 12-8
+    obj_id = range(0, 1)  # 15-8, 12-8
     #     shape_id = [0, 4, 7, 10]
     #     obj_id = [90, 520, 79, 37]
     #     p_idx = [241, 72, 20, 21]

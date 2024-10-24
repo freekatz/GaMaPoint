@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from einops import repeat
 from matplotlib import pyplot as plt
-from torch import nn
+import seaborn as sns
 import matplotlib.markers as mmarkers
 
 from utils import points_scaler
@@ -318,29 +318,13 @@ def vis_projects_3d(p, gs, cam_idx, hidden=False, **kwargs):
         return cs
 
 
-def mscatter(x, y, ax=None, m=None, **kw):
-    if not ax: ax = plt.gca()
-    sc = ax.scatter(x, y, **kw)
-    if (m is not None) and (len(m) == len(x)):
-        paths = []
-        for marker in m:
-            if isinstance(marker, mmarkers.MarkerStyle):
-                marker_obj = marker
-            else:
-                marker_obj = mmarkers.MarkerStyle(marker)
-            path = marker_obj.get_path().transformed(
-                marker_obj.get_transform())
-            paths.append(path)
-        sc.set_paths(paths)
-    return sc
-
-
 def vis_projects_2d(gs, cam_idx, **kwargs):
     vis = kwargs.get('vis', True)
     uv = gs.gs_points.uv
+    depths = gs.gs_points.depths
     delta = torch.round((uv % 1) * 1e5) / 1e5
     xy = uv - delta
-    colors = gs.gs_points.depths
+    colors = depths
     if vis:
         n = int(math.sqrt(len(cam_idx)))
         fig, axes = plt.subplots(n, n, dpi=640)
@@ -349,16 +333,23 @@ def vis_projects_2d(gs, cam_idx, **kwargs):
             for j in range(axes.shape[1]):
                 axes_list.append(axes[i, j])
         for i in range(len(axes_list)):
-            a = axes_list[i]
             c_idx = cam_idx[i]
+            x = xy[:, 0, c_idx]
+            y = xy[:, 1, c_idx]
             c = colors[:, 0, c_idx]
-            m = ['o'] * c.shape[0]
-            if gs.gs_points.cameras[c_idx].cam_index >= 0:
-                m[gs.gs_points.cameras[c_idx].cam_index] = 'v'
-            mscatter(xy[:, 0, c_idx], xy[:, 1, c_idx], a, s=4, c=c, m=m, cmap='rainbow')
+
+            a = axes_list[i]
             a.set_xticks([])
             a.set_yticks([])
             a.set_title(f'camera-{c_idx}', loc='left', fontsize=12)
+
+            visible = depths[:, 0, c_idx] != 0
+            if_visible = torch.nonzero(visible)
+            if_visible = if_visible.squeeze(-1)
+            x = torch.index_select(x, 0, if_visible)
+            y = torch.index_select(y, 0, if_visible)
+            c = torch.index_select(c, 0, if_visible)
+            sns.scatterplot(ax=a, x=x, y=y, s=6, c=c, cmap='rainbow')
         fig.set_size_inches(10 * n // 4, 8 * n // 4)
         fig.show()
     else:

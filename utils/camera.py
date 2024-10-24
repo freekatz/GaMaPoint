@@ -35,8 +35,8 @@ class OrbitCamera:
     """ An orbital camera class. a custom pytorch implementation @kiui
     """
 
-    def __init__(self, camid: int, width: int, height: int, campos: tuple,
-                 target: tuple = None, fovy: float = 60, cam_index = -1, device='cuda'):
+    def __init__(self, camid: int, width: int, height: int, campos: tuple, target: tuple = None,
+                 fovy: float = 60, cam_index = -1, target_index = -1, device='cuda'):
         """init function
 
         Args:
@@ -58,6 +58,7 @@ class OrbitCamera:
             target = (0, 0, 0)
         self.target = torch.tensor(target, dtype=torch.float32, device=device)  # look at this point
         self.cam_index = cam_index
+        self.target_index = target_index
         self.device = device
 
         elevation, azimuth, radius = undo_orbit_camera(self.pose.detach().cpu().numpy())
